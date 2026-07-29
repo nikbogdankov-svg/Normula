@@ -9,7 +9,14 @@
 # Один образ катится во все среды: отличается только APP_ENV.
 set -eu
 
-APP_ENV="${APP_ENV:-prod}"
+# APP_ENV обязателен и дефолта у него намеренно нет. С дефолтом забытая
+# переменная на stg-деплое молча подняла бы прод-конфиг (чужой Logto-appId,
+# прод-API) — лучше громкое падение, чем тихо неправильная среда.
+if [ -z "${APP_ENV:-}" ]; then
+  echo "[entrypoint] не задан APP_ENV: укажи среду ($(ls /etc/onemore | sed 's/^env\.//' | tr '\n' '|' | sed 's/|$//'))" >&2
+  exit 1
+fi
+
 PRESET="/etc/onemore/env.${APP_ENV}"
 
 if [ ! -f "$PRESET" ]; then
