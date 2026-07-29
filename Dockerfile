@@ -13,6 +13,9 @@ COPY config/ /etc/onemore/
 COPY docker/site.conf.template docker/security-headers.conf.template /etc/nginx/onemore-templates/
 COPY docker/entrypoint.sh /docker-entrypoint.d/40-render-config.sh
 RUN chmod +x /docker-entrypoint.d/40-render-config.sh
-# Среда контейнера: prod | stg. Один образ, отличается только APP_ENV.
-ENV APP_ENV=prod
+
+# Среда задаётся ТОЛЬКО снаружи: APP_ENV=prod|stg. Дефолта нет специально —
+# см. комментарий в entrypoint.sh. Один образ на все среды.
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null 2>&1 || exit 1

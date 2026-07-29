@@ -61,11 +61,30 @@ docker run -p 8080:8080 -e APP_ENV=stg  onemore-frontend   # stg.onemore.styleu.
 docker run -p 8080:8080 -e APP_ENV=prod onemore-frontend   # onemore.styleu.ru
 ```
 
+`APP_ENV` обязателен: дефолта у него нет специально, иначе забытая переменная
+на stg молча подняла бы прод-конфиг. Без неё контейнер падает со списком сред.
+
 Точечно переопределить можно переменными `API_UPSTREAM`, `API_RESOURCE`,
 `LOGTO_ENDPOINT`, `LOGTO_APP_ID` — они важнее пресета. `AUTH_MODE=mock`
 в контейнере запрещён (entrypoint падает): mock — только для локальной разработки.
 
-Проверка живости — `GET /healthz`.
+Проверка живости — `GET /healthz`; в образе есть `HEALTHCHECK` на неё.
+
+### Dokploy
+
+Приложение с типом сборки **Dockerfile**, по одному на среду:
+
+| | stg | prod |
+|---|---|---|
+| Branch | `staging` | `master` |
+| Environment | `APP_ENV=stg` | `APP_ENV=prod` |
+| Domain → Host | `stg.onemore.styleu.ru` | `onemore.styleu.ru` |
+| Container Port | `8080` | `8080` |
+| HTTPS / Certificate | вкл / Let's Encrypt | вкл / Let's Encrypt |
+
+Dockerfile Path — `Dockerfile`, Docker Context Path — `.`, Docker Build Stage —
+пусто. После деплоя добавь в Logto Console у соответствующего приложения
+Redirect URI `https://<домен>/callback` и post sign-out `https://<домен>/`.
 
 ## Команды
 

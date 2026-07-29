@@ -1,8 +1,11 @@
 node_modules/
 dist/
 dist-ssr/
-*.local
 *.tsbuildinfo
+
+# Личные env-оверрайды. НЕ '*.local': такой шаблон съедает config/env.local,
+# который обязан лежать в git — без него не собирается локальная среда.
+.env*.local
 
 .DS_Store
 .idea/
