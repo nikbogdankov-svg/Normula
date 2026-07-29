@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>onemore</title>
+    <!-- Рантайм-конфиг среды: в dev отдаёт vite-плагин, в контейнере — entrypoint. -->
+    <script src="/config.js"></script>
+  </head>
+  <body>
+    <!-- Заглушка живёт до первого рендера React. Осталась на экране — значит
+         приложение не стартовало: смотри консоль браузера и отдачу /config.js. -->
+    <div id="root">
+      <div style="font-family: system-ui, sans-serif; padding: 48px; text-align: center; color: #888">
+        Загрузка…
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

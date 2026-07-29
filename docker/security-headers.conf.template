@@ -1,0 +1,13 @@
+# Заголовки безопасности. Подключается include'ом в КАЖДЫЙ location:
+# nginx не наследует add_header в location, где есть собственный add_header,
+# поэтому «объявить один раз в server{}» недостаточно.
+#
+# ${LOGTO_ENDPOINT} подставляет entrypoint: в connect-src нужен адрес Logto
+# (OIDC discovery, JWKS, обмен кода на токен).
+
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ${LOGTO_ENDPOINT}; worker-src 'self' blob:" always;

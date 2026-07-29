@@ -1,0 +1,47 @@
+# # Пайплайн фронта. Как и в Go-сервисах, запускается только на merge request.
+# # Ветвление то же: feature/* → release/* → staging → master.
+# stages:
+#   - validate
+#   - check
+
+# workflow:
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# default:
+#   interruptible: true
+#   image: node:22-alpine
+
+# check-branch:
+#   stage: validate
+#   image: alpine:3.19
+#   rules:
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#   script:
+#     - |
+#       SOURCE="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+#       TARGET="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+#       echo "MR: ${SOURCE} → ${TARGET}"
+#       case "${SOURCE}|${TARGET}" in
+#         feature/*"|release/"*) echo "✅ Feature pipeline" ;;
+#         release/*"|staging")   echo "✅ Release pipeline" ;;
+#         "staging|master")      echo "✅ Prod pipeline" ;;
+#         *)
+#           echo "❌ Недопустимое направление MR: ${SOURCE} → ${TARGET}"
+#           echo "   Разрешено: feature/* → release/*, release/* → staging, staging → master"
+#           exit 1
+#           ;;
+#       esac
+
+# # typecheck + eslint + prettier + сборка — то же, что локальный `npm run check`.
+# check:
+#   stage: check
+#   cache:
+#     key:
+#       files:
+#         - package-lock.json
+#     paths:
+#       - .npm/
+#   script:
+#     - npm ci --cache .npm --prefer-offline
+#     - npm run check
