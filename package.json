@@ -1,0 +1,46 @@
+{
+  "name": "onemore-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mock": "AUTH_MODE=mock vite",
+    "dev:api-local": "API_UPSTREAM=http://localhost:8080 vite",
+    "build": "tsc -b && vite build",
+    "build:stg": "APP_ENV=stg npm run build",
+    "build:prod": "APP_ENV=prod npm run build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json}\"",
+    "check": "npm run typecheck && npm run lint && npm run format:check && vite build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@gravity-ui/icons": "^2.13.0",
+    "@gravity-ui/uikit": "^7.4.0",
+    "@logto/react": "^3.0.8",
+    "@tanstack/react-query": "^5.62.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^26.1.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "~5.6.3",
+    "typescript-eslint": "^8.18.1",
+    "vite": "^6.0.3"
+  }
+}

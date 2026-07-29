@@ -1,0 +1,75 @@
+server {
+    listen 8080;
+    server_name _;
+    server_tokens off;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    client_max_body_size 10m;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    include /etc/nginx/snippets/security-headers.conf;
+
+    # Рантайм-конфиг: не кэшируем никогда, иначе среда «залипнет» на старой.
+    location = /config.js {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        try_files $uri =404;
+    }
+
+    # index.html не кэшируем: он ссылается на хэшированные ассеты.
+    location = /index.html {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+    }
+
+    # Хэш в имени файла → содержимое неизменно.
+    location /assets/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        try_files $uri =404;
+    }
+
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # /api → бэкенд, префикс срезается. Same-origin → CORS не нужен.
+    #
+    # Адрес бэка подставлен в переменную намеренно: с литеральным upstream
+    # nginx резолвит DNS на старте и падает с "host not found", если записи
+    # ещё/уже нет. Через $api_upstream + resolver имя резолвится на каждый
+    # запрос: контейнер поднимается всегда, а смена IP бэка подхватывается
+    # без рестарта.
+    location ~ ^/api/(?<api_path>.*)$ {
+        include /etc/nginx/snippets/security-headers.conf;
+
+        resolver ${RESOLVER} ipv6=off valid=30s;
+        set $api_upstream "${API_UPSTREAM}";
+
+        proxy_pass $api_upstream/$api_path$is_args$args;
+        proxy_http_version 1.1;
+        proxy_set_header Host ${API_UPSTREAM_HOST};
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${API_UPSTREAM_HOST};
+
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    location / {
+        include /etc/nginx/snippets/security-headers.conf;
+        try_files $uri $uri/ /index.html;
+    }
+}
