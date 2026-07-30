@@ -9,6 +9,14 @@ import './sidebar.css';
 const EXPANDED_WIDTH = 250;
 const COLLAPSED_WIDTH = 56;
 const ICON_SIZE = 16;
+/**
+ * Дефолт Gravity — 1000 мс плюс «пауза» курсора (rest), из-за чего подсказка
+ * в меню кажется не работающей. Берём обычный Tooltip, а не ActionTooltip:
+ * первый красится в --g-color-base-float и потому белый в светлой теме и
+ * тёмный в тёмной, как в примерах самого Gravity. ActionTooltip всегда
+ * тёмный (--g-color-base-float-heavy).
+ */
+const TOOLTIP_DELAY = 120;
 
 /**
  * Боковое меню по макету: лого, переключатели темы и сворачивания,
@@ -59,14 +67,22 @@ export function Sidebar({
           {/* В свёрнутом меню остаётся только кнопка разворачивания —
               тема сворачивается вместе с остальным. */}
           {!collapsed && (
-            <Tooltip content={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+            <Tooltip
+              content={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+              openDelay={TOOLTIP_DELAY}
+              rest={0}
+            >
               <Button view="flat" size="m" onClick={toggleTheme} aria-label="Переключить тему">
                 <Icon data={theme === 'dark' ? Sun : Moon} size={ICON_SIZE} />
               </Button>
             </Tooltip>
           )}
 
-          <Tooltip content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>
+          <Tooltip
+            content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            openDelay={TOOLTIP_DELAY}
+            rest={0}
+          >
             <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
               <Icon data={LayoutSideContent} size={ICON_SIZE} />
             </Button>
@@ -110,7 +126,7 @@ export function Sidebar({
           </Flex>
         )}
 
-        <Tooltip content="Выйти">
+        <Tooltip content="Выйти" openDelay={TOOLTIP_DELAY} rest={0}>
           <Button view="flat" size="m" onClick={() => void signOut()} aria-label="Выйти">
             <Icon data={EllipsisVertical} size={ICON_SIZE} />
           </Button>
@@ -138,7 +154,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
   if (!collapsed) return link;
 
   return (
-    <Tooltip content={item.label} placement="right">
+    <Tooltip content={item.label} placement="right" openDelay={TOOLTIP_DELAY} rest={0}>
       {link}
     </Tooltip>
   );
