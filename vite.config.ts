@@ -103,6 +103,10 @@ export default defineConfig(() => {
     build: { sourcemap: APP_ENV !== 'prod' },
     server: {
       port: 5173,
+      // Порт — часть redirect URI, зарегистрированного в Logto. Если 5173
+      // занят, vite по умолчанию молча уехал бы на 5174, и вход упал бы с
+      // невнятным invalid_redirect_uri. Лучше сразу отказаться стартовать.
+      strictPort: true,
       // Браузер ходит same-origin /api → CORS не нужен ни в dev, ни в prod.
       proxy: {
         '/api': {
