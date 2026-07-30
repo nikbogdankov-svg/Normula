@@ -35,6 +35,7 @@ API_UPSTREAM="${API_UPSTREAM:-$(preset_get API_UPSTREAM)}"
 API_RESOURCE="${API_RESOURCE:-$(preset_get API_RESOURCE)}"
 LOGTO_ENDPOINT="${LOGTO_ENDPOINT:-$(preset_get LOGTO_ENDPOINT)}"
 LOGTO_APP_ID="${LOGTO_APP_ID:-$(preset_get LOGTO_APP_ID)}"
+MOCK_UNIMPLEMENTED="${MOCK_UNIMPLEMENTED:-$(preset_get MOCK_UNIMPLEMENTED)}"
 
 for key in AUTH_MODE API_UPSTREAM API_RESOURCE LOGTO_ENDPOINT LOGTO_APP_ID; do
   eval "value=\${$key}"
@@ -56,6 +57,7 @@ window.__APP_CONFIG__ = {
   "env": "${APP_ENV}",
   "apiBaseUrl": "/api",
   "authMode": "${AUTH_MODE}",
+  "mockUnimplemented": ${MOCK_UNIMPLEMENTED},
   "logto": {
     "endpoint": "${LOGTO_ENDPOINT}",
     "appId": "${LOGTO_APP_ID}",

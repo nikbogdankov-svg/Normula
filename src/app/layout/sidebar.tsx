@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Button, Icon, Text, Tooltip } from '@gravity-ui/uikit';
+import { Button, Flex, Icon, Text, Tooltip } from '@gravity-ui/uikit';
 import { EllipsisVertical, LayoutSideContent, Moon, Sun } from '@gravity-ui/icons';
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
@@ -56,11 +56,15 @@ export function Sidebar({
         )}
 
         <div style={{ display: 'flex', gap: 2 }}>
-          <Tooltip content={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
-            <Button view="flat" size="m" onClick={toggleTheme} aria-label="Переключить тему">
-              <Icon data={theme === 'dark' ? Sun : Moon} size={ICON_SIZE} />
-            </Button>
-          </Tooltip>
+          {/* В свёрнутом меню остаётся только кнопка разворачивания —
+              тема сворачивается вместе с остальным. */}
+          {!collapsed && (
+            <Tooltip content={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>
+              <Button view="flat" size="m" onClick={toggleTheme} aria-label="Переключить тему">
+                <Icon data={theme === 'dark' ? Sun : Moon} size={ICON_SIZE} />
+              </Button>
+            </Tooltip>
+          )}
 
           <Tooltip content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}>
             <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
@@ -71,10 +75,11 @@ export function Sidebar({
       </div>
 
       <nav style={{ flexGrow: 1, overflowY: 'auto', paddingBottom: 12 }}>
-        {NAV_GROUPS.map((group) => (
+        {NAV_GROUPS.map((group, index) => (
           <div key={group.title}>
             {!collapsed && <div className="sidebar-group__title">{group.title}</div>}
-            {collapsed && <div style={{ height: 12 }} />}
+            {collapsed &&
+              (index === 0 ? <div style={{ height: 8 }} /> : <div className="sidebar-separator" />)}
             {group.items.map((item) => (
               <SidebarLink key={item.to} item={item} collapsed={collapsed} />
             ))}
@@ -93,14 +98,16 @@ export function Sidebar({
         }}
       >
         {!collapsed && (
-          <div style={{ overflow: 'hidden' }}>
+          // Text рендерится инлайновым span, поэтому нужен явный столбец:
+          // иначе название организации и роль слипаются в одну строку.
+          <Flex direction="column" style={{ overflow: 'hidden' }}>
             <Text variant="body-1" ellipsis>
               {current ? current.name : 'Без организации'}
             </Text>
             <Text variant="caption-2" color="secondary" ellipsis>
               Администратор
             </Text>
-          </div>
+          </Flex>
         )}
 
         <Tooltip content="Выйти">

@@ -7,8 +7,9 @@ import { LandingRoute } from './routes/landing';
 import { CallbackRoute } from './routes/callback';
 import { NotFoundRoute } from './routes/not-found';
 import { InvitationRoute } from './routes/invitation';
-import { HelloRoute } from '@/features/hello/hello-route';
 import { ManagementRoute } from '@/features/organizations/management-route';
+import { StaffRoute } from '@/features/staff/staff-route';
+import { TtkRoute } from '@/features/ttk/ttk-route';
 
 /**
  * Маршруты приложения.
@@ -19,7 +20,8 @@ import { ManagementRoute } from '@/features/organizations/management-route';
  */
 const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/management': <ManagementRoute />,
-  '/app/administration': <HelloRoute />,
+  '/app/administration': <StaffRoute />,
+  '/app/ttk': <TtkRoute />,
 };
 
 const appChildren = NAV_ITEMS.map((item) => ({
