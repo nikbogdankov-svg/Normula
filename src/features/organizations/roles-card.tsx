@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button, Card, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, ShieldCheck } from '@gravity-ui/icons';
-import { ErrorState, LoadingState } from '@/shared/ui/states';
+import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useOrganizationRoles } from './api';
+import { useOrganizations } from '@/shared/auth';
 
 /**
  * Справочник организационных ролей и их разрешений.
@@ -10,6 +11,7 @@ import { useOrganizationRoles } from './api';
  */
 export function RolesCard() {
   const [open, setOpen] = useState(false);
+  const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationRoles();
 
   return (
@@ -31,7 +33,8 @@ export function RolesCard() {
 
       {open && (
         <div style={{ borderTop: '1px solid var(--g-color-line-generic)', padding: 16 }}>
-          {isPending && <LoadingState />}
+          {current === null && <NoOrganizationSelectedState />}
+          {current !== null && isPending && <LoadingState />}
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
           {data && (
             <Flex direction="column" gap={4}>

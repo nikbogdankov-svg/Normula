@@ -12,7 +12,7 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { Ban, Cubes3Overlap, Persons, Play, Plus, TrashBin } from '@gravity-ui/icons';
-import { ErrorState, LoadingState } from '@/shared/ui/states';
+import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
   useCreateOrganization,
   useDeleteOrganization,
@@ -20,6 +20,7 @@ import {
   useSetOrganizationDisabled,
 } from './api';
 import type { Organization } from './types';
+import { useOrganizations } from '@/shared/auth';
 import { OrganizationDetails } from './organization-details';
 import { RolesCard } from './roles-card';
 
@@ -30,7 +31,9 @@ import { RolesCard } from './roles-card';
  * что и остальное приложение, чтобы потом было что переодеть.
  */
 export function ManagementRoute() {
+  const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationList();
+  const hasOrganization = current !== null;
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Organization | null>(null);
 
@@ -61,7 +64,8 @@ export function ManagementRoute() {
           </Button>
         </Flex>
 
-        {isPending && <LoadingState />}
+        {!hasOrganization && <NoOrganizationSelectedState />}
+        {hasOrganization && isPending && <LoadingState />}
         {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
         {data && data.organizations.length > 0 && (
           <OrganizationsTable

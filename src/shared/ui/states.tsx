@@ -39,6 +39,22 @@ export function NoOrganizationsBanner() {
   );
 }
 
+/**
+ * Запрос не стартовал, потому что нет организации (enabled: false у useQuery).
+ * Без отдельного состояния страница бесконечно крутила бы лоадер: у
+ * отключённого запроса isPending остаётся true.
+ */
+export function NoOrganizationSelectedState() {
+  return (
+    <Flex justifyContent="center" style={{ padding: 48 }}>
+      <Text variant="body-2" color="secondary">
+        Нет организации — данные не запрашиваются. Попросите администратора добавить вас в
+        организацию.
+      </Text>
+    </Flex>
+  );
+}
+
 export function EmptyState({ text }: { text: string }) {
   return (
     <Flex justifyContent="center" style={{ padding: 48 }}>
