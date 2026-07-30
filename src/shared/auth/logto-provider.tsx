@@ -31,14 +31,39 @@ function requireLogtoSettings(): LogtoSettings {
  */
 function buildLogtoConfig(): LogtoConfig {
   const logto = requireLogtoSettings();
+
   return {
     endpoint: logto.endpoint,
     appId: logto.appId,
     resources: [logto.apiResource],
     includeReservedScopes: false,
-    scopes: [ReservedScope.OpenId, ReservedScope.OfflineAccess, UserScope.Organizations],
+    scopes: [
+      ReservedScope.OpenId,
+      ReservedScope.OfflineAccess,
+      UserScope.Organizations,
+      ...ORGANIZATION_SCOPES,
+    ],
   };
 }
+
+/**
+ * Организационные разрешения, которые бэкенд проверяет в токене.
+ *
+ * Их обязательно перечислять здесь: Logto кладёт в организационный токен
+ * только те скоупы, которые были ЗАПРОШЕНЫ, — даже если у пользователя они
+ * есть по роли. Без этого списка бэкенд отвечает «missing scope».
+ *
+ * Что человеку реально не выдано ролью, Logto просто не положит в токен,
+ * так что запрашивать можно весь набор.
+ */
+const ORGANIZATION_SCOPES = [
+  // Администрирование организаций платформы (раздел «Управление»).
+  'manage:platform',
+  // Управление своей организацией: участники, роли, приглашения.
+  'manage:organization',
+  // Чтение технологических карт.
+  'read:ttk',
+];
 
 export const signInRedirectUri = `${window.location.origin}/callback`;
 export const postSignOutRedirectUri = `${window.location.origin}/`;

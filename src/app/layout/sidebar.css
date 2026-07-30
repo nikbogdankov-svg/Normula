@@ -1,0 +1,45 @@
+/*
+ * Боковое меню из макета. Здесь только то, что нельзя выразить
+ * inline-стилем: hover и активное состояние. Все значения — токены Gravity.
+ */
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--g-spacing-2);
+  height: 26px;
+  padding: 0 var(--g-spacing-4);
+  border-left: 2px solid transparent;
+  color: var(--g-color-text-primary);
+  text-decoration: none;
+  font-size: var(--g-text-body-1-font-size);
+  line-height: var(--g-text-body-1-line-height);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-item:hover {
+  background: var(--g-color-base-simple-hover);
+}
+
+.sidebar-item_active {
+  border-left-color: var(--g-color-line-brand);
+  color: var(--g-color-text-brand);
+}
+
+.sidebar-item__icon {
+  flex-shrink: 0;
+  display: flex;
+  color: inherit;
+}
+
+.sidebar-group__title {
+  padding: var(--g-spacing-4) var(--g-spacing-4) var(--g-spacing-1);
+  color: var(--g-color-text-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}

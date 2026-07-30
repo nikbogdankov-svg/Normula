@@ -1,0 +1,30 @@
+/*
+ * Брендовые токены StyleU поверх темы Gravity UI.
+ *
+ * Макет собран на переменных Gravity (--g-color-*, --g-spacing-*,
+ * --g-border-radius-*), поэтому кастомной темы не нужно — достаточно
+ * переопределить брендовый цвет из Figma (Base/Brand #008C16).
+ */
+
+.g-root {
+  --g-color-private-green-550-solid: #008c16;
+  --g-color-private-green-600-solid: #007a13;
+
+  --g-color-base-brand: #008c16;
+  --g-color-base-brand-hover: #007a13;
+  --g-color-line-brand: #008c16;
+  --g-color-text-brand: #008c16;
+  --g-color-text-brand-heavy: #007a13;
+  --g-color-text-link: #008c16;
+  --g-color-text-link-hover: #007a13;
+}
+
+.g-root_theme_dark {
+  --g-color-base-brand: #2fa84a;
+  --g-color-base-brand-hover: #38bd56;
+  --g-color-line-brand: #2fa84a;
+  --g-color-text-brand: #4bc464;
+  --g-color-text-brand-heavy: #62d179;
+  --g-color-text-link: #4bc464;
+  --g-color-text-link-hover: #62d179;
+}
