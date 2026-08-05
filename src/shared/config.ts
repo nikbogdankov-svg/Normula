@@ -28,6 +28,12 @@ export interface AppConfig {
   apiBaseUrl: string;
   /** 'mock' — без Logto и без бэка (данные in-memory), 'logto' — по-настоящему. */
   authMode: AuthMode;
+  /**
+   * Отдавать ли из памяти ручки, которых на бэкенде ещё нет. Не зависит от
+   * authMode: можно входить настоящим Logto, а недоделанные разделы всё равно
+   * получать из моков. На стенде и проде выключено.
+   */
+  mockUnimplemented: boolean;
   logto?: LogtoSettings;
 }
 
@@ -55,6 +61,7 @@ function loadConfig(): AppConfig {
     env: raw.env ?? 'unknown',
     apiBaseUrl: raw.apiBaseUrl ?? '/api',
     authMode,
+    mockUnimplemented: raw.mockUnimplemented === true,
     logto: raw.logto,
   };
 }

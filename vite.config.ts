@@ -17,7 +17,13 @@ import react from '@vitejs/plugin-react';
  */
 const APP_ENV = process.env.APP_ENV ?? 'local';
 
-type EnvKey = 'AUTH_MODE' | 'API_UPSTREAM' | 'API_RESOURCE' | 'LOGTO_ENDPOINT' | 'LOGTO_APP_ID';
+type EnvKey =
+  | 'AUTH_MODE'
+  | 'API_UPSTREAM'
+  | 'API_RESOURCE'
+  | 'LOGTO_ENDPOINT'
+  | 'LOGTO_APP_ID'
+  | 'MOCK_UNIMPLEMENTED';
 
 function readPreset(env: string): Record<string, string> {
   const file = path.resolve(__dirname, 'config', `env.${env}`);
@@ -53,6 +59,7 @@ function renderConfigJs(): string {
     env: APP_ENV,
     apiBaseUrl: '/api',
     authMode,
+    mockUnimplemented: setting('MOCK_UNIMPLEMENTED') === 'true',
     logto: {
       endpoint: setting('LOGTO_ENDPOINT'),
       appId: setting('LOGTO_APP_ID'),
@@ -103,6 +110,10 @@ export default defineConfig(() => {
     build: { sourcemap: APP_ENV !== 'prod' },
     server: {
       port: 5173,
+      // Порт — часть redirect URI, зарегистрированного в Logto. Если 5173
+      // занят, vite по умолчанию молча уехал бы на 5174, и вход упал бы с
+      // невнятным invalid_redirect_uri. Лучше сразу отказаться стартовать.
+      strictPort: true,
       // Браузер ходит same-origin /api → CORS не нужен ни в dev, ни в prod.
       proxy: {
         '/api': {
