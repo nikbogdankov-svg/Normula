@@ -1,10 +1,15 @@
 # syntax=docker/dockerfile:1.7
 FROM node:22-alpine AS build
 WORKDIR /app
+# Без кеш-маунта: на слабом хосте битый/переполненный /root/.npm роняет npm
+# с «Exit handler never called». Слой всё равно кешируется по package-lock.json.
+ENV NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+RUN npm ci --loglevel=error
 COPY . .
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
