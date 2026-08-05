@@ -6,8 +6,13 @@ WORKDIR /app
 ENV NPM_CONFIG_AUDIT=false \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_UPDATE_NOTIFIER=false
+# Хосты, с которых registry.npmjs.org недоступен, собирают с зеркалом:
+# build arg NPM_REGISTRY=https://registry.npmmirror.com. Тарболлы те же,
+# integrity из lock-файла проверяется как обычно.
+ARG NPM_REGISTRY=https://registry.npmjs.org
 COPY package.json package-lock.json ./
-RUN npm ci --loglevel=error
+RUN npm ci --registry="$NPM_REGISTRY" \
+      --fetch-retries=5 --fetch-retry-maxtimeout=120000 --loglevel=error
 COPY . .
 RUN NODE_OPTIONS=--max-old-space-size=1024 npm run build
 
