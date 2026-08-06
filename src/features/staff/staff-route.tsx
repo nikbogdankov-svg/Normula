@@ -109,7 +109,7 @@ function StaffCard({
             startContent={<Icon data={Magnifier} size={14} />}
             style={{ width: 240 }}
           />
-          <Button view="action" onClick={onAdd}>
+          <Button view="outlined" onClick={onAdd}>
             <Icon data={Plus} size={16} />
             Добавить
           </Button>
@@ -171,14 +171,23 @@ function EmployeesTable({
 
   return (
     <Table
+      width="max"
       data={employees}
       columns={[
         {
           id: 'name',
           name: 'Имя',
-          template: (row) => `${row.lastName} ${row.firstName}`.trim() || '—',
+          template: (row) => `${row.firstName} ${row.lastName}`.trim() || '—',
         },
-        { id: 'email', name: 'Почта' },
+        {
+          id: 'email',
+          name: 'Почта',
+          template: (row) => (
+            <Text variant="body-1" color="secondary">
+              {row.email}
+            </Text>
+          ),
+        },
         {
           id: 'registeredAt',
           name: () => (

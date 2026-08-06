@@ -166,7 +166,7 @@ const employees: Employee[] = [
     firstName,
     lastName,
     email: `surname${index + 1}@zdorovoyepitanie.ru`,
-    orgEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@zdorovoyepitanie.ru`,
+    orgEmail: `${firstName.toLowerCase()[0] ?? ''}.${lastName.toLowerCase()}@zdorovoyepitanie.ru`,
     roleId,
     registeredAt: new Date(Date.UTC(2019, 1, 1 + index)).toISOString(),
     snils: '',
@@ -363,7 +363,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const employee: Employee = {
       ...body,
       id: `e-${Date.now()}`,
-      orgEmail: `${body.firstName.toLowerCase()}.${body.lastName.toLowerCase()}@zdorovoyepitanie.ru`,
+      orgEmail: `${body.firstName.toLowerCase()[0] ?? ''}.${body.lastName.toLowerCase()}@zdorovoyepitanie.ru`,
       registeredAt: new Date().toISOString(),
     };
     employees.unshift(employee);

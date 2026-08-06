@@ -58,7 +58,7 @@ export function ManagementRoute() {
             )}
           </Flex>
 
-          <Button view="action" onClick={() => setCreateOpen(true)}>
+          <Button view="outlined" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
             Добавить
           </Button>
@@ -146,6 +146,7 @@ function OrganizationsTable({
 
   return (
     <Table
+      width="max"
       data={organizations}
       onRowClick={(row) => onSelect(row)}
       // Выбранную строку не подсвечиваем классом: подходящей утилиты в Gravity

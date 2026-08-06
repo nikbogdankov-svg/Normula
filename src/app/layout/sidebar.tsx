@@ -37,6 +37,7 @@ export function Sidebar({
 
   return (
     <aside
+      className={collapsed ? 'sidebar sidebar_collapsed' : 'sidebar'}
       style={{
         width: collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH,
         flexShrink: 0,
@@ -142,7 +143,6 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
     <NavLink
       to={item.to}
       className={({ isActive }) => (isActive ? 'sidebar-item sidebar-item_active' : 'sidebar-item')}
-      style={collapsed ? { justifyContent: 'center', padding: 0 } : undefined}
     >
       <span className="sidebar-item__icon">
         <Icon data={item.icon} size={ICON_SIZE} />

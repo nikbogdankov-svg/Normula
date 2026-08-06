@@ -15,9 +15,8 @@ body,
 /*
  * Брендовые токены StyleU поверх темы Gravity UI.
  *
- * Макет собран на переменных Gravity (--g-color-*, --g-spacing-*,
- * --g-border-radius-*), поэтому кастомной темы не нужно — достаточно
- * переопределить брендовый цвет из Figma (Base/Brand #008C16).
+ * Макет: светло-серый фон рабочей области (#F5F7F9), белые карточки,
+ * мягкий мятный акцент активного пункта меню, бренд Base/Brand #008C16.
  */
 
 .g-root {
@@ -34,6 +33,15 @@ body,
   --g-color-text-brand-contrast: #ffffff;
   --g-color-text-link: #008c16;
   --g-color-text-link-hover: #007a13;
+
+  /* Рабочая область и мягкий акцент выбора — как в макете администрирования. */
+  --g-color-base-generic-ultralight: #f5f7f9;
+  --g-color-base-selection: #e7f5e9;
+  --g-color-base-selection-hover: #d9eedc;
+
+  /* Карточки в макете белые на сером фоне; Gravity filled по умолчанию серый. */
+  --onemore-card-bg: #ffffff;
+  --onemore-sidebar-active-bg: #e7f5e9;
 }
 
 .g-root_theme_dark {
@@ -45,4 +53,19 @@ body,
   --g-color-text-brand-contrast: #ffffff;
   --g-color-text-link: #4bc464;
   --g-color-text-link-hover: #62d179;
+
+  --g-color-base-generic-ultralight: #1b1f22;
+  --g-color-base-selection: rgba(47, 168, 74, 0.18);
+  --g-color-base-selection-hover: rgba(47, 168, 74, 0.28);
+
+  --onemore-card-bg: var(--g-color-base-float);
+  --onemore-sidebar-active-bg: rgba(47, 168, 74, 0.22);
+}
+
+/* Белые (в светлой теме) поверхности карточек поверх серой рабочей области.
+   view=filled в Gravity рисует серый base-generic; в макете карточки белые. */
+.g-root .g-card_view_filled {
+  --_--background-color: var(--onemore-card-bg);
+  --_--border-color: var(--g-color-line-generic);
+  --_--border-width: 1px;
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Dialog, Flex, Icon, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
-import { Lock } from '@gravity-ui/icons';
+import { Button, Dialog, Flex, Icon, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import { ArrowRight, Lock } from '@gravity-ui/icons';
 import { useCreateEmployee, useDeleteEmployee, useResetPassword, useStaffRoles } from './api';
 import type { Employee } from './types';
 
@@ -29,7 +29,7 @@ function orgEmail(firstName: string, lastName: string): string {
       .toLowerCase()
       .replace(/[^a-zа-яё0-9]/gi, '');
 
-  return `${slug(firstName)}.${slug(lastName)}@zdorovoyepitanie.ru`;
+  return `${slug(firstName)[0] ?? ''}.${slug(lastName)}@zdorovoyepitanie.ru`;
 }
 
 /** Двухшаговое добавление сотрудника из макета. */
@@ -89,12 +89,14 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                   value={form.firstName}
                   onUpdate={(v) => set({ firstName: v })}
                   autoFocus
+                  style={{ flex: 1 }}
                 />
                 <TextInput
                   label="Фамилия:"
                   placeholder="Иванов"
                   value={form.lastName}
                   onUpdate={(v) => set({ lastName: v })}
+                  style={{ flex: 1 }}
                 />
               </Flex>
               <TextInput
@@ -128,16 +130,18 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
               <Flex gap={2}>
                 <TextInput
                   label="СНИЛС:"
-                  placeholder="Иван"
+                  placeholder="000-000-000 00"
                   value={form.snils}
                   onUpdate={(v) => set({ snils: v })}
                   autoFocus
+                  style={{ flex: 1 }}
                 />
                 <TextInput
                   label="ИНН:"
-                  placeholder="Иванов"
+                  placeholder="000000000000"
                   value={form.inn}
                   onUpdate={(v) => set({ inn: v })}
+                  style={{ flex: 1 }}
                 />
               </Flex>
               <TextInput
@@ -148,7 +152,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
               />
               <TextInput
                 label="Другой док:"
-                placeholder="example@mail.ru"
+                placeholder="Серия и номер"
                 value={form.otherDoc}
                 onUpdate={(v) => set({ otherDoc: v })}
               />
@@ -156,14 +160,23 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
           )}
         </Flex>
       </Dialog.Body>
-      <Dialog.Footer
-        onClickButtonCancel={step === 1 ? close : () => setStep(1)}
-        onClickButtonApply={step === 1 ? () => setStep(2) : submit}
-        textButtonCancel={step === 1 ? 'Отмена' : 'Назад'}
-        textButtonApply={step === 1 ? 'Дальше' : 'Добавить и выдать пароль'}
-        propsButtonApply={{ disabled: step === 1 && !firstStepReady }}
-        loading={create.isPending}
-      />
+      <Dialog.Footer>
+        <Flex justifyContent="space-between" gap={2} style={{ width: '100%' }}>
+          <Button view="flat" size="l" onClick={step === 1 ? close : () => setStep(1)}>
+            {step === 1 ? 'Отмена' : 'Назад'}
+          </Button>
+          <Button
+            view="action"
+            size="l"
+            onClick={step === 1 ? () => setStep(2) : submit}
+            disabled={step === 1 && !firstStepReady}
+            loading={create.isPending}
+          >
+            <Icon data={ArrowRight} size={16} />
+            {step === 1 ? 'Дальше' : 'Добавить и выдать пароль'}
+          </Button>
+        </Flex>
+      </Dialog.Footer>
     </Dialog>
   );
 }
