@@ -130,7 +130,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
               <Flex gap={2}>
                 <TextInput
                   label="СНИЛС:"
-                  placeholder="000-000-000 00"
+                  placeholder="00 000 0000 00"
                   value={form.snils}
                   onUpdate={(v) => set({ snils: v })}
                   autoFocus
@@ -138,7 +138,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                 />
                 <TextInput
                   label="ИНН:"
-                  placeholder="000000000000"
+                  placeholder="00 0000 000 00"
                   value={form.inn}
                   onUpdate={(v) => set({ inn: v })}
                   style={{ flex: 1 }}
@@ -152,7 +152,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
               />
               <TextInput
                 label="Другой док:"
-                placeholder="Серия и номер"
+                placeholder="000000000"
                 value={form.otherDoc}
                 onUpdate={(v) => set({ otherDoc: v })}
               />
