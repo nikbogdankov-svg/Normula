@@ -24,12 +24,7 @@ import { useOrganizations } from '@/shared/auth';
 import { OrganizationDetails } from './organization-details';
 import { RolesCard } from './roles-card';
 
-/**
- * «Управление» — платформенное администрирование организаций.
- *
- * Дизайна для раздела пока нет: свёрстано теми же карточками и таблицами,
- * что и остальное приложение, чтобы потом было что переодеть.
- */
+/** «Управление» — организации в том же карточном стиле, что и «Персонал». */
 export function ManagementRoute() {
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationList();
@@ -38,7 +33,7 @@ export function ManagementRoute() {
   const [selected, setSelected] = useState<Organization | null>(null);
 
   return (
-    <Flex direction="column" gap={4} style={{ padding: 16 }}>
+    <Flex direction="column" gap={3} style={{ padding: 16 }}>
       <RolesCard />
 
       <Card view="filled" style={{ padding: 0 }}>
@@ -64,23 +59,32 @@ export function ManagementRoute() {
           </Button>
         </Flex>
 
-        {!hasOrganization && <NoOrganizationSelectedState />}
-        {hasOrganization && isPending && <LoadingState />}
-        {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
-        {data && data.organizations.length > 0 && (
-          <OrganizationsTable
-            organizations={data.organizations}
-            onSelect={setSelected}
-            selectedId={selected?.id ?? null}
-          />
-        )}
-        {data && data.organizations.length === 0 && (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <Text variant="body-2" color="secondary">
-              Организаций пока нет
-            </Text>
-          </div>
-        )}
+        {/* Разделитель шапки и таблицы — как у «Персонал». */}
+        <div
+          style={{
+            borderTop: '1px solid var(--g-color-line-generic)',
+            paddingTop: 4,
+            paddingBottom: 8,
+          }}
+        >
+          {!hasOrganization && <NoOrganizationSelectedState />}
+          {hasOrganization && isPending && <LoadingState />}
+          {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
+          {data && data.organizations.length > 0 && (
+            <OrganizationsTable
+              organizations={data.organizations}
+              onSelect={setSelected}
+              selectedId={selected?.id ?? null}
+            />
+          )}
+          {data && data.organizations.length === 0 && (
+            <div style={{ padding: 48, textAlign: 'center' }}>
+              <Text variant="body-2" color="secondary">
+                Организаций пока нет
+              </Text>
+            </div>
+          )}
+        </div>
       </Card>
 
       {selected && (
@@ -145,61 +149,75 @@ function OrganizationsTable({
   };
 
   return (
-    <Table
-      width="max"
-      data={organizations}
-      onRowClick={(row) => onSelect(row)}
-      // Выбранную строку не подсвечиваем классом: подходящей утилиты в Gravity
-      // нет, а выбор и так виден — карточка организации раскрывается ниже.
-      getRowDescriptor={(row) => (row.id === selectedId ? { disabled: false } : undefined)}
-      columns={[
-        { id: 'name', name: 'Название', width: '100%' },
-        {
-          id: 'memberCount',
-          name: 'Участников',
-          template: (row) => (
-            <Flex alignItems="center" gap={1}>
-              <Icon data={Persons} size={14} />
-              {row.memberCount}
-            </Flex>
-          ),
-        },
-        {
-          id: 'disabled',
-          name: 'Статус',
-          template: (row) =>
-            row.disabled ? (
-              <Label theme="warning">Отключена</Label>
-            ) : (
-              <Label theme="success">Активна</Label>
+    <div className="admin-table-wrap">
+      <Table
+        width="max"
+        className="admin-table"
+        data={organizations}
+        onRowClick={(row) => onSelect(row)}
+        // Выбранную строку не подсвечиваем классом: подходящей утилиты в Gravity
+        // нет, а выбор и так виден — карточка организации раскрывается ниже.
+        getRowDescriptor={(row) => (row.id === selectedId ? { disabled: false } : undefined)}
+        columns={[
+          {
+            id: 'name',
+            name: 'Название',
+            template: (row) => (
+              <Text variant="body-1" style={{ fontWeight: 600 }}>
+                {row.name}
+              </Text>
             ),
-        },
-        {
-          id: 'createdAt',
-          name: 'Создана',
-          template: (row) => formatDate(row.createdAt),
-        },
-        {
-          id: 'actions',
-          name: 'Действия',
-          template: (row) => (
-            <Flex gap={1} onClick={(e) => e.stopPropagation()}>
-              <Button
-                view="flat"
-                size="s"
-                onClick={() => onToggleDisabled(row)}
-                title={row.disabled ? 'Включить' : 'Отключить'}
-              >
-                <Icon data={row.disabled ? Play : Ban} size={16} />
-              </Button>
-              <Button view="flat" size="s" onClick={() => onRemove(row)} title="Удалить">
-                <Icon data={TrashBin} size={16} />
-              </Button>
-            </Flex>
-          ),
-        },
-      ]}
-    />
+          },
+          {
+            id: 'memberCount',
+            name: 'Участников',
+            template: (row) => (
+              <Flex alignItems="center" gap={1}>
+                <Icon data={Persons} size={14} />
+                {row.memberCount}
+              </Flex>
+            ),
+          },
+          {
+            id: 'disabled',
+            name: 'Статус',
+            template: (row) =>
+              row.disabled ? (
+                <Label theme="warning">Отключена</Label>
+              ) : (
+                <Label theme="success">Активна</Label>
+              ),
+          },
+          {
+            id: 'createdAt',
+            name: 'Создана',
+            template: (row) => formatDate(row.createdAt),
+          },
+          {
+            id: 'actions',
+            name: 'Действия',
+            width: 0,
+            align: 'end',
+            className: 'admin-table__actions',
+            template: (row) => (
+              <Flex gap={1} justifyContent="flex-end" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  view="flat"
+                  size="s"
+                  onClick={() => onToggleDisabled(row)}
+                  title={row.disabled ? 'Включить' : 'Отключить'}
+                >
+                  <Icon data={row.disabled ? Play : Ban} size={16} />
+                </Button>
+                <Button view="flat" size="s" onClick={() => onRemove(row)} title="Удалить">
+                  <Icon data={TrashBin} size={16} />
+                </Button>
+              </Flex>
+            ),
+          },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -244,6 +262,7 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
   return (
     <Dialog open={open} onClose={onClose} size="s">
       <Dialog.Header caption="Новая организация" />
+      <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
           <TextInput label="Название" value={name} onUpdate={setName} autoFocus />
@@ -257,6 +276,7 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
           />
         </Flex>
       </Dialog.Body>
+      <Dialog.Divider />
       <Dialog.Footer
         onClickButtonCancel={onClose}
         onClickButtonApply={submit}

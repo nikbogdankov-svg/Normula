@@ -44,7 +44,7 @@ export function TtkRoute() {
             onUpdate={setSearch}
             hasClear
             startContent={
-              <span style={{ display: 'inline-flex', paddingInlineStart: 8 }}>
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
                 <Icon data={Magnifier} size={14} />
               </span>
             }

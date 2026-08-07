@@ -10,6 +10,9 @@ import { InvitationRoute } from './routes/invitation';
 import { ManagementRoute } from '@/features/organizations/management-route';
 import { StaffRoute } from '@/features/staff/staff-route';
 import { TtkRoute } from '@/features/ttk/ttk-route';
+import { ProfileRoute } from '@/features/profile/profile-route';
+import { MenuRoute } from '@/features/menu/menu-route';
+import { ObjectsRoute } from '@/features/objects/objects-route';
 
 /**
  * Маршруты приложения.
@@ -22,6 +25,9 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/management': <ManagementRoute />,
   '/app/administration': <StaffRoute />,
   '/app/ttk': <TtkRoute />,
+  '/app/profile': <ProfileRoute />,
+  '/app/menu': <MenuRoute />,
+  '/app/objects': <ObjectsRoute />,
 };
 
 const appChildren = NAV_ITEMS.map((item) => ({

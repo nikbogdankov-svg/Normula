@@ -29,17 +29,23 @@ export function AppLayout() {
       <main
         style={{
           flexGrow: 1,
+          minWidth: 0,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
           overflowY: 'auto',
           background: 'var(--g-color-base-generic-ultralight)',
         }}
       >
         {organizations?.length === 0 && (
-          <div style={{ padding: '16px 16px 0' }}>
+          <div style={{ padding: '16px 16px 0', flexShrink: 0 }}>
             <NoOrganizationsBanner />
           </div>
         )}
 
-        <Outlet />
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Outlet />
+        </div>
       </main>
     </div>
   );

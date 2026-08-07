@@ -11,6 +11,7 @@ import {
   FileText,
   Gear,
   Heart,
+  Layers3Diagonal,
   ListCheck,
   Person,
   Receipt,
@@ -44,13 +45,14 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Планирование',
     items: [
-      { to: '/app/menu', label: 'Меню', icon: SquareListUl, wip: true },
+      { to: '/app/menu', label: 'Меню', icon: SquareListUl },
       { to: '/app/ttk', label: 'ТТК', icon: FileText },
     ],
   },
   {
     title: 'Производство',
     items: [
+      { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/portions', label: 'Порционник', icon: Receipt, wip: true },
       { to: '/app/cooking-plan', label: 'План приготовления', icon: Calendar, wip: true },
       { to: '/app/products-layout', label: 'Раскладка продуктов', icon: Box, wip: true },
@@ -94,7 +96,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/app/management', label: 'Управление', icon: Cubes3Overlap },
       { to: '/app/administration', label: 'Администрирование', icon: Gear },
-      { to: '/app/profile', label: 'Мой профиль', icon: Person, wip: true },
+      { to: '/app/profile', label: 'Мой профиль', icon: Person },
     ],
   },
 ];

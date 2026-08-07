@@ -19,28 +19,36 @@ import {
 import { useEmployees, useStaffRoles } from './api';
 import type { Employee } from './types';
 import { RoleAccessCard } from './role-access-card';
-import { AddEmployeeDialog, DeleteEmployeeDialog, ResetPasswordDialog } from './staff-dialogs';
+import {
+  AddEmployeeDialog,
+  DeleteEmployeeDialog,
+  EditEmployeeDialog,
+  ResetPasswordDialog,
+} from './staff-dialogs';
 
 /** Экран «Администрирование» из макета: доступы для ролей + персонал. */
 export function StaffRoute() {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [toEdit, setToEdit] = useState<Employee | null>(null);
   const [toDelete, setToDelete] = useState<Employee | null>(null);
   const [toReset, setToReset] = useState<Employee | null>(null);
 
   return (
-    <Flex direction="column" gap={4} style={{ padding: 16 }}>
+    <Flex direction="column" gap={3} style={{ padding: 16 }}>
       <RoleAccessCard />
 
       <StaffCard
         search={search}
         onSearch={setSearch}
         onAdd={() => setAddOpen(true)}
+        onEdit={setToEdit}
         onDelete={setToDelete}
         onReset={setToReset}
       />
 
       <AddEmployeeDialog open={addOpen} onClose={() => setAddOpen(false)} />
+      <EditEmployeeDialog employee={toEdit} onClose={() => setToEdit(null)} />
       <DeleteEmployeeDialog employee={toDelete} onClose={() => setToDelete(null)} />
       <ResetPasswordDialog employee={toReset} onClose={() => setToReset(null)} />
     </Flex>
@@ -51,12 +59,14 @@ function StaffCard({
   search,
   onSearch,
   onAdd,
+  onEdit,
   onDelete,
   onReset,
 }: {
   search: string;
   onSearch: (value: string) => void;
   onAdd: () => void;
+  onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onReset: (employee: Employee) => void;
 }) {
@@ -96,7 +106,11 @@ function StaffCard({
             value={search}
             onUpdate={onSearch}
             hasClear
-            startContent={<Icon data={Magnifier} size={14} />}
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <Icon data={Magnifier} size={14} />
+              </span>
+            }
             style={{ width: 240 }}
           />
           <Button view="outlined" onClick={onAdd}>
@@ -107,7 +121,13 @@ function StaffCard({
       </Flex>
 
       {/* Разделитель шапки и таблицы — как в макете «Персонал». */}
-      <div style={{ borderTop: '1px solid var(--g-color-line-generic)', paddingTop: 4 }}>
+      <div
+        style={{
+          borderTop: '1px solid var(--g-color-line-generic)',
+          paddingTop: 4,
+          paddingBottom: 8,
+        }}
+      >
         {current === null && <NoOrganizationSelectedState />}
         {current !== null && isPending && <LoadingState />}
         {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
@@ -121,6 +141,7 @@ function StaffCard({
             employees={employees}
             ascending={ascending}
             onToggleSort={() => setAscending((value) => !value)}
+            onEdit={onEdit}
             onDelete={onDelete}
             onReset={onReset}
           />
@@ -134,12 +155,14 @@ function EmployeesTable({
   employees,
   ascending,
   onToggleSort,
+  onEdit,
   onDelete,
   onReset,
 }: {
   employees: Employee[];
   ascending: boolean;
   onToggleSort: () => void;
+  onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onReset: (employee: Employee) => void;
 }) {
@@ -148,10 +171,10 @@ function EmployeesTable({
     roles.data?.roles.find((role) => role.id === roleId)?.name ?? '—';
 
   return (
-    <div className="staff-table-wrap">
+    <div className="admin-table-wrap">
       <Table
         width="max"
-        className="staff-table"
+        className="admin-table"
         data={employees}
         columns={[
           {
@@ -204,14 +227,15 @@ function EmployeesTable({
             name: 'Действия',
             // Узкая колонка по ширине кнопок — остальное место уходит имени/почте.
             width: 0,
-            className: 'staff-table__actions',
+            align: 'end',
+            className: 'admin-table__actions',
             template: (row) => (
-              <Flex alignItems="center" gap={1}>
+              <Flex alignItems="center" justifyContent="flex-end" gap={1}>
                 <Button view="flat" size="s" onClick={() => onReset(row)}>
                   <Icon data={Key} size={14} />
                   Сброс пароля
                 </Button>
-                <Button view="flat" size="s" title="Изменить" disabled>
+                <Button view="flat" size="s" title="Изменить" onClick={() => onEdit(row)}>
                   <Icon data={Pencil} size={16} />
                 </Button>
                 <Button view="flat" size="s" onClick={() => onDelete(row)} title="Удалить">

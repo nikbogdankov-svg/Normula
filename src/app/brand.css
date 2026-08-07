@@ -97,23 +97,24 @@ body,
   padding: 16px;
 }
 
-/* Таблица персонала: линии строк совпадают с полями контента (не до края карточки). */
-.g-root .staff-table-wrap {
+/* Таблицы Персонал / Организации: линии строк совпадают с контентом. */
+.g-root .admin-table-wrap {
   padding-inline: 16px;
 }
 
-.g-root .staff-table,
-.g-root .staff-table .g-table__table {
+.g-root .admin-table,
+.g-root .admin-table .g-table__table {
   width: 100%;
 }
 
-.g-root .staff-table .g-table__head .g-table__cell {
+.g-root .admin-table .g-table__head .g-table__cell {
   color: var(--g-color-text-secondary);
   font-weight: var(--g-text-body-font-weight);
 }
 
-/* Колонка «Действия» по ширине контента. */
-.g-root .staff-table .staff-table__actions {
+/* Колонка «Действия» по ширине контента, выравнивание вправо. */
+.g-root .admin-table .admin-table__actions {
   width: 1%;
   white-space: nowrap;
+  text-align: end;
 }

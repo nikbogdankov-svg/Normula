@@ -6,7 +6,11 @@ import type {
   OrganizationRole,
 } from '@/features/organizations/types';
 import type { Employee, StaffRole } from '@/features/staff/types';
+import { orgEmail } from '@/features/staff/org-email';
 import type { Collection, Recipe } from '@/features/ttk/types';
+import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
+import { MEALS } from '@/features/menu/types';
+import { formatKettle, type DistributionRow, type KitchenUnit } from '@/features/objects/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -25,7 +29,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Как только ручка появится на сервере, префикс отсюда убирается — и запросы
  * сразу пойдут по сети, без правок в фичах.
  */
-export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk'];
+export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk', '/v1/menus', '/v1/objects'];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
 export function isMocked(path: string): boolean {
@@ -165,14 +169,14 @@ const employees: Employee[] = [
     id: `e-${index + 1}`,
     firstName,
     lastName,
-    email: `surname${index + 1}@zdorovoyepitanie.ru`,
-    orgEmail: `${firstName.toLowerCase()[0] ?? ''}.${lastName.toLowerCase()}@zdorovoyepitanie.ru`,
+    email: `${lastName.toLowerCase()}${firstName.toLowerCase()}@mail.ru`,
+    orgEmail: orgEmail(firstName, lastName),
     roleId,
     registeredAt: new Date(Date.UTC(2019, 1, 1 + index)).toISOString(),
-    snils: '',
-    inn: '',
-    passport: '',
-    otherDoc: '',
+    snils: `00 000 000${index} 0${index}`,
+    inn: `00 0000 000 0${index}`,
+    passport: `012${index} 45678${index}`,
+    otherDoc: `DOC-${index + 1}`,
   };
 });
 
@@ -186,17 +190,48 @@ const collections: Collection[] = [
   { id: 'c-2', name: 'Сборник технических нормативов, 2020' },
 ];
 
+const DISH_NAMES = [
+  'Бефстроганов из мяса',
+  'Каша рисовая молочная',
+  'Омлет натуральный',
+  'Суп картофельный с мясом',
+  'Котлета куриная паровая',
+  'Компот из сухофруктов',
+  'Салат из свежих овощей',
+  'Пюре картофельное',
+  'Рыба запечённая',
+  'Чай с сахаром',
+  'Бутерброд с сыром',
+  'Борщ со сметаной',
+  'Гуляш из говядины',
+  'Каша гречневая',
+  'Сок яблочный',
+  'Запеканка творожная',
+  'Щи из свежей капусты',
+  'Котлета рыбная',
+  'Макароны отварные',
+  'Кисель ягодный',
+  'Яйцо варёное',
+  'Суп гороховый',
+  'Рагу овощное',
+  'Какао с молоком',
+];
+
 const sampleRecipe = (index: number): Recipe => {
   const inCollection = index % 3 !== 0;
+  const protein = (12 + (index % 8) * 2.4).toFixed(1).replace('.', ',');
+  const fat = (8 + (index % 6) * 1.7).toFixed(1).replace('.', ',');
+  const carbs = (18 + (index % 10) * 3.2).toFixed(1).replace('.', ',');
+  const kcal = 180 + (index % 9) * 35;
 
   return {
     id: `t-${index}`,
-    name: index === 1 ? 'Бефстроганов из мяса' : `Название блюда ${index}`,
+    name: DISH_NAMES[(index - 1) % DISH_NAMES.length],
     collectionName: inCollection ? collections[index % 2].name : '',
     collectionId: inCollection ? collections[index % 2].id : '',
-    portionYield: '90/50',
-    price: 180 + (index % 5) * 5,
-    kcal: 240 + (index % 4) * 20,
+    portionYield: index % 2 === 0 ? '150/50' : '90/50',
+    price: 95 + (index % 7) * 18,
+    kcal,
     temperature: 'Отпуск не ниже 65°С',
     shelfLife: 'Не более 2х часов с момента реализации',
     recipe:
@@ -261,13 +296,164 @@ const sampleRecipe = (index: number): Recipe => {
         pricePerKg: '25 ₽',
       },
     ],
-    outputPerPortion: '90/50',
+    outputPerPortion: index % 2 === 0 ? '150/50' : '90/50',
     outputPer100: '9,0/5,0',
-    nutrition: { protein: '26,1', fat: '30,8', carbs: '8,3', kcal: '404', vitaminC: '0,78' },
+    nutrition: {
+      protein,
+      fat,
+      carbs,
+      kcal: String(kcal),
+      vitaminC: (0.4 + (index % 5) * 0.2).toFixed(2).replace('.', ','),
+    },
   };
 };
 
 const recipes: Recipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
+
+function emptySlots(cycleDays: number): CycleMenu['slots'] {
+  const slots: CycleMenu['slots'] = [];
+  for (let day = 1; day <= cycleDays; day += 1) {
+    for (const meal of MEALS) {
+      slots.push({ day, mealId: meal.id, dishes: [] });
+    }
+  }
+  return slots;
+}
+
+/**
+ * Пищевая ценность блюд по приёмам: в сумме за день ≈ норма «Основная»
+ * (1800 ккал / Б 90 / Ж 60 / У 250 / 450 ₽) с допуском ±10%.
+ */
+const MEAL_NUTRITION: Record<
+  MealId,
+  Array<{ kcal: number; protein: number; fat: number; carbs: number; price: number }>
+> = {
+  breakfast: [
+    { kcal: 250, protein: 12, fat: 8, carbs: 35, price: 55 },
+    { kcal: 200, protein: 10, fat: 7, carbs: 30, price: 50 },
+  ],
+  second_breakfast: [{ kcal: 180, protein: 8, fat: 5, carbs: 28, price: 40 }],
+  lunch: [
+    { kcal: 220, protein: 14, fat: 8, carbs: 28, price: 55 },
+    { kcal: 250, protein: 16, fat: 10, carbs: 30, price: 70 },
+    { kcal: 160, protein: 8, fat: 6, carbs: 24, price: 40 },
+  ],
+  snack: [{ kcal: 180, protein: 6, fat: 4, carbs: 30, price: 40 }],
+  dinner: [
+    { kcal: 200, protein: 10, fat: 7, carbs: 25, price: 50 },
+    { kcal: 160, protein: 6, fat: 5, carbs: 20, price: 50 },
+  ],
+};
+
+/** Небольшой сдвиг ккал/БЖУ по дням; цена не масштабируется вверх выше лимита. */
+function dayScale(day: number): number {
+  return 1 + (((day - 1) % 5) - 2) * 0.02;
+}
+
+const PRICE_LIMIT = 450;
+
+function scaleNutrition(
+  value: { kcal: number; protein: number; fat: number; carbs: number; price: number },
+  scale: number
+) {
+  return {
+    kcal: Math.round(value.kcal * scale),
+    protein: Math.round(value.protein * scale * 10) / 10,
+    fat: Math.round(value.fat * scale * 10) / 10,
+    carbs: Math.round(value.carbs * scale * 10) / 10,
+    // Цену можно только снижать относительно базы — лимит нельзя превышать.
+    price: Math.round(value.price * Math.min(scale, 1)),
+  };
+}
+
+/** Заполняет сетку блюдами из ТТК так, чтобы итог дня закрывал норму. */
+function filledSlots(cycleDays: number): CycleMenu['slots'] {
+  const slots = emptySlots(cycleDays).map((slot) => {
+    const mealIndex = MEALS.findIndex((meal) => meal.id === slot.mealId);
+    const templates = MEAL_NUTRITION[slot.mealId];
+    const scale = dayScale(slot.day);
+    const dishes = templates.map((template, offset) => {
+      const recipe = recipes[(slot.day * 3 + mealIndex + offset * 5) % recipes.length];
+      const nutrition = scaleNutrition(template, scale);
+      return {
+        ...dishRef(recipe),
+        name: recipe.name,
+        ...nutrition,
+      };
+    });
+    return { ...slot, dishes };
+  });
+
+  // Страховка: если из‑за округления цена дня > лимита — пропорционально ужимаем.
+  for (let day = 1; day <= cycleDays; day += 1) {
+    const daySlots = slots.filter((slot) => slot.day === day);
+    const totalPrice = daySlots.reduce(
+      (sum, slot) => sum + slot.dishes.reduce((s, dish) => s + dish.price, 0),
+      0
+    );
+    if (totalPrice <= PRICE_LIMIT) continue;
+    const factor = PRICE_LIMIT / totalPrice;
+    for (const slot of daySlots) {
+      slot.dishes = slot.dishes.map((dish) => ({
+        ...dish,
+        price: Math.max(1, Math.floor(dish.price * factor)),
+      }));
+    }
+  }
+
+  return slots;
+}
+
+function parseRuNumber(value: string): number {
+  const parsed = Number(value.replace(',', '.').replace(/[^\d.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dishRef(recipe: Recipe): MenuDishRef {
+  return {
+    recipeId: recipe.id,
+    name: recipe.name,
+    kcal: recipe.kcal,
+    price: recipe.price,
+    protein: parseRuNumber(recipe.nutrition.protein),
+    fat: parseRuNumber(recipe.nutrition.fat),
+    carbs: parseRuNumber(recipe.nutrition.carbs),
+    portionYield: recipe.portionYield,
+  };
+}
+
+function todayIso(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function mondayOfWeek(iso: string = todayIso()): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1);
+  const weekday = date.getDay();
+  const delta = weekday === 0 ? -6 : 1 - weekday;
+  date.setDate(date.getDate() + delta);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+const menus: CycleMenu[] = [
+  {
+    id: 'menu-1',
+    name: 'Меню',
+    dietName: 'Основная',
+    startDate: mondayOfWeek(),
+    cycleDays: 14,
+    status: 'draft',
+    createdAt: new Date().toISOString(),
+    slots: filledSlots(14),
+  },
+];
 
 /** Достаёт сегменты пути по шаблону вида /v1/admin/organizations/:id/members. */
 function match(pattern: string, path: string): Record<string, string> | null {
@@ -426,7 +612,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const employee: Employee = {
       ...body,
       id: `e-${Date.now()}`,
-      orgEmail: `${body.firstName.toLowerCase()[0] ?? ''}.${body.lastName.toLowerCase()}@zdorovoyepitanie.ru`,
+      orgEmail: orgEmail(body.firstName, body.lastName),
       registeredAt: new Date().toISOString(),
     };
     employees.unshift(employee);
@@ -443,7 +629,11 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   if (employee && method === 'PATCH') {
     const found = employees.find((e) => e.id === employee.id);
     if (!found) throw new Error('mock: сотрудник не найден');
-    Object.assign(found, options.body);
+    const body = options.body as Partial<Employee>;
+    Object.assign(found, body);
+    if (body.firstName !== undefined || body.lastName !== undefined) {
+      found.orgEmail = orgEmail(found.firstName, found.lastName);
+    }
 
     return { employee: found } as T;
   }
@@ -566,8 +756,264 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return { organization: found } as T;
   }
 
+  // Меню (цикловое)
+  if (route === '/v1/menus' && method === 'GET') {
+    return { menus, total: menus.length } as T;
+  }
+
+  if (route === '/v1/menus' && method === 'POST') {
+    const body = options.body as {
+      name: string;
+      dietName: string;
+      startDate: string;
+      cycleDays: number;
+    };
+    const cycleDays = body.cycleDays > 0 ? body.cycleDays : 14;
+    const menu: CycleMenu = {
+      id: `menu-${Date.now()}`,
+      name: body.name.trim() || 'Новое меню',
+      dietName: body.dietName || 'Основная',
+      startDate: mondayOfWeek(body.startDate || todayIso()),
+      cycleDays,
+      status: 'draft',
+      createdAt: new Date().toISOString(),
+      slots: filledSlots(cycleDays),
+    };
+    menus.unshift(menu);
+
+    return { menu } as T;
+  }
+
+  const menuItem = match('/v1/menus/:id', route);
+  if (menuItem && method === 'GET') {
+    const found = menus.find((menu) => menu.id === menuItem.id);
+    if (!found) throw new Error('mock: меню не найдено');
+
+    return { menu: found } as T;
+  }
+
+  if (menuItem && method === 'PATCH') {
+    const found = menus.find((menu) => menu.id === menuItem.id);
+    if (!found) throw new Error('mock: меню не найдено');
+
+    const body = options.body as {
+      name?: string;
+      dietName?: string;
+      startDate?: string;
+      cycleDays?: number;
+    };
+
+    if (body.name !== undefined) found.name = body.name.trim() || found.name;
+    if (body.dietName !== undefined) found.dietName = body.dietName;
+    if (body.startDate !== undefined) found.startDate = mondayOfWeek(body.startDate);
+
+    if (body.cycleDays !== undefined && body.cycleDays > 0 && body.cycleDays !== found.cycleDays) {
+      const previous = new Map(
+        found.slots.map((slot) => [`${slot.day}:${slot.mealId}`, slot.dishes] as const)
+      );
+      found.cycleDays = body.cycleDays;
+      found.slots = emptySlots(body.cycleDays).map((slot) => ({
+        ...slot,
+        dishes: previous.get(`${slot.day}:${slot.mealId}`) ?? [],
+      }));
+    }
+
+    return { menu: found } as T;
+  }
+
+  const menuSlot = match('/v1/menus/:id/slots', route);
+  if (menuSlot && method === 'PUT') {
+    const found = menus.find((menu) => menu.id === menuSlot.id);
+    if (!found) throw new Error('mock: меню не найдено');
+
+    const body = options.body as { day: number; mealId: MealId; dishes: MenuDishRef[] };
+    const index = found.slots.findIndex(
+      (slot) => slot.day === body.day && slot.mealId === body.mealId
+    );
+    if (index === -1) {
+      found.slots.push({ day: body.day, mealId: body.mealId, dishes: body.dishes });
+    } else {
+      found.slots[index] = { ...found.slots[index], dishes: body.dishes };
+    }
+
+    return { menu: found } as T;
+  }
+
+  // --- Объекты (пищеблок → ЛПУ → отделения) ---
+  if (route === '/v1/objects/kitchen' && method === 'GET') {
+    return { kitchen } as T;
+  }
+
+  if (route === '/v1/objects/distribution' && method === 'GET') {
+    return {
+      rows: distributionRows,
+      totalPortions: distributionRows.reduce((sum, row) => sum + row.portions, 0),
+    } as T;
+  }
+
+  if (route === '/v1/objects/tables/headcount' && method === 'PATCH') {
+    const body = options.body as {
+      facilityId: string;
+      departmentId: string;
+      tableId: string;
+      headcount: number;
+    };
+    const facility = kitchen.facilities.find((item) => item.id === body.facilityId);
+    if (!facility) throw new Error('mock: ЛПУ не найдено');
+    const department = facility.departments.find((item) => item.id === body.departmentId);
+    if (!department) throw new Error('mock: отделение не найдено');
+    const table = department.tables.find((item) => item.id === body.tableId);
+    if (!table) throw new Error('mock: стол не найден');
+    table.headcount = Math.max(0, body.headcount);
+    rebuildDistribution();
+    return { kitchen } as T;
+  }
+
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
 }
+
+const kitchen: KitchenUnit = {
+  id: 'kitchen-1',
+  name: 'Центральный пищеблок',
+  facilities: [
+    {
+      id: 'lpu-1',
+      name: 'Больница №1',
+      address: 'корп. А',
+      kettleNumber: 1,
+      departments: [
+        {
+          id: 'dep-1-1',
+          name: 'Терапия',
+          tables: [
+            { id: 'tbl-1-1-1', name: 'Основная', headcount: 42 },
+            { id: 'tbl-1-1-2', name: 'Щадящая', headcount: 18 },
+          ],
+        },
+        {
+          id: 'dep-1-2',
+          name: 'Хирургия',
+          tables: [
+            { id: 'tbl-1-2-1', name: 'Основная', headcount: 30 },
+            { id: 'tbl-1-2-2', name: 'Диабетическая', headcount: 12 },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'lpu-2',
+      name: 'Больница №5',
+      address: 'корп. Б',
+      kettleNumber: 2,
+      departments: [
+        {
+          id: 'dep-2-1',
+          name: 'Педиатрия',
+          tables: [
+            { id: 'tbl-2-1-1', name: 'Основная', headcount: 36 },
+            { id: 'tbl-2-1-2', name: 'Щадящая', headcount: 14 },
+          ],
+        },
+        {
+          id: 'dep-2-2',
+          name: 'Неврология',
+          tables: [{ id: 'tbl-2-2-1', name: 'Основная', headcount: 28 }],
+        },
+      ],
+    },
+    {
+      id: 'lpu-3',
+      name: 'Поликлиника №3',
+      address: 'дневной стационар',
+      kettleNumber: 1,
+      departments: [
+        {
+          id: 'dep-3-1',
+          name: 'Дневной стационар',
+          tables: [{ id: 'tbl-3-1-1', name: 'Основная', headcount: 22 }],
+        },
+      ],
+    },
+    {
+      id: 'lpu-4',
+      name: 'Больница №2',
+      address: 'корп. В',
+      kettleNumber: 3,
+      departments: [
+        {
+          id: 'dep-4-1',
+          name: 'Кардиология',
+          tables: [
+            { id: 'tbl-4-1-1', name: 'Основная', headcount: 38 },
+            { id: 'tbl-4-1-2', name: 'Щадящая', headcount: 16 },
+          ],
+        },
+        {
+          id: 'dep-4-2',
+          name: 'Реанимация',
+          tables: [{ id: 'tbl-4-2-1', name: 'Основная', headcount: 10 }],
+        },
+        {
+          id: 'dep-4-3',
+          name: 'Ортопедия',
+          tables: [
+            { id: 'tbl-4-3-1', name: 'Основная', headcount: 24 },
+            { id: 'tbl-4-3-2', name: 'Диабетическая', headcount: 8 },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'lpu-5',
+      name: 'Роддом №1',
+      address: 'корп. Г',
+      kettleNumber: 2,
+      departments: [
+        {
+          id: 'dep-5-1',
+          name: 'Послеродовое',
+          tables: [
+            { id: 'tbl-5-1-1', name: 'Основная', headcount: 40 },
+            { id: 'tbl-5-1-2', name: 'Щадящая', headcount: 15 },
+          ],
+        },
+        {
+          id: 'dep-5-2',
+          name: 'Патология',
+          tables: [{ id: 'tbl-5-2-1', name: 'Основная', headcount: 20 }],
+        },
+      ],
+    },
+  ],
+};
+
+let distributionRows: DistributionRow[] = [];
+
+function rebuildDistribution() {
+  const dishes = ['Каша рисовая молочная', 'Суп картофельный с мясом', 'Котлета куриная паровая'];
+  const rows: DistributionRow[] = [];
+  // Сначала блюдо — одинаковые идут подряд для группировки в таблице.
+  for (const dishName of dishes) {
+    for (const facility of kitchen.facilities) {
+      for (const department of facility.departments) {
+        for (const table of department.tables) {
+          if (table.headcount <= 0) continue;
+          rows.push({
+            dishName,
+            facilityName: facility.name,
+            departmentName: department.name,
+            tableName: table.name,
+            kettleLabel: formatKettle(facility.kettleNumber),
+            portions: table.headcount,
+          });
+        }
+      }
+    }
+  }
+  distributionRows = rows;
+}
+
+rebuildDistribution();
 
 /** Держит счётчик участников в согласии со списком. */
 function syncMemberCount(organizationId: string) {
