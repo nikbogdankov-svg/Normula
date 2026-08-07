@@ -1,16 +1,5 @@
 import { useState } from 'react';
-import {
-  Button,
-  Card,
-  Dialog,
-  Flex,
-  Icon,
-  Label,
-  Select,
-  Text,
-  TextInput,
-  useToaster,
-} from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, Label, Select, Text, TextInput } from '@gravity-ui/uikit';
 import { ArrowUpFromSquare, Magnifier, Plus, Printer } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
@@ -19,10 +8,12 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useCollections, useCreateRecipe, useRecipes, type RecipeSort } from './api';
+import { useCollections, useRecipes, type RecipeSort } from './api';
 import type { Recipe } from './types';
 import { RecipeDialog } from './recipe-dialog';
+import { CreateRecipeDialog } from './create-recipe-dialog';
 import { ImportCollectionsDialog } from './import-dialog';
+import './ttk-route.css';
 
 const ALL_COLLECTIONS = 'all';
 
@@ -52,7 +43,11 @@ export function TtkRoute() {
             value={search}
             onUpdate={setSearch}
             hasClear
-            startContent={<Icon data={Magnifier} size={14} />}
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 8 }}>
+                <Icon data={Magnifier} size={14} />
+              </span>
+            }
             style={{ width: 220 }}
           />
           <Select
@@ -80,14 +75,14 @@ export function TtkRoute() {
         </Flex>
 
         <Flex alignItems="center" gap={2}>
-          <Button view="outlined" onClick={() => window.print()} title="Печать">
+          <Button view="normal-contrast" onClick={() => window.print()} title="Печать">
             <Icon data={Printer} size={16} />
           </Button>
-          <Button view="outlined" onClick={() => setImportOpen(true)}>
+          <Button view="normal-contrast" onClick={() => setImportOpen(true)}>
             <Icon data={ArrowUpFromSquare} size={16} />
             Импорт сборника
           </Button>
-          <Button view="action" onClick={() => setCreateOpen(true)}>
+          <Button view="normal-contrast" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
             Создать ТТК
           </Button>
@@ -115,7 +110,7 @@ export function TtkRoute() {
         </div>
       )}
 
-      <RecipeDialog recipe={opened} onClose={() => setOpened(null)} />
+      <RecipeDialog recipe={opened} onClose={() => setOpened(null)} onRecipeChange={setOpened} />
       <ImportCollectionsDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <CreateRecipeDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </Flex>
@@ -124,135 +119,26 @@ export function TtkRoute() {
 
 function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: () => void }) {
   return (
-    <Card view="filled" style={{ padding: '10px 12px', cursor: 'pointer' }} onClick={onOpen}>
-      <Flex alignItems="center" gap={2}>
-        <Text variant="body-2">{recipe.name}</Text>
+    <Card
+      type="action"
+      view="filled"
+      className="ttk-recipe-card"
+      style={{ padding: '10px 12px', cursor: 'pointer' }}
+      onClick={onOpen}
+    >
+      <div className="ttk-recipe-card__title-row">
+        <Text variant="body-2" className="ttk-recipe-card__name">
+          {recipe.name}
+        </Text>
         {recipe.collectionName && (
-          <Text variant="body-1" color="secondary" ellipsis>
-            <Label theme="normal">{recipe.collectionName}</Label>
-          </Text>
+          <Label theme="normal" className="ttk-recipe-card__tag" title={recipe.collectionName}>
+            {recipe.collectionName}
+          </Label>
         )}
-      </Flex>
+      </div>
       <Text variant="body-1" color="secondary">
-        {recipe.price} ₽ • {recipe.kcal} кКал • {recipe.meals}
+        {recipe.price} ₽ • {recipe.kcal} кКал
       </Text>
     </Card>
-  );
-}
-
-/**
- * Создание карты. Отдельного экрана в макете я не сверял — форма собрана
- * из полей, которые видны в открытой карте.
- */
-function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const create = useCreateRecipe();
-  const collections = useCollections();
-  const toaster = useToaster();
-  const [form, setForm] = useState({
-    name: '',
-    collectionId: '',
-    portionYield: '',
-    price: '',
-    kcal: '',
-    meals: '',
-    temperature: '',
-    shelfLife: '',
-    recipe: '',
-  });
-
-  const set = (patch: Partial<typeof form>) => setForm((value) => ({ ...value, ...patch }));
-
-  const submit = () => {
-    create.mutate(
-      {
-        ...form,
-        price: Number(form.price) || 0,
-        kcal: Number(form.kcal) || 0,
-      },
-      {
-        onSuccess: () => {
-          toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
-          onClose();
-        },
-        onError: (e) =>
-          toaster.add({ name: 'ttk-create', title: 'Ошибка', content: e.message, theme: 'danger' }),
-      }
-    );
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} size="s">
-      <Dialog.Header caption="Создание ТТК" />
-      <Dialog.Body>
-        <Flex direction="column" gap={3}>
-          <TextInput
-            label="Название:"
-            value={form.name}
-            onUpdate={(v) => set({ name: v })}
-            autoFocus
-          />
-          <Select
-            label="Сборник:"
-            placeholder="Без сборника"
-            width="max"
-            value={form.collectionId ? [form.collectionId] : []}
-            onUpdate={(v) => set({ collectionId: v[0] ?? '' })}
-            options={(collections.data?.collections ?? []).map((collection) => ({
-              value: collection.id,
-              content: collection.name,
-            }))}
-          />
-          <Flex gap={2}>
-            <TextInput
-              label="Выход порции:"
-              placeholder="90/50"
-              value={form.portionYield}
-              onUpdate={(v) => set({ portionYield: v })}
-            />
-            <TextInput
-              label="Цена, ₽:"
-              type="number"
-              value={form.price}
-              onUpdate={(v) => set({ price: v })}
-            />
-          </Flex>
-          <Flex gap={2}>
-            <TextInput
-              label="Калорийность:"
-              type="number"
-              value={form.kcal}
-              onUpdate={(v) => set({ kcal: v })}
-            />
-            <TextInput
-              label="Приём пищи:"
-              placeholder="Завтрак/Ужин"
-              value={form.meals}
-              onUpdate={(v) => set({ meals: v })}
-            />
-          </Flex>
-          <TextInput
-            label="Температура:"
-            placeholder="Отпуск не ниже 65°С"
-            value={form.temperature}
-            onUpdate={(v) => set({ temperature: v })}
-          />
-          <TextInput
-            label="Срок реализации:"
-            placeholder="Не более 2х часов"
-            value={form.shelfLife}
-            onUpdate={(v) => set({ shelfLife: v })}
-          />
-          <TextInput label="Рецепт:" value={form.recipe} onUpdate={(v) => set({ recipe: v })} />
-        </Flex>
-      </Dialog.Body>
-      <Dialog.Footer
-        onClickButtonCancel={onClose}
-        onClickButtonApply={submit}
-        textButtonCancel="Отмена"
-        textButtonApply="Создать"
-        propsButtonApply={{ disabled: !form.name.trim() }}
-        loading={create.isPending}
-      />
-    </Dialog>
   );
 }

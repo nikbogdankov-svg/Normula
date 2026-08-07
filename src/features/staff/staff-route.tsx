@@ -1,15 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  Flex,
-  Icon,
-  Select,
-  Table,
-  Text,
-  TextInput,
-  useToaster,
-} from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, Table, Text, TextInput } from '@gravity-ui/uikit';
 import {
   ArrowUpArrowDown,
   Key,
@@ -26,7 +16,7 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useEmployees, useStaffRoles, useUpdateEmployee } from './api';
+import { useEmployees, useStaffRoles } from './api';
 import type { Employee } from './types';
 import { RoleAccessCard } from './role-access-card';
 import { AddEmployeeDialog, DeleteEmployeeDialog, ResetPasswordDialog } from './staff-dialogs';
@@ -116,23 +106,26 @@ function StaffCard({
         </Flex>
       </Flex>
 
-      {current === null && <NoOrganizationSelectedState />}
-      {current !== null && isPending && <LoadingState />}
-      {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
-      {data && employees.length === 0 && (
-        <EmptyState
-          text={search ? `Никого не нашли по запросу «${search}»` : 'Сотрудников пока нет'}
-        />
-      )}
-      {data && employees.length > 0 && (
-        <EmployeesTable
-          employees={employees}
-          ascending={ascending}
-          onToggleSort={() => setAscending((value) => !value)}
-          onDelete={onDelete}
-          onReset={onReset}
-        />
-      )}
+      {/* Разделитель шапки и таблицы — как в макете «Персонал». */}
+      <div style={{ borderTop: '1px solid var(--g-color-line-generic)', paddingTop: 4 }}>
+        {current === null && <NoOrganizationSelectedState />}
+        {current !== null && isPending && <LoadingState />}
+        {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
+        {data && employees.length === 0 && (
+          <EmptyState
+            text={search ? `Никого не нашли по запросу «${search}»` : 'Сотрудников пока нет'}
+          />
+        )}
+        {data && employees.length > 0 && (
+          <EmployeesTable
+            employees={employees}
+            ascending={ascending}
+            onToggleSort={() => setAscending((value) => !value)}
+            onDelete={onDelete}
+            onReset={onReset}
+          />
+        )}
+      </div>
     </Card>
   );
 }
@@ -151,94 +144,84 @@ function EmployeesTable({
   onReset: (employee: Employee) => void;
 }) {
   const roles = useStaffRoles();
-  const update = useUpdateEmployee();
-  const toaster = useToaster();
-
-  const changeRole = (employee: Employee, roleId: string) => {
-    update.mutate(
-      { id: employee.id, patch: { roleId } },
-      {
-        onError: (e) =>
-          toaster.add({
-            name: 'role-change',
-            title: 'Ошибка',
-            content: e.message,
-            theme: 'danger',
-          }),
-      }
-    );
-  };
+  const roleName = (roleId: string) =>
+    roles.data?.roles.find((role) => role.id === roleId)?.name ?? '—';
 
   return (
-    <Table
-      width="max"
-      data={employees}
-      columns={[
-        {
-          id: 'name',
-          name: 'Имя',
-          template: (row) => `${row.firstName} ${row.lastName}`.trim() || '—',
-        },
-        {
-          id: 'email',
-          name: 'Почта',
-          template: (row) => (
-            <Text variant="body-1" color="secondary">
-              {row.email}
-            </Text>
-          ),
-        },
-        {
-          id: 'registeredAt',
-          name: () => (
-            <Flex
-              alignItems="center"
-              gap={1}
-              style={{ cursor: 'pointer' }}
-              onClick={onToggleSort}
-              title={ascending ? 'Сначала новые' : 'Сначала старые'}
-            >
-              Регистрация
-              <Icon data={ArrowUpArrowDown} size={14} />
-            </Flex>
-          ),
-          template: (row) => row.registeredAt.slice(0, 10),
-        },
-        {
-          id: 'role',
-          name: 'Роль',
-          template: (row) => (
-            <Select
-              size="s"
-              width={150}
-              value={[row.roleId]}
-              onUpdate={(value) => value[0] && changeRole(row, value[0])}
-              options={(roles.data?.roles ?? []).map((role) => ({
-                value: role.id,
-                content: role.name,
-              }))}
-            />
-          ),
-        },
-        {
-          id: 'actions',
-          name: 'Действия',
-          template: (row) => (
-            <Flex alignItems="center" gap={1}>
-              <Button view="flat" size="s" onClick={() => onReset(row)}>
-                <Icon data={Key} size={14} />
-                Сброс пароля
-              </Button>
-              <Button view="flat" size="s" title="Изменить" disabled>
-                <Icon data={Pencil} size={16} />
-              </Button>
-              <Button view="flat" size="s" onClick={() => onDelete(row)} title="Удалить">
-                <Icon data={TrashBin} size={16} />
-              </Button>
-            </Flex>
-          ),
-        },
-      ]}
-    />
+    <div className="staff-table-wrap">
+      <Table
+        width="max"
+        className="staff-table"
+        data={employees}
+        columns={[
+          {
+            id: 'name',
+            name: 'Имя',
+            width: '28%',
+            template: (row) => (
+              <Text variant="body-1" style={{ fontWeight: 600 }}>
+                {`${row.firstName} ${row.lastName}`.trim() || '—'}
+              </Text>
+            ),
+          },
+          {
+            id: 'email',
+            name: 'Почта',
+            width: '32%',
+            template: (row) => (
+              <Text variant="body-1" color="secondary">
+                {row.email}
+              </Text>
+            ),
+          },
+          {
+            id: 'registeredAt',
+            name: () => (
+              <Flex
+                alignItems="center"
+                gap={1}
+                style={{ cursor: 'pointer' }}
+                onClick={onToggleSort}
+                title={ascending ? 'Сначала новые' : 'Сначала старые'}
+              >
+                Регистрация
+                <Icon data={ArrowUpArrowDown} size={14} />
+              </Flex>
+            ),
+            template: (row) => row.registeredAt.slice(0, 10),
+          },
+          {
+            id: 'role',
+            name: 'Роль',
+            template: (row) => (
+              <Text variant="body-1" style={{ fontWeight: 600 }}>
+                {roleName(row.roleId)}
+              </Text>
+            ),
+          },
+          {
+            id: 'actions',
+            name: 'Действия',
+            // Узкая колонка по ширине кнопок — остальное место уходит имени/почте.
+            width: 0,
+            className: 'staff-table__actions',
+            template: (row) => (
+              <Flex alignItems="center" gap={1}>
+                <Button view="flat" size="s" onClick={() => onReset(row)}>
+                  <Icon data={Key} size={14} />
+                  Сброс пароля
+                </Button>
+                <Button view="flat" size="s" title="Изменить" disabled>
+                  <Icon data={Pencil} size={16} />
+                </Button>
+                <Button view="flat" size="s" onClick={() => onDelete(row)} title="Удалить">
+                  <Icon data={TrashBin} size={16} />
+                </Button>
+              </Flex>
+            ),
+          },
+        ]}
+      />
+    </div>
   );
 }

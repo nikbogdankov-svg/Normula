@@ -15,7 +15,7 @@ body,
 /*
  * Брендовые токены StyleU поверх темы Gravity UI.
  *
- * Макет: светло-серый фон рабочей области (#F5F7F9), белые карточки,
+ * Макет: светло-серый фон рабочей области (#F2F2F2), белые карточки,
  * мягкий мятный акцент активного пункта меню, бренд Base/Brand #008C16.
  */
 
@@ -35,7 +35,7 @@ body,
   --g-color-text-link-hover: #007a13;
 
   /* Рабочая область и мягкий акцент выбора — как в макете администрирования. */
-  --g-color-base-generic-ultralight: #f5f7f9;
+  --g-color-base-generic-ultralight: #f2f2f2;
   --g-color-base-selection: #e7f5e9;
   --g-color-base-selection-hover: #d9eedc;
 
@@ -68,4 +68,52 @@ body,
   --_--background-color: var(--onemore-card-bg);
   --_--border-color: var(--g-color-line-generic);
   --_--border-width: 1px;
+}
+
+/* Отступы всех popup/Dialog из макета. */
+.g-root .g-dialog {
+  --_--side-padding: 16px;
+}
+
+.g-root .g-dialog-header {
+  padding: 16px 12px 16px 16px;
+}
+
+/* Место под крестик, чтобы заголовок не заезжал под кнопку. */
+.g-root .g-dialog_has-close .g-dialog-header {
+  padding-inline-end: calc(12px + 36px);
+}
+
+.g-root .g-dialog-btn-close {
+  inset-block-start: 12px;
+  inset-inline-end: 12px;
+}
+
+.g-root .g-dialog-body {
+  padding: 12px 16px 16px;
+}
+
+.g-root .g-dialog-footer {
+  padding: 16px;
+}
+
+/* Таблица персонала: линии строк совпадают с полями контента (не до края карточки). */
+.g-root .staff-table-wrap {
+  padding-inline: 16px;
+}
+
+.g-root .staff-table,
+.g-root .staff-table .g-table__table {
+  width: 100%;
+}
+
+.g-root .staff-table .g-table__head .g-table__cell {
+  color: var(--g-color-text-secondary);
+  font-weight: var(--g-text-body-font-weight);
+}
+
+/* Колонка «Действия» по ширине контента. */
+.g-root .staff-table .staff-table__actions {
+  width: 1%;
+  white-space: nowrap;
 }

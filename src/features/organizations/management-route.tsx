@@ -153,7 +153,7 @@ function OrganizationsTable({
       // нет, а выбор и так виден — карточка организации раскрывается ниже.
       getRowDescriptor={(row) => (row.id === selectedId ? { disabled: false } : undefined)}
       columns={[
-        { id: 'name', name: 'Название' },
+        { id: 'name', name: 'Название', width: '100%' },
         {
           id: 'memberCount',
           name: 'Участников',

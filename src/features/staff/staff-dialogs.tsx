@@ -54,6 +54,12 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
     form.email.trim() !== '' &&
     form.roleId !== '';
 
+  const secondStepReady =
+    form.snils.trim() !== '' &&
+    form.inn.trim() !== '' &&
+    form.passport.trim() !== '' &&
+    form.otherDoc.trim() !== '';
+
   const submit = () => {
     create.mutate(form, {
       onSuccess: (result) => {
@@ -74,6 +80,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
   return (
     <Dialog open={open} onClose={close} size="s">
       <Dialog.Header caption="Добавление нового сотрудника" />
+      <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
           <Text variant="body-1" color="secondary">
@@ -84,6 +91,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
             <>
               <Flex gap={2}>
                 <TextInput
+                  size="l"
                   label="Имя:"
                   placeholder="Иван"
                   value={form.firstName}
@@ -92,6 +100,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                   style={{ flex: 1 }}
                 />
                 <TextInput
+                  size="l"
                   label="Фамилия:"
                   placeholder="Иванов"
                   value={form.lastName}
@@ -100,6 +109,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                 />
               </Flex>
               <TextInput
+                size="l"
                 label="Почта:"
                 placeholder="example@mail.ru"
                 type="email"
@@ -107,6 +117,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                 onUpdate={(v) => set({ email: v })}
               />
               <Select
+                size="l"
                 label="Роль:"
                 placeholder="Выберите роль"
                 width="max"
@@ -118,17 +129,19 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                 }))}
               />
               <TextInput
+                size="l"
                 label="E-mail организации:"
                 placeholder="Доступен после ввода имени и фамилии"
                 value={orgEmail(form.firstName, form.lastName)}
                 disabled
-                startContent={<Icon data={Lock} size={14} />}
+                startContent={<Icon data={Lock} size={16} />}
               />
             </>
           ) : (
             <>
               <Flex gap={2}>
                 <TextInput
+                  size="l"
                   label="СНИЛС:"
                   placeholder="00 000 0000 00"
                   value={form.snils}
@@ -137,6 +150,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                   style={{ flex: 1 }}
                 />
                 <TextInput
+                  size="l"
                   label="ИНН:"
                   placeholder="00 0000 000 00"
                   value={form.inn}
@@ -145,12 +159,14 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
                 />
               </Flex>
               <TextInput
+                size="l"
                 label="Паспорт:"
                 placeholder="0123 456789"
                 value={form.passport}
                 onUpdate={(v) => set({ passport: v })}
               />
               <TextInput
+                size="l"
                 label="Другой док:"
                 placeholder="000000000"
                 value={form.otherDoc}
@@ -160,8 +176,9 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
           )}
         </Flex>
       </Dialog.Body>
+      <Dialog.Divider />
       <Dialog.Footer>
-        <Flex justifyContent="space-between" gap={2} style={{ width: '100%' }}>
+        <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="flat" size="l" onClick={step === 1 ? close : () => setStep(1)}>
             {step === 1 ? 'Отмена' : 'Назад'}
           </Button>
@@ -169,7 +186,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
             view="action"
             size="l"
             onClick={step === 1 ? () => setStep(2) : submit}
-            disabled={step === 1 && !firstStepReady}
+            disabled={step === 1 ? !firstStepReady : !secondStepReady}
             loading={create.isPending}
           >
             <Icon data={ArrowRight} size={16} />

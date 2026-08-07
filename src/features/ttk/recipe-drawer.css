@@ -1,0 +1,140 @@
+/* Полноширинный нижний drawer ТТК. */
+.ttk-recipe-drawer {
+  z-index: 100000;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.ttk-recipe-drawer[data-floating-ui-status='initial'],
+.ttk-recipe-drawer[data-floating-ui-status='close'] {
+  background-color: transparent;
+}
+
+/* Gravity рисует .g-drawer__item белым (base-background) — перекрываем явно. */
+.g-drawer__item.ttk-recipe-drawer__panel,
+.ttk-recipe-drawer__panel {
+  background: #f2f2f2 !important;
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+  max-height: calc(90vh + 40px);
+  overflow: hidden !important;
+}
+
+.ttk-recipe-drawer__panel .g-drawer__item-content {
+  box-sizing: border-box;
+  height: 100%;
+  background: #f2f2f2;
+}
+
+.ttk-recipe-drawer__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: calc(90vh + 40px);
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+.ttk-recipe-drawer__mode {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.ttk-recipe-drawer__mode[hidden] {
+  display: none !important;
+}
+
+.ttk-recipe-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+.ttk-recipe-drawer__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.ttk-recipe-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding: 16px 24px;
+  background: #f2f2f2;
+}
+
+/* Gravity режет label до 50% ширины поля — в форме показываем целиком. */
+.ttk-recipe-drawer__body_create .g-text-input__label {
+  max-width: none !important;
+  overflow: visible;
+}
+
+.ttk-recipe-drawer__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ttk-recipe-drawer__meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ttk-recipe-drawer__meta-label {
+  width: 140px;
+  flex-shrink: 0;
+  color: var(--g-color-text-secondary);
+}
+
+.ttk-recipe-drawer__table-wrap {
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid var(--g-color-line-generic);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--g-color-base-float);
+}
+
+.ttk-recipe-drawer__table-wrap .g-table,
+.ttk-recipe-drawer__table-wrap table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.ttk-recipe-drawer__table-wrap .g-table__cell,
+.ttk-recipe-drawer__table-wrap th,
+.ttk-recipe-drawer__table-wrap td {
+  word-break: break-word;
+}
+
+.ttk-recipe-drawer__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 24px;
+  border-top: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}

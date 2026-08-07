@@ -8,7 +8,10 @@ import './sidebar.css';
 
 const EXPANDED_WIDTH = 250;
 const COLLAPSED_WIDTH = 56;
-const ICON_SIZE = 16;
+/** Иконки в кнопках шапки/футера — без увеличения кнопок. */
+const BUTTON_ICON_SIZE = 16;
+/** Иконки пунктов навигации. */
+const NAV_ICON_SIZE = 18;
 /**
  * Дефолт Gravity — 1000 мс плюс «пауза» курсора (rest), из-за чего подсказка
  * в меню кажется не работающей. Берём обычный Tooltip, а не ActionTooltip:
@@ -74,7 +77,7 @@ export function Sidebar({
               rest={0}
             >
               <Button view="flat" size="m" onClick={toggleTheme} aria-label="Переключить тему">
-                <Icon data={theme === 'dark' ? Sun : Moon} size={ICON_SIZE} />
+                <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />
               </Button>
             </Tooltip>
           )}
@@ -85,7 +88,7 @@ export function Sidebar({
             rest={0}
           >
             <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
-              <Icon data={LayoutSideContent} size={ICON_SIZE} />
+              <Icon data={LayoutSideContent} size={BUTTON_ICON_SIZE} />
             </Button>
           </Tooltip>
         </div>
@@ -129,7 +132,7 @@ export function Sidebar({
 
         <Tooltip content="Выйти" openDelay={TOOLTIP_DELAY} rest={0}>
           <Button view="flat" size="m" onClick={() => void signOut()} aria-label="Выйти">
-            <Icon data={EllipsisVertical} size={ICON_SIZE} />
+            <Icon data={EllipsisVertical} size={BUTTON_ICON_SIZE} />
           </Button>
         </Tooltip>
       </div>
@@ -145,7 +148,7 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       className={({ isActive }) => (isActive ? 'sidebar-item sidebar-item_active' : 'sidebar-item')}
     >
       <span className="sidebar-item__icon">
-        <Icon data={item.icon} size={ICON_SIZE} />
+        <Icon data={item.icon} size={NAV_ICON_SIZE} />
       </span>
       {!collapsed && <span>{item.label}</span>}
     </NavLink>

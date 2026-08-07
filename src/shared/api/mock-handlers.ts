@@ -188,7 +188,6 @@ const collections: Collection[] = [
 
 const sampleRecipe = (index: number): Recipe => {
   const inCollection = index % 3 !== 0;
-  const meals = ['Завтрак/Ужин', 'Обед', 'Полдник', 'Ужин'][index % 4];
 
   return {
     id: `t-${index}`,
@@ -198,7 +197,6 @@ const sampleRecipe = (index: number): Recipe => {
     portionYield: '90/50',
     price: 180 + (index % 5) * 5,
     kcal: 240 + (index % 4) * 20,
-    meals,
     temperature: 'Отпуск не ниже 65°С',
     shelfLife: 'Не более 2х часов с момента реализации',
     recipe:
@@ -212,6 +210,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '142',
         grossPer100: '19,3',
         netPer100: '14,2',
+        pricePerKg: '450 ₽',
       },
       {
         name: 'Масса готового мяса',
@@ -219,6 +218,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '90',
         grossPer100: '',
         netPer100: '9,0',
+        pricePerKg: '',
       },
       {
         name: 'Лук репчатый',
@@ -226,6 +226,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '24',
         grossPer100: '2,9',
         netPer100: '2,4',
+        pricePerKg: '80 ₽',
       },
       {
         name: 'Масло растительное',
@@ -233,6 +234,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '7',
         grossPer100: '0,7',
         netPer100: '0,7',
+        pricePerKg: '200 ₽',
       },
       {
         name: 'Мука пшеничная',
@@ -240,6 +242,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '4',
         grossPer100: '0,4',
         netPer100: '0,4',
+        pricePerKg: '70 ₽',
       },
       {
         name: 'Сметана',
@@ -247,6 +250,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '23',
         grossPer100: '2,3',
         netPer100: '2,3',
+        pricePerKg: '320 ₽',
       },
       {
         name: 'Соль',
@@ -254,6 +258,7 @@ const sampleRecipe = (index: number): Recipe => {
         netPerPortion: '1,8',
         grossPer100: '0,18',
         netPer100: '0,18',
+        pricePerKg: '25 ₽',
       },
     ],
     outputPerPortion: '90/50',
@@ -321,16 +326,74 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   if (route === '/v1/ttk' && method === 'POST') {
-    const body = options.body as { name: string; collectionId: string };
+    const body = options.body as {
+      name: string;
+      portionYield: string;
+      temperature: string;
+      shelfLife: string;
+      recipe: string;
+      ingredients: Array<{ name: string; grossPerPortion: string; netPerPortion: string }>;
+    };
+    const base = sampleRecipe(recipes.length + 1);
     const recipe: Recipe = {
-      ...sampleRecipe(recipes.length + 1),
-      ...(options.body as Partial<Recipe>),
+      ...base,
       id: `t-${Date.now()}`,
-      collectionName: collections.find((c) => c.id === body.collectionId)?.name ?? '',
+      name: body.name,
+      collectionId: '',
+      collectionName: '',
+      portionYield: body.portionYield,
+      temperature: body.temperature,
+      shelfLife: body.shelfLife,
+      recipe: body.recipe,
+      ingredients: (body.ingredients ?? [])
+        .filter((row) => row.name.trim())
+        .map((row) => ({
+          name: row.name,
+          grossPerPortion: row.grossPerPortion,
+          netPerPortion: row.netPerPortion,
+          grossPer100: '',
+          netPer100: '',
+          pricePerKg: '',
+        })),
     };
     recipes.unshift(recipe);
 
     return { recipe } as T;
+  }
+
+  const ttkRecipe = match('/v1/ttk/:id', route);
+  if (ttkRecipe && method === 'PATCH') {
+    const found = recipes.find((r) => r.id === ttkRecipe.id);
+    if (!found) throw new Error('mock: ТТК не найдена');
+
+    const body = options.body as {
+      name: string;
+      portionYield: string;
+      temperature: string;
+      shelfLife: string;
+      recipe: string;
+      ingredients: Array<{ name: string; grossPerPortion: string; netPerPortion: string }>;
+    };
+
+    Object.assign(found, {
+      name: body.name,
+      portionYield: body.portionYield,
+      temperature: body.temperature,
+      shelfLife: body.shelfLife,
+      recipe: body.recipe,
+      ingredients: (body.ingredients ?? [])
+        .filter((row) => row.name.trim())
+        .map((row) => ({
+          name: row.name,
+          grossPerPortion: row.grossPerPortion,
+          netPerPortion: row.netPerPortion,
+          grossPer100: '',
+          netPer100: '',
+          pricePerKg: '',
+        })),
+    });
+
+    return { recipe: found } as T;
   }
 
   // Администрирование: персонал и роли
