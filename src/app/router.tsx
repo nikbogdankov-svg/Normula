@@ -13,6 +13,7 @@ import { TtkRoute } from '@/features/ttk/ttk-route';
 import { ProfileRoute } from '@/features/profile/profile-route';
 import { MenuRoute } from '@/features/menu/menu-route';
 import { ObjectsRoute } from '@/features/objects/objects-route';
+import { PortionsRoute } from '@/features/portions/portions-route';
 
 /**
  * Маршруты приложения.
@@ -28,6 +29,7 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/profile': <ProfileRoute />,
   '/app/menu': <MenuRoute />,
   '/app/objects': <ObjectsRoute />,
+  '/app/portions': <PortionsRoute />,
 };
 
 const appChildren = NAV_ITEMS.map((item) => ({

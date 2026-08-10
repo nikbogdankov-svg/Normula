@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Button, Card, Flex, Icon, Table, Text, TextInput } from '@gravity-ui/uikit';
 import {
+  ArrowDown,
+  ArrowUp,
   ArrowUpArrowDown,
   Key,
   Magnifier,
@@ -18,7 +20,6 @@ import {
 } from '@/shared/ui/states';
 import { useEmployees, useStaffRoles } from './api';
 import type { Employee } from './types';
-import { RoleAccessCard } from './role-access-card';
 import {
   AddEmployeeDialog,
   DeleteEmployeeDialog,
@@ -26,7 +27,9 @@ import {
   ResetPasswordDialog,
 } from './staff-dialogs';
 
-/** Экран «Администрирование» из макета: доступы для ролей + персонал. */
+type StaffSort = 'name' | 'registeredAt';
+
+/** Экран «Персонал»: таблица сотрудников. */
 export function StaffRoute() {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -36,8 +39,6 @@ export function StaffRoute() {
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
-      <RoleAccessCard />
-
       <StaffCard
         search={search}
         onSearch={setSearch}
@@ -72,20 +73,31 @@ function StaffCard({
 }) {
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useEmployees(search);
+  const [sort, setSort] = useState<StaffSort>('registeredAt');
   const [ascending, setAscending] = useState(false);
 
-  // Сортировка по дате регистрации живёт на клиенте: в макете это переключатель
-  // в заголовке столбца, отдельного параметра у списка нет.
+  const onSort = (column: StaffSort) => {
+    if (sort === column) {
+      setAscending((value) => !value);
+      return;
+    }
+    setSort(column);
+    setAscending(column === 'name');
+  };
+
   const employees = useMemo(() => {
     const list = [...(data?.employees ?? [])];
-    list.sort((a, b) =>
-      ascending
-        ? a.registeredAt.localeCompare(b.registeredAt)
-        : b.registeredAt.localeCompare(a.registeredAt)
-    );
-
+    const dir = ascending ? 1 : -1;
+    list.sort((a, b) => {
+      if (sort === 'name') {
+        const left = `${a.lastName} ${a.firstName}`.trim();
+        const right = `${b.lastName} ${b.firstName}`.trim();
+        return left.localeCompare(right, 'ru') * dir;
+      }
+      return a.registeredAt.localeCompare(b.registeredAt) * dir;
+    });
     return list;
-  }, [data, ascending]);
+  }, [data, sort, ascending]);
 
   return (
     <Card view="filled" style={{ padding: 0 }}>
@@ -113,7 +125,7 @@ function StaffCard({
             }
             style={{ width: 240 }}
           />
-          <Button view="outlined" onClick={onAdd}>
+          <Button view="normal" onClick={onAdd}>
             <Icon data={Plus} size={16} />
             Добавить
           </Button>
@@ -139,8 +151,9 @@ function StaffCard({
         {data && employees.length > 0 && (
           <EmployeesTable
             employees={employees}
+            sort={sort}
             ascending={ascending}
-            onToggleSort={() => setAscending((value) => !value)}
+            onSort={onSort}
             onEdit={onEdit}
             onDelete={onDelete}
             onReset={onReset}
@@ -153,15 +166,17 @@ function StaffCard({
 
 function EmployeesTable({
   employees,
+  sort,
   ascending,
-  onToggleSort,
+  onSort,
   onEdit,
   onDelete,
   onReset,
 }: {
   employees: Employee[];
+  sort: StaffSort;
   ascending: boolean;
-  onToggleSort: () => void;
+  onSort: (column: StaffSort) => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onReset: (employee: Employee) => void;
@@ -179,48 +194,43 @@ function EmployeesTable({
         columns={[
           {
             id: 'name',
-            name: 'Имя',
+            name: () => (
+              <SortableHeader
+                label="Имя"
+                column="name"
+                sort={sort}
+                ascending={ascending}
+                onSort={onSort}
+              />
+            ),
             width: '28%',
             template: (row) => (
-              <Text variant="body-1" style={{ fontWeight: 600 }}>
-                {`${row.firstName} ${row.lastName}`.trim() || '—'}
-              </Text>
+              <Text variant="subheader-1">{`${row.firstName} ${row.lastName}`.trim() || '—'}</Text>
             ),
           },
           {
             id: 'email',
-            name: 'Почта',
+            name: 'Рабочая почта',
             width: '32%',
-            template: (row) => (
-              <Text variant="body-1" color="secondary">
-                {row.email}
-              </Text>
-            ),
+            template: (row) => <Text variant="body-1">{row.email}</Text>,
           },
           {
             id: 'registeredAt',
             name: () => (
-              <Flex
-                alignItems="center"
-                gap={1}
-                style={{ cursor: 'pointer' }}
-                onClick={onToggleSort}
-                title={ascending ? 'Сначала новые' : 'Сначала старые'}
-              >
-                Регистрация
-                <Icon data={ArrowUpArrowDown} size={14} />
-              </Flex>
+              <SortableHeader
+                label="Регистрация"
+                column="registeredAt"
+                sort={sort}
+                ascending={ascending}
+                onSort={onSort}
+              />
             ),
-            template: (row) => row.registeredAt.slice(0, 10),
+            template: (row) => <Text variant="body-1">{row.registeredAt.slice(0, 10)}</Text>,
           },
           {
             id: 'role',
             name: 'Роль',
-            template: (row) => (
-              <Text variant="body-1" style={{ fontWeight: 600 }}>
-                {roleName(row.roleId)}
-              </Text>
-            ),
+            template: (row) => <Text variant="subheader-1">{roleName(row.roleId)}</Text>,
           },
           {
             id: 'actions',
@@ -231,14 +241,19 @@ function EmployeesTable({
             className: 'admin-table__actions',
             template: (row) => (
               <Flex alignItems="center" justifyContent="flex-end" gap={1}>
-                <Button view="flat" size="s" onClick={() => onReset(row)}>
+                <Button view="flat-secondary" size="s" onClick={() => onReset(row)}>
                   <Icon data={Key} size={14} />
                   Сброс пароля
                 </Button>
-                <Button view="flat" size="s" title="Изменить" onClick={() => onEdit(row)}>
+                <Button view="flat-secondary" size="s" title="Изменить" onClick={() => onEdit(row)}>
                   <Icon data={Pencil} size={16} />
                 </Button>
-                <Button view="flat" size="s" onClick={() => onDelete(row)} title="Удалить">
+                <Button
+                  view="flat-secondary"
+                  size="s"
+                  onClick={() => onDelete(row)}
+                  title="Удалить"
+                >
                   <Icon data={TrashBin} size={16} />
                 </Button>
               </Flex>
@@ -247,5 +262,48 @@ function EmployeesTable({
         ]}
       />
     </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  column,
+  sort,
+  ascending,
+  onSort,
+}: {
+  label: string;
+  column: StaffSort;
+  sort: StaffSort;
+  ascending: boolean;
+  onSort: (column: StaffSort) => void;
+}) {
+  const active = sort === column;
+  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+
+  return (
+    <Flex
+      alignItems="center"
+      gap={1}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => onSort(column)}
+      title={
+        active
+          ? ascending
+            ? 'По возрастанию — нажмите для убывания'
+            : 'По убыванию — нажмите для возрастания'
+          : `Сортировать по: ${label}`
+      }
+    >
+      {label}
+      <span
+        style={{
+          display: 'inline-flex',
+          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
+        }}
+      >
+        <Icon data={icon} size={14} />
+      </span>
+    </Flex>
   );
 }

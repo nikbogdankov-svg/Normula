@@ -52,8 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Производство',
     items: [
-      { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
-      { to: '/app/portions', label: 'Порционник', icon: Receipt, wip: true },
+      { to: '/app/portions', label: 'Порционник', icon: Receipt },
       { to: '/app/cooking-plan', label: 'План приготовления', icon: Calendar, wip: true },
       { to: '/app/products-layout', label: 'Раскладка продуктов', icon: Box, wip: true },
       {
@@ -86,6 +85,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Справочники',
     items: [
+      { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/norms', label: 'Нормы', icon: ListCheck, wip: true },
       { to: '/app/products', label: 'Продукты', icon: ShoppingCart, wip: true },
       { to: '/app/diets', label: 'Диеты', icon: Heart, wip: true },

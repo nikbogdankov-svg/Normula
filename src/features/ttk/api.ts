@@ -14,18 +14,25 @@ import type {
 
 const KEY = 'ttk';
 
-export type RecipeSort = 'name' | 'price' | 'kcal';
+export type RecipeSort = 'name' | 'price';
 
-export function useRecipes(params: { search: string; collectionId: string; sort: RecipeSort }) {
+export function useRecipes(params: {
+  search: string;
+  collectionId: string;
+  sort: RecipeSort;
+  ascending?: boolean;
+}) {
   const api = useApi();
+  const ascending = params.ascending ?? true;
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, params],
+    queryKey: [KEY, api.organizationId, { ...params, ascending }],
     queryFn: () => {
       const query = new URLSearchParams({
         search: params.search,
         collectionId: params.collectionId,
         sort: params.sort,
+        order: ascending ? 'asc' : 'desc',
       });
 
       return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);

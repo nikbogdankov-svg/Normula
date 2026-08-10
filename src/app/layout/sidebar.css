@@ -3,6 +3,25 @@
  * inline-стилем: hover и активное состояние. Все значения — токены Gravity.
  */
 
+/* Колонка иконок: один inset в открытом и свёрнутом меню. */
+.sidebar-header,
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding-inline: calc(var(--g-spacing-2) + var(--g-spacing-3));
+}
+
+.sidebar-header {
+  height: 56px;
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--g-color-line-generic);
+  padding-block: 12px;
+}
+
 .sidebar-item {
   display: flex;
   align-items: center;
@@ -47,11 +66,17 @@
   color: inherit;
 }
 
-/* Свёрнутое меню: подсветка только вокруг иконки, как в макете. */
+/* Свёрнутое меню: равные отступы по бокам, иконка по центру. */
+.sidebar_collapsed .sidebar-header,
+.sidebar_collapsed .sidebar-footer {
+  justify-content: center;
+  padding-inline: 0;
+}
+
 .sidebar_collapsed .sidebar-item {
   justify-content: center;
-  padding: 0;
-  margin: 2px var(--g-spacing-2);
+  margin-inline: 0;
+  padding-inline: 0;
   background: transparent;
 }
 
@@ -67,6 +92,10 @@
 .sidebar_collapsed .sidebar-item_active .sidebar-item__icon {
   background: var(--onemore-sidebar-active-bg);
   color: var(--g-color-text-brand);
+}
+
+.sidebar_collapsed .sidebar-separator {
+  margin-inline: 14px;
 }
 
 .sidebar-group__title {

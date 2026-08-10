@@ -129,27 +129,35 @@ function MenuByDates({ menuId }: { menuId: string }) {
   }, [menuId]);
 
   useEffect(() => {
+    const weekTimer = weekTimerRef;
+    const persistTimer = persistTimerRef;
     return () => {
-      if (weekTimerRef.current !== null) window.clearTimeout(weekTimerRef.current);
-      if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
+      if (weekTimer.current !== null) window.clearTimeout(weekTimer.current);
+      if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
     };
   }, []);
 
   const menu = data?.menu;
   const startDate = viewStartDate ?? menu?.startDate ?? startOfWeekMonday();
+  /** Пока startDate на сервере не совпал с просматриваемым — слоты ещё от другого периода. */
+  const periodSynced = menu?.startDate === startDate;
 
   useEffect(() => {
     if (!menu || menu.cycleDays === CYCLE_DAYS) return;
     updateMenu.mutate({ cycleDays: CYCLE_DAYS });
   }, [menu, updateMenu]);
 
+  useEffect(() => {
+    if (!periodSynced) setPicker(null);
+  }, [periodSynced]);
+
   const slotMap = useMemo(() => {
     const map = new Map<string, MenuDishRef[]>();
     for (const slot of menu?.slots ?? []) {
-      map.set(slotKey(slot.day, slot.mealId), slot.dishes);
+      map.set(slotKey(slot.day, slot.mealId), periodSynced ? slot.dishes : EMPTY_DISHES);
     }
     return map;
-  }, [menu?.slots]);
+  }, [menu?.slots, periodSynced]);
 
   const dayTotals = useMemo(() => {
     if (!menu) return new Map<number, DayTotals>();
@@ -219,21 +227,29 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
     pendingWeekRef.current = next;
     setWeekLoading(true);
+    setPicker(null);
 
     if (weekTimerRef.current !== null) window.clearTimeout(weekTimerRef.current);
+    if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
+
     weekTimerRef.current = window.setTimeout(() => {
       const pending = pendingWeekRef.current;
-      if (pending) setViewStartDate(pending);
       pendingWeekRef.current = null;
-      setWeekLoading(false);
-
-      // Сохраняем неделю в фоне, без дёрганья UI.
-      if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
-      if (pending) {
-        persistTimerRef.current = window.setTimeout(() => {
-          updateMenu.mutate({ startDate: pending });
-        }, 400);
+      if (!pending) {
+        setWeekLoading(false);
+        return;
       }
+
+      // Сначала переключаем период на сервере (свои слоты), потом обновляем календарь.
+      updateMenu.mutate(
+        { startDate: pending },
+        {
+          onSettled: () => {
+            setViewStartDate(pending);
+            setWeekLoading(false);
+          },
+        }
+      );
     }, 180);
   };
 
@@ -253,7 +269,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
         <Flex alignItems="center" gap={2} wrap>
           <Button
             view="outlined"
-            size="m"
+            size="l"
             title="Предыдущий период"
             disabled={weekLoading}
             onClick={() => shiftPeriod(-1)}
@@ -262,13 +278,13 @@ function MenuByDates({ menuId }: { menuId: string }) {
           </Button>
           <TextInput
             className="menu-week-field"
-            size="m"
+            size="l"
             value={formatDateRange(startDate, CYCLE_DAYS)}
             readOnly
           />
           <Button
             view="outlined"
-            size="m"
+            size="l"
             title="Следующий период"
             disabled={weekLoading}
             onClick={() => shiftPeriod(1)}
@@ -277,7 +293,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
           </Button>
           <Button
             view="outlined"
-            size="m"
+            size="l"
             disabled={weekLoading}
             onClick={() => goToWeek(startOfWeekMonday())}
           >
@@ -287,6 +303,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
         <Flex alignItems="center" gap={2} wrap>
           <Select
+            size="l"
             label="Организация:"
             width={300}
             value={[organizationId]}
@@ -294,6 +311,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
             options={ORG_OPTIONS}
           />
           <Select
+            size="l"
             label="Диета:"
             width={200}
             value={[menu.dietName]}
@@ -351,7 +369,11 @@ function MenuByDates({ menuId }: { menuId: string }) {
                       <button
                         type="button"
                         className="menu-grid__cell-btn"
-                        onClick={() => setPicker({ day, mealId: meal.id })}
+                        disabled={!periodSynced || weekLoading}
+                        onClick={() => {
+                          if (!periodSynced || weekLoading) return;
+                          setPicker({ day, mealId: meal.id });
+                        }}
                       >
                         {dishes.length === 0 ? (
                           <span className="menu-grid__empty">+ блюдо</span>
