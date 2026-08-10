@@ -13,6 +13,8 @@ export interface Ingredient {
   netPerPortion: string;
   grossPer100: string;
   netPer100: string;
+  /** Цена за 1 кг; пустая строка — ячейка пустая. */
+  pricePerKg: string;
 }
 
 export interface Nutrition {
@@ -39,8 +41,6 @@ export interface Recipe {
   portionYield: string;
   price: number;
   kcal: number;
-  /** Приёмы пищи: «Завтрак/Ужин», «Обед», «Полдник». */
-  meals: string;
   temperature: string;
   shelfLife: string;
   recipe: string;
@@ -60,17 +60,25 @@ export interface ListCollectionsResponse {
   collections: Collection[];
 }
 
+/** Строка ингредиента в форме создания ТТК (макет «Создать ТТК»). */
+export interface CreateRecipeIngredient {
+  name: string;
+  grossPerPortion: string;
+  netPerPortion: string;
+}
+
 export interface CreateRecipeRequest {
   name: string;
-  collectionId: string;
   portionYield: string;
-  price: number;
-  kcal: number;
-  meals: string;
   temperature: string;
   shelfLife: string;
+  /** Технология приготовления. */
   recipe: string;
+  ingredients: CreateRecipeIngredient[];
 }
+
+/** Тело обновления ТТК — те же поля, что и при создании. */
+export type UpdateRecipeRequest = CreateRecipeRequest;
 
 export interface ImportCollectionsRequest {
   /** Имена файлов: настоящую загрузку добавим вместе с бэкендом. */

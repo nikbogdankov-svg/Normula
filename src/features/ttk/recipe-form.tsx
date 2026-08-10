@@ -1,0 +1,180 @@
+import { useEffect, useState } from 'react';
+import { Button, Flex, Icon, Text, TextArea, TextInput } from '@gravity-ui/uikit';
+import { Plus, TrashBin } from '@gravity-ui/icons';
+import type { CreateRecipeIngredient, CreateRecipeRequest, Recipe } from './types';
+
+const emptyIngredient = (): CreateRecipeIngredient => ({
+  name: '',
+  grossPerPortion: '',
+  netPerPortion: '',
+});
+
+function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
+  if (recipe.ingredients.length === 0) return [emptyIngredient()];
+
+  return recipe.ingredients.map((row) => ({
+    name: row.name,
+    grossPerPortion: row.grossPerPortion,
+    netPerPortion: row.netPerPortion,
+  }));
+}
+
+/** Состояние и разметка формы создания/редактирования ТТК. */
+export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
+  const [name, setName] = useState('');
+  const [portionYield, setPortionYield] = useState('');
+  const [temperature, setTemperature] = useState('');
+  const [shelfLife, setShelfLife] = useState('');
+  const [recipe, setRecipe] = useState('');
+  const [ingredients, setIngredients] = useState<CreateRecipeIngredient[]>([emptyIngredient()]);
+
+  useEffect(() => {
+    if (initial) {
+      setName(initial.name);
+      setPortionYield(initial.portionYield);
+      setTemperature(initial.temperature);
+      setShelfLife(initial.shelfLife);
+      setRecipe(initial.recipe);
+      setIngredients(ingredientsFromRecipe(initial));
+      return;
+    }
+
+    setName('');
+    setPortionYield('');
+    setTemperature('');
+    setShelfLife('');
+    setRecipe('');
+    setIngredients([emptyIngredient()]);
+    // Сбрасываем только по ключу сессии формы, не по ссылке на initial.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetKey задаёт момент предзаполнения
+  }, [resetKey]);
+
+  const updateIngredient = (index: number, patch: Partial<CreateRecipeIngredient>) => {
+    setIngredients((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  };
+
+  const removeIngredient = (index: number) => {
+    setIngredients((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
+  };
+
+  const getBody = (): CreateRecipeRequest => ({
+    name: name.trim(),
+    portionYield: portionYield.trim(),
+    temperature: temperature.trim(),
+    shelfLife: shelfLife.trim(),
+    recipe: recipe.trim(),
+    ingredients: ingredients.filter((row) => row.name.trim()),
+  });
+
+  const fields = (
+    <Flex direction="column" gap={2}>
+      <Flex gap={2}>
+        <TextInput
+          size="l"
+          label="Название изделия:"
+          placeholder="Название блюда"
+          value={name}
+          onUpdate={setName}
+          autoFocus
+          style={{ flex: 1 }}
+        />
+        <TextInput
+          size="l"
+          label="Выход порции:"
+          placeholder="00/00"
+          value={portionYield}
+          onUpdate={setPortionYield}
+          style={{ flex: 1 }}
+        />
+      </Flex>
+
+      <Flex gap={2}>
+        <TextInput
+          size="l"
+          label="Температура:"
+          placeholder="Отпуск не ниже 65°С"
+          value={temperature}
+          onUpdate={setTemperature}
+          style={{ flex: 1 }}
+        />
+        <TextInput
+          size="l"
+          label="Срок реализации:"
+          placeholder="Не более часов"
+          value={shelfLife}
+          onUpdate={setShelfLife}
+          style={{ flex: 1 }}
+        />
+      </Flex>
+
+      <Flex direction="column" gap={2}>
+        <Text variant="body-1">Технология приготовления</Text>
+        <TextArea
+          size="l"
+          placeholder="Опишите технологию приготовления"
+          value={recipe}
+          onUpdate={setRecipe}
+          minRows={3}
+        />
+      </Flex>
+
+      <Flex direction="column" gap={2}>
+        <Text variant="subheader-1">Ингредиенты</Text>
+
+        {ingredients.map((row, index) => (
+          <Flex key={index} gap={2} alignItems="flex-end">
+            <TextInput
+              size="l"
+              label="Продукт:"
+              placeholder="Название блюда"
+              value={row.name}
+              onUpdate={(value) => updateIngredient(index, { name: value })}
+              style={{ flex: 2 }}
+            />
+            <TextInput
+              size="l"
+              label="Брутто на 1 порц, г:"
+              placeholder="000"
+              value={row.grossPerPortion}
+              onUpdate={(value) => updateIngredient(index, { grossPerPortion: value })}
+              style={{ flex: 1 }}
+            />
+            <TextInput
+              size="l"
+              label="Нетто на 1 порц, г:"
+              placeholder="000"
+              value={row.netPerPortion}
+              onUpdate={(value) => updateIngredient(index, { netPerPortion: value })}
+              style={{ flex: 1 }}
+            />
+            {index > 0 ? (
+              <Button
+                view="flat"
+                size="l"
+                onClick={() => removeIngredient(index)}
+                title="Удалить"
+                aria-label="Удалить ингредиент"
+              >
+                <Icon data={TrashBin} size={18} />
+              </Button>
+            ) : (
+              <span style={{ width: 40, flexShrink: 0 }} />
+            )}
+          </Flex>
+        ))}
+
+        <Button
+          view="normal"
+          size="m"
+          onClick={() => setIngredients((rows) => [...rows, emptyIngredient()])}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <Icon data={Plus} size={16} />
+          Добавить ингредиент
+        </Button>
+      </Flex>
+    </Flex>
+  );
+
+  return { fields, getBody, canSubmit: Boolean(name.trim()) };
+}

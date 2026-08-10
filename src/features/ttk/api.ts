@@ -7,6 +7,7 @@ import type {
   ListCollectionsResponse,
   ListRecipesResponse,
   Recipe,
+  UpdateRecipeRequest,
 } from './types';
 
 /** API раздела ТТК. Данные организационные — токен по умолчанию. */
@@ -57,6 +58,17 @@ export function useCreateRecipe() {
     mutationFn: (body: CreateRecipeRequest) =>
       api.request<{ recipe: Recipe }>('/v1/ttk', { method: 'POST', body }),
     onSuccess: invalidate,
+  });
+}
+
+export function useUpdateRecipe() {
+  const api = useApi();
+
+  // Инвалидацию списка делает RecipeDialog после переключения в view —
+  // иначе refetch в середине смены mode может закрыть drawer.
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateRecipeRequest }) =>
+      api.request<{ recipe: Recipe }>(`/v1/ttk/${id}`, { method: 'PATCH', body }),
   });
 }
 

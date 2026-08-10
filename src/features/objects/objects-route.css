@@ -1,0 +1,77 @@
+.objects-facility-bar-scroll {
+  overflow-x: auto;
+}
+
+.objects-facility-bar {
+  display: flex;
+  border: 1px solid var(--g-color-line-generic-solid);
+  border-radius: 12px;
+  background: var(--g-color-base-background);
+}
+
+.objects-facility-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 0;
+  min-width: 140px;
+  margin: 0;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 0;
+  background: var(--g-color-base-background);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.objects-facility-card:first-child {
+  border-radius: 11px 0 0 11px;
+}
+
+.objects-facility-card:last-child {
+  border-radius: 0 11px 11px 0;
+}
+
+.objects-facility-card:only-child {
+  border-radius: 11px;
+}
+
+.objects-facility-card:hover {
+  background: var(--g-color-base-generic-ultralight);
+}
+
+.objects-facility-card_active,
+.objects-facility-card_active:hover {
+  background: var(--g-color-base-generic);
+}
+
+.objects-facility-tables .g-table__table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.objects-group-table .objects-group-row_no-divider .g-table__cell {
+  border-block-end-color: transparent;
+  padding-block-end: 4px;
+}
+
+.objects-group-table .objects-group-row_continuation .g-table__cell {
+  padding-block-start: 4px;
+}
+
+/* Линия между ЛПУ внутри блюда — не пересекает столбец «Блюдо». */
+.objects-group-table .objects-group-row_facility-divider .g-table__cell:first-child {
+  border-block-end-color: transparent;
+}
+
+/* Линия между отделениями — не пересекает «Блюдо» и «ЛПУ». */
+.objects-group-table .objects-group-row_department-divider .g-table__cell:nth-child(-n + 2) {
+  border-block-end-color: transparent;
+}
+
+/* Выравнивание «Всего» с цифрами внутри TextInput size=s (padding ~8px). */
+.objects-total-headcount {
+  display: inline-block;
+  padding-inline-start: 8px;
+}
