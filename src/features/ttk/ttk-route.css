@@ -1,0 +1,30 @@
+/* Карточки списка ТТК без тени, с рамкой. */
+.ttk-recipe-card {
+  --g-card-box-shadow: none;
+  --g-card-border-width: 1px;
+  --g-card-border-color: var(--g-color-line-generic);
+}
+
+.ttk-recipe-card:hover {
+  --g-card-box-shadow: none;
+}
+
+.ttk-recipe-card__title-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+/* Имя блюда всегда целиком; обрезается только тег сборника. */
+.ttk-recipe-card__name {
+  flex: 0 0 auto;
+}
+
+/* Короткий тег по ширине контента; длинный — сжимается и обрезается. */
+.ttk-recipe-card__tag {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  width: auto;
+}

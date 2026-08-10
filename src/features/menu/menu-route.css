@@ -1,0 +1,256 @@
+/* Сетка меню: приёмы × дни + итог на день. */
+.menu-toolbar {
+  flex-shrink: 0;
+}
+
+.menu-week-field {
+  width: 210px;
+  flex-shrink: 0;
+}
+
+.menu-week-field .g-text-input__control {
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+}
+
+.menu-grid-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--g-color-line-generic);
+  border-radius: 12px;
+  background: var(--onemore-card-bg);
+  box-shadow: none;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+.menu-grid-wrap::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+.menu-grid-fade {
+  width: 100%;
+  height: 100%;
+  transition: opacity 160ms ease;
+}
+
+.menu-grid-fade_loading {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.menu-grid-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--onemore-card-bg) 55%, transparent);
+}
+
+.menu-grid {
+  display: grid;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
+  height: 100%;
+  min-height: 480px;
+  background: var(--onemore-card-bg);
+  /* --menu-days / --menu-meal-rows задаются инлайном из React */
+  grid-template-columns: 140px repeat(var(--menu-days), minmax(180px, 1fr));
+  /* Приёмы делят высоту поровну; «Итог на день» заметно ниже. */
+  grid-template-rows: 52px repeat(var(--menu-meal-rows), 1fr) minmax(64px, 0.55fr);
+}
+
+.menu-grid__cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--onemore-card-bg);
+  border-right: 1px solid var(--g-color-line-generic);
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.menu-grid__cell_end {
+  border-right: none;
+}
+
+.menu-grid__meal {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  justify-content: center;
+  padding: 12px;
+  font-weight: 600;
+  background: var(--onemore-card-bg);
+}
+
+.menu-grid__day {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  text-align: center;
+  background: var(--onemore-card-bg);
+}
+
+.menu-grid__day-weekday {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: lowercase;
+  color: var(--g-color-text-secondary);
+}
+
+.menu-grid__day-date {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.5em;
+  padding-inline-end: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--g-color-text-primary);
+}
+
+.menu-grid__today-dot {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--g-color-base-brand);
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+.menu-grid__corner {
+  z-index: 3;
+}
+
+.menu-grid__slot {
+  padding: 0;
+}
+
+.menu-grid__cell-btn {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  padding: 8px;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-grid__cell-btn:hover {
+  background: var(--g-color-base-simple-hover);
+}
+
+.menu-grid__dish {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.25;
+}
+
+.menu-grid__empty {
+  color: var(--g-color-text-hint);
+}
+
+.menu-grid__slot-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--g-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-grid__total-label {
+  position: sticky;
+  left: 0;
+  bottom: 0;
+  z-index: 4;
+  justify-content: center;
+  padding: 10px 12px;
+  font-weight: 600;
+  border-bottom: none;
+  background: var(--onemore-card-bg);
+}
+
+.menu-grid__total-cell {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 8px 10px;
+  border-bottom: none;
+  background: var(--onemore-card-bg);
+}
+
+.menu-grid__total-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.menu-grid__metric {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--g-color-text-secondary);
+}
+
+.menu-grid__metric-label {
+  color: var(--g-color-text-secondary);
+}
+
+.menu-grid__metric-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--g-color-text-primary);
+}
+
+.menu-grid__metric-value_ok {
+  color: var(--g-color-text-positive);
+}
+
+.menu-grid__metric-value_low,
+.menu-grid__metric-value_high {
+  color: var(--g-color-text-danger);
+}

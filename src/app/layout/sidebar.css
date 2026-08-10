@@ -7,37 +7,73 @@
   display: flex;
   align-items: center;
   gap: var(--g-spacing-2);
-  height: 26px;
-  padding: 0 var(--g-spacing-4);
-  border-left: 2px solid transparent;
-  color: var(--g-color-text-primary);
+  height: 36px;
+  padding: 0 var(--g-spacing-3);
+  color: var(--g-color-text-secondary);
   text-decoration: none;
-  font-size: var(--g-text-body-1-font-size);
-  line-height: var(--g-text-body-1-line-height);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: var(--g-text-body-font-weight);
   white-space: nowrap;
   overflow: hidden;
+  border-radius: var(--g-border-radius-l);
+  margin: 2px var(--g-spacing-2);
 }
 
 .sidebar-item:hover {
   background: var(--g-color-base-simple-hover);
+  color: var(--g-color-text-primary);
 }
 
+/* Развёрнутое меню: активный пункт — мятная «таблетка» на всю строку. */
 .sidebar-item_active {
-  border-left-color: var(--g-color-line-brand);
+  background: var(--onemore-sidebar-active-bg);
+  color: var(--g-color-text-brand);
+}
+
+.sidebar-item_active:hover {
+  background: var(--onemore-sidebar-active-bg);
   color: var(--g-color-text-brand);
 }
 
 .sidebar-item__icon {
   flex-shrink: 0;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--g-border-radius-m);
   color: inherit;
+}
+
+/* Свёрнутое меню: подсветка только вокруг иконки, как в макете. */
+.sidebar_collapsed .sidebar-item {
+  justify-content: center;
+  padding: 0;
+  margin: 2px var(--g-spacing-2);
+  background: transparent;
+}
+
+.sidebar_collapsed .sidebar-item:hover {
+  background: transparent;
+}
+
+.sidebar_collapsed .sidebar-item_active {
+  background: transparent;
+  color: var(--g-color-text-brand);
+}
+
+.sidebar_collapsed .sidebar-item_active .sidebar-item__icon {
+  background: var(--onemore-sidebar-active-bg);
+  color: var(--g-color-text-brand);
 }
 
 .sidebar-group__title {
   padding: var(--g-spacing-4) var(--g-spacing-4) var(--g-spacing-1);
   color: var(--g-color-text-secondary);
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 16px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;

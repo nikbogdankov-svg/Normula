@@ -1,0 +1,15 @@
+/* Серый активный сегмент — как в макете, без brand-подсветки. */
+.employee-edit-tabs .g-segmented-radio-group__option_checked .g-segmented-radio-group__option-text {
+  color: var(--g-color-text-primary);
+}
+
+.employee-edit-tabs .g-segmented-radio-group__option_checked::after {
+  background-color: var(--g-color-base-generic);
+  border-color: var(--g-color-line-generic);
+}
+
+/* Одинаковая ширина сегментов независимо от длины подписи. */
+.employee-edit-tabs .g-segmented-radio-group__option {
+  flex: 1 1 0;
+  min-width: 0;
+}

@@ -1,7 +1,12 @@
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { LogtoProvider, ReservedScope, useLogto, UserScope, type LogtoConfig } from '@logto/react';
 import { config, type LogtoSettings } from '@/shared/config';
-import { AuthContext, type AuthContextValue, type Organization } from './auth-context';
+import {
+  AuthContext,
+  type AuthContextValue,
+  type AuthUser,
+  type Organization,
+} from './auth-context';
 
 function requireLogtoSettings(): LogtoSettings {
   if (!config.logto) {
@@ -72,6 +77,7 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
   const logto = useLogto();
   const { signIn, signOut, getAccessToken, getOrganizationToken, fetchUserInfo } = logto;
   const apiResource = requireLogtoSettings().apiResource;
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   const getApiToken = useCallback(async () => {
     const token = await getAccessToken(apiResource);
@@ -102,11 +108,46 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     return (info.organizations ?? []).map((id) => ({ id, name: id }));
   }, [fetchUserInfo]);
 
+  // Имя/почта в userinfo появятся только если приложению выданы соответствующие
+  // скоупы; иначе остаётся sub. Профиль рисует то, что реально пришло.
+  useEffect(() => {
+    if (!logto.isAuthenticated) {
+      setUser(null);
+      return;
+    }
+    let cancelled = false;
+    fetchUserInfo()
+      .then((info) => {
+        if (cancelled) return;
+        const record = info as {
+          sub?: string;
+          name?: string;
+          username?: string;
+          email?: string;
+        };
+        if (!record.sub) {
+          setUser(null);
+          return;
+        }
+        setUser({
+          id: record.sub,
+          name: record.name ?? record.username,
+          email: record.email,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [logto.isAuthenticated, fetchUserInfo]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       isLoading: logto.isLoading,
       isAuthenticated: logto.isAuthenticated,
-      user: null, // заполняется лениво через fetchUserInfo при необходимости
+      user,
       signIn: () => signIn(signInRedirectUri),
       signOut: () => signOut(postSignOutRedirectUri),
       getApiToken,
@@ -116,6 +157,7 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     [
       logto.isLoading,
       logto.isAuthenticated,
+      user,
       signIn,
       signOut,
       getApiToken,
