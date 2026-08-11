@@ -7,6 +7,7 @@ import {
   Calendar,
   CircleRuble,
   Cubes3Overlap,
+  BookOpen,
   Files,
   FileText,
   Gear,
@@ -80,7 +81,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Документы',
-    items: [{ to: '/app/documents', label: 'Документы', icon: Files, wip: true }],
+    items: [
+      { to: '/app/journals', label: 'Автоматические журналы', icon: BookOpen },
+      { to: '/app/documents', label: 'Документы', icon: Files, wip: true },
+    ],
   },
   {
     title: 'Справочники',
