@@ -26,10 +26,8 @@ export interface Employee {
   id: string;
   firstName: string;
   lastName: string;
-  /** Личная почта — по ней сотрудник входит. */
+  /** Рабочая почта — по ней сотрудник входит. */
   email: string;
-  /** Почта в организации, выдаётся автоматически. */
-  orgEmail: string;
   roleId: string;
   /** Дата регистрации, ISO-строка. */
   registeredAt: string;

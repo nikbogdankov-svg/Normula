@@ -6,11 +6,11 @@ import type {
   OrganizationRole,
 } from '@/features/organizations/types';
 import type { Employee, StaffRole } from '@/features/staff/types';
-import { orgEmail } from '@/features/staff/org-email';
 import type { Collection, Recipe } from '@/features/ttk/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
 import { formatKettle, type DistributionRow, type KitchenUnit } from '@/features/objects/types';
+import type { DishDistributionRow, PortionEntry } from '@/features/portions/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -29,7 +29,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Как только ручка появится на сервере, префикс отсюда убирается — и запросы
  * сразу пойдут по сети, без правок в фичах.
  */
-export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk', '/v1/menus', '/v1/objects'];
+export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk', '/v1/menus', '/v1/objects', '/v1/portions'];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
 export function isMocked(path: string): boolean {
@@ -169,8 +169,7 @@ const employees: Employee[] = [
     id: `e-${index + 1}`,
     firstName,
     lastName,
-    email: `${lastName.toLowerCase()}${firstName.toLowerCase()}@mail.ru`,
-    orgEmail: orgEmail(firstName, lastName),
+    email: `${lastName.toLowerCase()}${firstName.toLowerCase()}@pitaniye.ru`,
     roleId,
     registeredAt: new Date(Date.UTC(2019, 1, 1 + index)).toISOString(),
     snils: `00 000 000${index} 0${index}`,
@@ -455,6 +454,25 @@ const menus: CycleMenu[] = [
   },
 ];
 
+/**
+ * Слоты по периоду (понедельник начала 14 дней).
+ * Текущий период — с расписанием, остальные при первом заходе пустые.
+ */
+const menuSlotsByPeriod = new Map<string, Record<string, CycleMenu['slots']>>();
+
+function periodSlots(menuId: string): Record<string, CycleMenu['slots']> {
+  let periods = menuSlotsByPeriod.get(menuId);
+  if (!periods) {
+    periods = {};
+    menuSlotsByPeriod.set(menuId, periods);
+  }
+  return periods;
+}
+
+for (const menu of menus) {
+  periodSlots(menu.id)[menu.startDate] = menu.slots;
+}
+
 /** Достаёт сегменты пути по шаблону вида /v1/admin/organizations/:id/members. */
 function match(pattern: string, path: string): Record<string, string> | null {
   const patternParts = pattern.split('/');
@@ -496,16 +514,17 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const query = (params.get('search') ?? '').trim().toLowerCase();
     const collectionId = params.get('collectionId') ?? '';
     const sort = params.get('sort') ?? 'name';
+    const ascending = (params.get('order') ?? 'asc') !== 'desc';
 
     let found = recipes;
     if (query) found = found.filter((r) => r.name.toLowerCase().includes(query));
     if (collectionId) found = found.filter((r) => r.collectionId === collectionId);
 
     const sorted = [...found].sort((a, b) => {
-      if (sort === 'price') return a.price - b.price;
-      if (sort === 'kcal') return a.kcal - b.kcal;
+      const dir = ascending ? 1 : -1;
+      if (sort === 'price') return (a.price - b.price) * dir;
 
-      return a.name.localeCompare(b.name, 'ru');
+      return a.name.localeCompare(b.name, 'ru') * dir;
     });
 
     return { recipes: sorted, total: sorted.length } as T;
@@ -608,11 +627,10 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   if (route === '/v1/staff' && method === 'POST') {
-    const body = options.body as Omit<Employee, 'id' | 'orgEmail' | 'registeredAt'>;
+    const body = options.body as Omit<Employee, 'id' | 'registeredAt'>;
     const employee: Employee = {
       ...body,
       id: `e-${Date.now()}`,
-      orgEmail: orgEmail(body.firstName, body.lastName),
       registeredAt: new Date().toISOString(),
     };
     employees.unshift(employee);
@@ -629,11 +647,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   if (employee && method === 'PATCH') {
     const found = employees.find((e) => e.id === employee.id);
     if (!found) throw new Error('mock: сотрудник не найден');
-    const body = options.body as Partial<Employee>;
-    Object.assign(found, body);
-    if (body.firstName !== undefined || body.lastName !== undefined) {
-      found.orgEmail = orgEmail(found.firstName, found.lastName);
-    }
+    Object.assign(found, options.body as Partial<Employee>);
 
     return { employee: found } as T;
   }
@@ -779,6 +793,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       createdAt: new Date().toISOString(),
       slots: filledSlots(cycleDays),
     };
+    periodSlots(menu.id)[menu.startDate] = menu.slots;
     menus.unshift(menu);
 
     return { menu } as T;
@@ -805,7 +820,21 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
     if (body.name !== undefined) found.name = body.name.trim() || found.name;
     if (body.dietName !== undefined) found.dietName = body.dietName;
-    if (body.startDate !== undefined) found.startDate = mondayOfWeek(body.startDate);
+
+    if (body.startDate !== undefined) {
+      const next = mondayOfWeek(body.startDate);
+      if (next !== found.startDate) {
+        const periods = periodSlots(found.id);
+        periods[found.startDate] = found.slots;
+        found.startDate = next;
+        if (!periods[next]) {
+          // Только текущие две недели заранее с расписанием; остальные периоды — пустые.
+          periods[next] =
+            next === mondayOfWeek() ? filledSlots(found.cycleDays) : emptySlots(found.cycleDays);
+        }
+        found.slots = periods[next];
+      }
+    }
 
     if (body.cycleDays !== undefined && body.cycleDays > 0 && body.cycleDays !== found.cycleDays) {
       const previous = new Map(
@@ -816,6 +845,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         ...slot,
         dishes: previous.get(`${slot.day}:${slot.mealId}`) ?? [],
       }));
+      periodSlots(found.id)[found.startDate] = found.slots;
     }
 
     return { menu: found } as T;
@@ -835,6 +865,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     } else {
       found.slots[index] = { ...found.slots[index], dishes: body.dishes };
     }
+    periodSlots(found.id)[found.startDate] = found.slots;
 
     return { menu: found } as T;
   }
@@ -867,6 +898,82 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     table.headcount = Math.max(0, body.headcount);
     rebuildDistribution();
     return { kitchen } as T;
+  }
+
+  const facilityRoute = match('/v1/objects/facilities/:id', route);
+  if (facilityRoute && method === 'PATCH') {
+    const body = options.body as {
+      name: string;
+      address: string;
+      kettleNumber: number;
+      departments: Array<{
+        id: string;
+        name: string;
+        tables: Array<{ id: string; name: string }>;
+      }>;
+    };
+    const facility = kitchen.facilities.find((item) => item.id === facilityRoute.id);
+    if (!facility) throw new Error('mock: ЛПУ не найдено');
+
+    const oldDepartments = facility.departments;
+    facility.name = body.name.trim();
+    facility.address = body.address.trim();
+    facility.kettleNumber = Math.max(1, body.kettleNumber);
+    facility.departments = body.departments.map((department) => {
+      const oldDepartment = oldDepartments.find((item) => item.id === department.id);
+      return {
+        id: department.id,
+        name: department.name.trim(),
+        tables: department.tables.map((table) => {
+          const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
+          return {
+            id: table.id,
+            name: table.name.trim(),
+            headcount: oldTable?.headcount ?? 0,
+          };
+        }),
+      };
+    });
+
+    prunePortionEntries();
+    rebuildDistribution();
+    return { kitchen } as T;
+  }
+
+  // --- Порционник (численность на дату + раздача по блюдам) ---
+  if (route === '/v1/portions' && method === 'GET') {
+    const date = params.get('date') ?? '';
+    return { date, entries: ensurePortionsDay(date) } as T;
+  }
+
+  if (route === '/v1/portions/dishes' && method === 'GET') {
+    const date = params.get('date') ?? '';
+    const rows = buildDishDistribution(date);
+    return {
+      date,
+      rows,
+      totalPortions: rows.reduce((sum, row) => sum + row.portions, 0),
+    } as T;
+  }
+
+  if (route === '/v1/portions/headcount' && method === 'PATCH') {
+    const body = options.body as {
+      date: string;
+      facilityId: string;
+      departmentId: string;
+      tableId: string;
+      headcount: number;
+    };
+    const entries = ensurePortionsDay(body.date);
+    const found = entries.find(
+      (item) =>
+        item.facilityId === body.facilityId &&
+        item.departmentId === body.departmentId &&
+        item.tableId === body.tableId
+    );
+    if (!found) throw new Error('mock: строка порционника не найдена');
+    found.headcount = Math.max(0, body.headcount);
+    return { date: body.date, entries } as T;
   }
 
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
@@ -1014,6 +1121,77 @@ function rebuildDistribution() {
 }
 
 rebuildDistribution();
+
+/** Порционник по датам: ключ YYYY-MM-DD → строки численности. */
+const portionsByDate: Record<string, PortionEntry[]> = {};
+
+function tableExists(facilityId: string, departmentId: string, tableId: string): boolean {
+  const facility = kitchen.facilities.find((item) => item.id === facilityId);
+  if (!facility) return false;
+  const department = facility.departments.find((item) => item.id === departmentId);
+  if (!department) return false;
+  return department.tables.some((item) => item.id === tableId);
+}
+
+function prunePortionEntries() {
+  for (const date of Object.keys(portionsByDate)) {
+    portionsByDate[date] = portionsByDate[date].filter((entry) =>
+      tableExists(entry.facilityId, entry.departmentId, entry.tableId)
+    );
+  }
+}
+
+function ensurePortionsDay(date: string): PortionEntry[] {
+  if (!date) throw new Error('mock: не указана дата порционника');
+  if (!portionsByDate[date]) {
+    const entries: PortionEntry[] = [];
+    for (const facility of kitchen.facilities) {
+      for (const department of facility.departments) {
+        for (const table of department.tables) {
+          entries.push({
+            facilityId: facility.id,
+            departmentId: department.id,
+            tableId: table.id,
+            headcount: table.headcount,
+          });
+        }
+      }
+    }
+    portionsByDate[date] = entries;
+  }
+  return portionsByDate[date];
+}
+
+function buildDishDistribution(date: string): DishDistributionRow[] {
+  const dishes = ['Каша рисовая молочная', 'Суп картофельный с мясом', 'Котлета куриная паровая'];
+  const entries = ensurePortionsDay(date);
+  const rows: DishDistributionRow[] = [];
+  for (const dishName of dishes) {
+    for (const facility of kitchen.facilities) {
+      for (const department of facility.departments) {
+        for (const table of department.tables) {
+          const entry = entries.find(
+            (item) =>
+              item.facilityId === facility.id &&
+              item.departmentId === department.id &&
+              item.tableId === table.id
+          );
+          const portions = entry?.headcount ?? 0;
+          if (portions <= 0) continue;
+          rows.push({
+            dishName,
+            facilityName: facility.name,
+            departmentName: department.name,
+            tableName: table.name,
+            kettleLabel: formatKettle(facility.kettleNumber),
+            portions,
+          });
+        }
+      }
+    }
+  }
+  return rows;
+}
 
 /** Держит счётчик участников в согласии со списком. */
 function syncMemberCount(organizationId: string) {
