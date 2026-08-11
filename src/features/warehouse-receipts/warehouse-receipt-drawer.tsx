@@ -110,11 +110,8 @@ export function ReceiptDrawer({
                   </tr>
                 </thead>
                 <tbody>
-                  {view.items.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className={index === view.items.length - 1 ? 'admin-table__row_last' : ''}
-                    >
+                  {view.items.map((item) => (
+                    <tr key={item.id}>
                       <td>{item.productName}</td>
                       <td style={{ textAlign: 'right' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right' }}>{item.unit}</td>
@@ -122,15 +119,20 @@ export function ReceiptDrawer({
                       <td style={{ textAlign: 'right' }}>{item.totalPrice.toFixed(2)}</td>
                     </tr>
                   ))}
+                  <tr className="admin-table__row_total">
+                    <td>
+                      <strong>Всего</strong>
+                    </td>
+                    <td />
+                    <td />
+                    <td />
+                    <td style={{ textAlign: 'right' }}>
+                      <strong>{totalSum.toFixed(2)} ₽</strong>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-
-            <Flex justifyContent="flex-end" style={{ paddingTop: 8 }}>
-              <Text variant="body-1">
-                <strong>Итого: {totalSum.toFixed(2)} ₽</strong>
-              </Text>
-            </Flex>
           </Flex>
         </div>
       </div>

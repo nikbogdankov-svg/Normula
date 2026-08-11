@@ -44,23 +44,28 @@
   gap: 12px;
   flex-shrink: 0;
   padding-block: 16px;
-  padding-inline: 24px;
+  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
   border-bottom: 1px solid var(--g-color-line-generic);
   background: #f2f2f2;
 }
 
 /* Контент drawer'а. */
 .warehouse-receipt-drawer__body {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding: 16px 24px;
+  box-sizing: border-box;
   background: #f2f2f2;
 }
 
 /* Стили таблицы как на основной странице. */
 .warehouse-receipt-drawer__body .admin-table-wrap {
   overflow-x: auto;
+  padding: 0;
 }
 
 .warehouse-receipt-drawer__body .admin-table {
@@ -79,11 +84,11 @@
 
 .warehouse-receipt-drawer__body .admin-table tbody tr {
   border-bottom: 1px solid var(--g-color-line-generic);
-  transition: background-color 0.15s ease-out;
 }
 
-.warehouse-receipt-drawer__body .admin-table tbody tr:hover {
-  background-color: var(--g-color-bg-secondary);
+/* Отключаем ховер-эффект строк таблицы в drawer'е. */
+.warehouse-receipt-drawer__body .admin-table tbody tr:hover td {
+  background-color: transparent;
 }
 
 .warehouse-receipt-drawer__body .admin-table tbody td {
@@ -93,4 +98,12 @@
 /* Последняя строка без нижней границы. */
 .warehouse-receipt-drawer__body .admin-table tbody .admin-table__row_last {
   border-bottom: none;
+}
+
+/* Строка «Всего» в таблице drawer'а. */
+.warehouse-receipt-drawer__body .admin-table tbody .admin-table__row_total {
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: none;
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
 }

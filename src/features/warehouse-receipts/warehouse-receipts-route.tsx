@@ -113,11 +113,26 @@ export function WarehouseReceiptsRoute() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th style={{ width: 100 }}>Дата</th>
-                  <th style={{ width: 150 }}>Накладная</th>
-                  <th>Товары</th>
-                  <th style={{ width: 120 }}>Кол-во позиций</th>
-                  <th style={{ width: 140 }}>Сумма</th>
+                  <th style={{ width: 100 }}>
+                    <Text variant="body-1" color="secondary">
+                      Дата
+                    </Text>
+                  </th>
+                  <th style={{ width: 150 }}>
+                    <Text variant="body-1" color="secondary">
+                      Накладная
+                    </Text>
+                  </th>
+                  <th>
+                    <Text variant="body-1" color="secondary">
+                      Кол-во товаров
+                    </Text>
+                  </th>
+                   <th style={{ width: 140 }}>
+                    <Text variant="body-1" color="secondary">
+                      Сумма
+                    </Text>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -138,10 +153,9 @@ export function WarehouseReceiptsRoute() {
                       </td>
                       <td>
                         <Text variant="body-2" color="secondary">
-                          {receipt.items.map((i) => i.productName).join(', ')}
+                          {receipt.items.length}
                         </Text>
                       </td>
-                      <td>{receipt.items.length}</td>
                       <td>{totalSum.toFixed(2)} ₽</td>
                     </tr>
                   );

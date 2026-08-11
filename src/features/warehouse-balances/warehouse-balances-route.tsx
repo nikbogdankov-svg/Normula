@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Card, Flex, Icon, Text, TextInput, useToaster } from '@gravity-ui/uikit';
-import { Plus, Magnifier, Archive } from '@gravity-ui/icons';
+import { Button, Card, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
+import { Magnifier, Archive } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
 import { useBalances } from './api';
@@ -11,19 +11,10 @@ const MOCK_WAREHOUSE_ID = 'warehouse-central';
 
 export function WarehouseBalancesRoute() {
   const api = useApi();
-  const toaster = useToaster();
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<WarehouseBalance | null>(null);
 
   const { data, isLoading, error } = useBalances(MOCK_WAREHOUSE_ID);
-
-  const onCreateBalance = () => {
-    toaster.add({
-      name: 'balance-create',
-      title: 'Функция пока в разработке',
-      theme: 'info',
-    });
-  };
 
   if (api.organizationId === null) {
     return (
@@ -59,10 +50,29 @@ export function WarehouseBalancesRoute() {
     );
   }
 
-  const filteredRows = data.balances.filter((balance) => {
+  const rows = data.balances.flatMap((balance) =>
+    balance.items.flatMap((item) =>
+      item.batches.map((batch, batchIndex) => ({
+        id: batch.batchId,
+        date: balance.date,
+        productName: item.productName,
+        batchNumber: batch.batchNumber,
+        remaining: batch.remaining,
+        price: batch.price,
+        unit: item.unit,
+        isFirstBatchOfProduct: batchIndex === 0,
+        isLastBatchOfProduct: batchIndex === item.batches.length - 1,
+      })),
+    ),
+  );
+
+  const filteredRows = rows.filter((row) => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
-    return balance.date.includes(query);
+    return (
+      row.productName.toLowerCase().includes(query) ||
+      row.batchNumber.toLowerCase().includes(query)
+    );
   });
 
   return (
@@ -81,7 +91,7 @@ export function WarehouseBalancesRoute() {
           <Flex alignItems="center" gap={2} wrap>
             <TextInput
               size="m"
-              placeholder="Поиск по дате"
+              placeholder="Поиск по товару или партии"
               value={search}
               onUpdate={setSearch}
               hasClear
@@ -92,12 +102,8 @@ export function WarehouseBalancesRoute() {
                   <Icon data={Magnifier} size={16} />
                 </span>
               }
-              style={{ width: 200 }}
+              style={{ width: 320 }}
             />
-            <Button onClick={onCreateBalance} size="m">
-              <Icon data={Plus} size={16} />
-              Баланс
-            </Button>
           </Flex>
         </Flex>
 
@@ -112,26 +118,31 @@ export function WarehouseBalancesRoute() {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th>Товар</th>
+                  <th>Партия</th>
                   <th style={{ width: 100 }}>Дата</th>
-                  <th>Товары</th>
-                  <th style={{ width: 140 }}>Кол-во позиций</th>
+                  <th style={{ width: 120 }}>Цена</th>
+                  <th style={{ width: 140 }}>Остаток</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((balance, index) => (
+                {filteredRows.map((row, index) => (
                   <tr
-                    key={balance.id}
-                    className={index === filteredRows.length - 1 ? 'admin-table__row_last' : ''}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setOpened(balance)}
+                    key={row.id}
+                    className={[
+                      index === filteredRows.length - 1 ? 'admin-table__row_last' : '',
+                      !row.isLastBatchOfProduct ? 'admin-table__row_no-border' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                   >
-                    <td>{new Date(balance.date).toLocaleDateString('ru-RU')}</td>
+                    <td>{row.isFirstBatchOfProduct ? row.productName : ''}</td>
+                    <td>{row.batchNumber}</td>
+                    <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
+                    <td>{row.price} ₽</td>
                     <td>
-                      <Text variant="body-2" color="secondary">
-                        {balance.items.map((i) => i.productName).join(', ')}
-                      </Text>
+                      {row.remaining} {row.unit}
                     </td>
-                    <td>{balance.items.length}</td>
                   </tr>
                 ))}
               </tbody>
@@ -158,45 +169,31 @@ export function WarehouseBalancesRoute() {
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--g-color-line-generic)' }}>
                   <th style={{ textAlign: 'left', padding: 8 }}>Товар</th>
-                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>На начало</th>
-                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>Приходы</th>
-                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>Списания</th>
-                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>На конец</th>
+                  <th style={{ textAlign: 'left', padding: 8 }}>Партия</th>
+                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>Остаток</th>
                   <th style={{ textAlign: 'center', width: 80, padding: 8 }}>Ед.</th>
                 </tr>
               </thead>
               <tbody>
-                {opened.items.map((item) => (
-                  <tr
-                    key={item.productId}
-                    style={{ borderBottom: '1px solid var(--g-color-line-generic)' }}
-                  >
-                    <td style={{ padding: 8 }}>{item.productName}</td>
-                    <td style={{ textAlign: 'right', padding: 8 }}>{item.beginningBalance}</td>
-                    <td
-                      style={{
-                        textAlign: 'right',
-                        padding: 8,
-                        color: 'var(--g-color-text-positive)',
-                      }}
+                {opened.items.map((item) =>
+                  item.batches.map((batch, batchIndex) => (
+                    <tr
+                      key={batch.batchId}
+                      style={{ borderBottom: '1px solid var(--g-color-line-generic)' }}
                     >
-                      +{item.receipts}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: 'right',
-                        padding: 8,
-                        color: 'var(--g-color-text-danger)',
-                      }}
-                    >
-                      -{item.writeOff}
-                    </td>
-                    <td style={{ textAlign: 'right', padding: 8, fontWeight: 600 }}>
-                      {item.endingBalance}
-                    </td>
-                    <td style={{ textAlign: 'center', padding: 8 }}>{item.unit}</td>
-                  </tr>
-                ))}
+                      <td style={{ padding: 8, fontWeight: batchIndex === 0 ? 600 : 400 }}>
+                        {batchIndex === 0 ? item.productName : ''}
+                      </td>
+                      <td style={{ padding: 8 }}>{batch.batchNumber}</td>
+                      <td style={{ textAlign: 'right', padding: 8, fontWeight: 600 }}>
+                        {batch.remaining}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: 8 }}>
+                        {batchIndex === 0 ? item.unit : ''}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </Flex>

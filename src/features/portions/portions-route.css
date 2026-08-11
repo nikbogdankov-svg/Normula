@@ -24,3 +24,9 @@
   display: inline-block;
   padding-inline-start: 8px;
 }
+
+/* Отключаем ховер-эффект строк таблицы порционника. */
+.g-root .portions-group-table .g-table__body .g-table__row:hover,
+.g-root .portions-group-table .g-table__body .g-table__row:hover > .g-table__cell {
+  background-color: transparent;
+}

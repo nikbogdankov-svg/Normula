@@ -22,11 +22,11 @@
 
 .admin-table tbody tr {
   border-bottom: 1px solid var(--g-color-line-generic);
-  transition: background-color 0.15s ease-out;
+  transition: background-color 0.12s ease;
 }
 
-.admin-table tbody tr:hover {
-  background-color: var(--g-color-bg-secondary);
+.admin-table tbody tr:hover td{
+  background-color: var(--g-color-base-simple-hover);
 }
 
 .admin-table tbody td {

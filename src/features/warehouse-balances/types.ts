@@ -12,11 +12,16 @@ export interface WarehouseBalance {
 export interface BalanceItem {
   productId: string;
   productName: string;
-  beginningBalance: number;
-  receipts: number;
-  writeOff: number;
-  endingBalance: number;
   unit: string; // "кг", "л", "шт"
+  batches: BalanceBatch[];
+}
+
+/** Партия товара в балансе. */
+export interface BalanceBatch {
+  batchId: string;
+  batchNumber: string; // номер накладной/партии
+  remaining: number; // оставшееся количество
+  price: number; // цена за единицу
 }
 
 /** Запрос создания баланса. */
