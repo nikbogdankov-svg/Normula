@@ -1,0 +1,96 @@
+/* Нижний drawer деталей накладной. */
+.warehouse-receipt-drawer {
+  z-index: 100000;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.warehouse-receipt-drawer[data-floating-ui-status='initial'],
+.warehouse-receipt-drawer[data-floating-ui-status='close'] {
+  background-color: transparent;
+}
+
+/* Drawer панель. */
+.g-drawer__item.warehouse-receipt-drawer__panel,
+.warehouse-receipt-drawer__panel {
+  background: #f2f2f2 !important;
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+  max-height: calc(90vh + 40px);
+  overflow: hidden !important;
+}
+
+.warehouse-receipt-drawer__panel .g-drawer__item-content {
+  box-sizing: border-box;
+  height: 100%;
+  background: #f2f2f2;
+}
+
+.warehouse-receipt-drawer__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: calc(90vh + 40px);
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+/* Шапка drawer'а. */
+.warehouse-receipt-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-block: 16px;
+  padding-inline: 24px;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+/* Контент drawer'а. */
+.warehouse-receipt-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px;
+  background: #f2f2f2;
+}
+
+/* Стили таблицы как на основной странице. */
+.warehouse-receipt-drawer__body .admin-table-wrap {
+  overflow-x: auto;
+}
+
+.warehouse-receipt-drawer__body .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.warehouse-receipt-drawer__body .admin-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
+}
+
+.warehouse-receipt-drawer__body .admin-table tbody tr {
+  border-bottom: 1px solid var(--g-color-line-generic);
+  transition: background-color 0.15s ease-out;
+}
+
+.warehouse-receipt-drawer__body .admin-table tbody tr:hover {
+  background-color: var(--g-color-bg-secondary);
+}
+
+.warehouse-receipt-drawer__body .admin-table tbody td {
+  padding: 12px 16px;
+}
+
+/* Последняя строка без нижней границы. */
+.warehouse-receipt-drawer__body .admin-table tbody .admin-table__row_last {
+  border-bottom: none;
+}

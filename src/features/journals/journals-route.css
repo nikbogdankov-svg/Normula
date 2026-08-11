@@ -6,12 +6,6 @@
   min-height: 0;
 }
 
-.journals-page__intro {
-  padding: 12px 16px;
-  border-radius: var(--g-border-radius-l);
-  background: var(--g-color-base-generic-ultralight);
-}
-
 .journal-drawer {
   display: flex;
   flex-direction: column;

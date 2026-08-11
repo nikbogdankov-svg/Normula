@@ -15,6 +15,8 @@ import { MenuRoute } from '@/features/menu/menu-route';
 import { ObjectsRoute } from '@/features/objects/objects-route';
 import { PortionsRoute } from '@/features/portions/portions-route';
 import { JournalsRoute } from '@/features/journals/journals-route';
+import { WarehouseReceiptsRoute } from '@/features/warehouse-receipts/warehouse-receipts-route';
+import { WarehouseBalancesRoute } from '@/features/warehouse-balances/warehouse-balances-route';
 
 /**
  * Маршруты приложения.
@@ -32,6 +34,8 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/objects': <ObjectsRoute />,
   '/app/portions': <PortionsRoute />,
   '/app/journals': <JournalsRoute />,
+  '/app/warehouse-receipts': <WarehouseReceiptsRoute />,
+  '/app/warehouse-balances': <WarehouseBalancesRoute />,
 };
 
 const appChildren = NAV_ITEMS.map((item) => ({

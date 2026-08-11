@@ -67,8 +67,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Склад',
     items: [
-      { to: '/app/receipts', label: 'Приход', icon: ArrowRightToLine, wip: true },
-      { to: '/app/stock', label: 'Остатки', icon: Archive, wip: true },
+      { to: '/app/warehouse-receipts', label: 'Приход', icon: ArrowRightToLine },
+      { to: '/app/warehouse-balances', label: 'Остатки', icon: Archive },
       { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine, wip: true },
     ],
   },
@@ -82,7 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Документы',
     items: [
-      { to: '/app/journals', label: 'Автоматические журналы', icon: BookOpen },
+      { to: '/app/journals', label: 'Журналы', icon: BookOpen },
       { to: '/app/documents', label: 'Документы', icon: Files, wip: true },
     ],
   },

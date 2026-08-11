@@ -1,10 +1,6 @@
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { Printer, Xmark } from '@gravity-ui/icons';
-import {
-  JOURNAL_PRIORITY_LABELS,
-  JOURNAL_SOURCE_LABELS,
-  type AutoJournal,
-} from './types';
+import { JOURNAL_PRIORITY_LABELS, JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
 
 function FieldList({
   title,

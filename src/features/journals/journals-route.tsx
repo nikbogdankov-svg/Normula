@@ -5,7 +5,6 @@ import {
   Flex,
   Icon,
   Label,
-  SegmentedRadioGroup,
   Table,
   Text,
   TextInput,
@@ -15,16 +14,8 @@ import { BookOpen, Magnifier, Printer } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { JournalDrawer } from './journal-drawer';
-import {
-  AUTO_JOURNALS,
-  JOURNAL_PRIORITY_LABELS,
-  JOURNAL_SOURCE_LABELS,
-  type AutoJournal,
-  type JournalPriority,
-} from './types';
+import { AUTO_JOURNALS, JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
 import './journals-route.css';
-
-type PriorityFilter = 'all' | JournalPriority;
 
 /**
  * Раздел «Автоматические журналы» [ЖУРН]:
@@ -34,13 +25,11 @@ export function JournalsRoute() {
   const { current } = useOrganizations();
   const toaster = useToaster();
   const [search, setSearch] = useState('');
-  const [priority, setPriority] = useState<PriorityFilter>('all');
   const [opened, setOpened] = useState<AutoJournal | null>(null);
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return AUTO_JOURNALS.filter((journal) => {
-      if (priority !== 'all' && journal.priority !== priority) return false;
       if (!query) return true;
       return (
         journal.tag.toLowerCase().includes(query) ||
@@ -48,7 +37,7 @@ export function JournalsRoute() {
         journal.description.toLowerCase().includes(query)
       );
     });
-  }, [priority, search]);
+  }, [search]);
 
   const onGenerate = (journal: AutoJournal) => {
     toaster.add({
@@ -69,25 +58,6 @@ export function JournalsRoute() {
 
   return (
     <div className="journals-page">
-      <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
-        <Flex direction="column" gap={1}>
-          <Text variant="header-1">Автоматические журналы</Text>
-          <Text variant="body-2" color="secondary">
-            Журналы формируются программой из меню, порционника, накладных и ТТК.
-          </Text>
-        </Flex>
-        <Button view="normal" size="l" onClick={() => window.print()} title="Печать">
-          <Icon data={Printer} size={16} />
-        </Button>
-      </Flex>
-
-      <div className="journals-page__intro">
-        <Text variant="body-2" color="secondary">
-          Часть полей заполняется автоматически, часть — вручную: оценка, подпись, разрешение на
-          выдачу. Обязательные журналы отмечены как «Обязательно», остальные — «Желательно».
-        </Text>
-      </div>
-
       <Card view="filled" style={{ padding: 0 }}>
         <Flex
           alignItems="center"
@@ -101,28 +71,24 @@ export function JournalsRoute() {
             <Text variant="subheader-2">Каталог журналов</Text>
           </Flex>
           <Flex alignItems="center" gap={2} wrap>
+            <Button view="normal" size="m" onClick={() => window.print()} title="Печать">
+              <Icon data={Printer} size={16} />
+            </Button>
             <TextInput
-              size="l"
+              size="m"
               placeholder="Поиск по тегу или названию"
               value={search}
               onUpdate={setSearch}
               hasClear
               startContent={
-                <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <span
+                  style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
+                >
                   <Icon data={Magnifier} size={16} />
                 </span>
               }
               style={{ width: 280 }}
             />
-            <SegmentedRadioGroup
-              size="l"
-              value={priority}
-              onUpdate={(value) => setPriority(value as PriorityFilter)}
-            >
-              <SegmentedRadioGroup.Option value="all" content="Все" />
-              <SegmentedRadioGroup.Option value="required" content="Обязательные" />
-              <SegmentedRadioGroup.Option value="optional" content="Желательные" />
-            </SegmentedRadioGroup>
           </Flex>
         </Flex>
 
@@ -136,31 +102,14 @@ export function JournalsRoute() {
               getRowDescriptor={(row) => ({ id: row.id, interactive: true })}
               columns={[
                 {
-                  id: 'tag',
-                  name: 'Тег',
-                  width: 120,
-                  template: (row) => (
-                    <Text variant="body-1" style={{ fontWeight: 600 }}>
-                      {row.tag}
-                    </Text>
-                  ),
-                },
-                {
                   id: 'title',
                   name: 'Журнал',
-                  template: (row) => (
-                    <Flex direction="column" gap={1}>
-                      <Text variant="body-1">{row.title}</Text>
-                      <Text variant="caption-2" color="secondary">
-                        {row.description}
-                      </Text>
-                    </Flex>
-                  ),
+                  template: (row) => <Text variant="body-1">{row.title}</Text>,
                 },
                 {
                   id: 'sources',
                   name: 'Источники',
-                  width: 220,
+                  width: 300,
                   template: (row) => (
                     <Flex gap={1} wrap>
                       {row.sources.map((source) => (
@@ -174,25 +123,15 @@ export function JournalsRoute() {
                 {
                   id: 'manual',
                   name: 'Вручную',
-                  width: 160,
+                  width: 240,
                   template: (row) =>
                     row.manualFields.length > 0 ? (
-                      <Text variant="body-2">{row.manualFields.join(', ')}</Text>
+                      <Text variant="body-1">{row.manualFields.join(', ')}</Text>
                     ) : (
-                      <Text variant="body-2" color="secondary">
+                      <Text variant="body-1" color="secondary">
                         —
                       </Text>
                     ),
-                },
-                {
-                  id: 'priority',
-                  name: 'Приоритет',
-                  width: 140,
-                  template: (row) => (
-                    <Label theme={row.priority === 'required' ? 'danger' : 'utility'} size="s">
-                      {JOURNAL_PRIORITY_LABELS[row.priority]}
-                    </Label>
-                  ),
                 },
               ]}
             />
@@ -200,11 +139,7 @@ export function JournalsRoute() {
         </div>
       </Card>
 
-      <JournalDrawer
-        journal={opened}
-        onClose={() => setOpened(null)}
-        onGenerate={onGenerate}
-      />
+      <JournalDrawer journal={opened} onClose={() => setOpened(null)} onGenerate={onGenerate} />
     </div>
   );
 }

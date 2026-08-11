@@ -29,7 +29,14 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Как только ручка появится на сервере, префикс отсюда убирается — и запросы
  * сразу пойдут по сети, без правок в фичах.
  */
-export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk', '/v1/menus', '/v1/objects', '/v1/portions'];
+export const MOCKED_PREFIXES = [
+  '/v1/staff',
+  '/v1/ttk',
+  '/v1/menus',
+  '/v1/objects',
+  '/v1/portions',
+  '/v1/warehouse',
+];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
 export function isMocked(path: string): boolean {
@@ -472,6 +479,124 @@ function periodSlots(menuId: string): Record<string, CycleMenu['slots']> {
 for (const menu of menus) {
   periodSlots(menu.id)[menu.startDate] = menu.slots;
 }
+
+// --- Склад: приходы и остатки ---
+
+const warehouseReceipts = [
+  {
+    id: 'rec-1',
+    date: new Date(Date.now() - 2 * day).toISOString(),
+    invoiceNumber: 'НАК-2025-001',
+    warehouseId: 'warehouse-central',
+    items: [
+      {
+        id: 'rec-1-item-1',
+        productId: 'prod-1',
+        productName: 'Мука пшеничная',
+        quantity: 50,
+        unit: 'кг',
+        unitPrice: 45,
+        totalPrice: 2250,
+      },
+      {
+        id: 'rec-1-item-2',
+        productId: 'prod-2',
+        productName: 'Масло подсолнечное',
+        quantity: 20,
+        unit: 'л',
+        unitPrice: 120,
+        totalPrice: 2400,
+      },
+    ],
+    createdAt: new Date(Date.now() - 2 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * day).toISOString(),
+  },
+  {
+    id: 'rec-2',
+    date: new Date(Date.now() - 1 * day).toISOString(),
+    invoiceNumber: 'НАК-2025-002',
+    warehouseId: 'warehouse-central',
+    items: [
+      {
+        id: 'rec-2-item-1',
+        productId: 'prod-3',
+        productName: 'Молоко коровье',
+        quantity: 100,
+        unit: 'л',
+        unitPrice: 65,
+        totalPrice: 6500,
+      },
+      {
+        id: 'rec-2-item-2',
+        productId: 'prod-4',
+        productName: 'Яйцо куриное',
+        quantity: 300,
+        unit: 'шт',
+        unitPrice: 12,
+        totalPrice: 3600,
+      },
+    ],
+    createdAt: new Date(Date.now() - 1 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * day).toISOString(),
+  },
+];
+
+const warehouseBalances = [
+  {
+    id: 'bal-1',
+    date: new Date(Date.now() - 2 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    items: [
+      {
+        productId: 'prod-1',
+        productName: 'Мука пшеничная',
+        beginningBalance: 100,
+        receipts: 50,
+        writeOff: 30,
+        endingBalance: 120,
+        unit: 'кг',
+      },
+      {
+        productId: 'prod-2',
+        productName: 'Масло подсолнечное',
+        beginningBalance: 40,
+        receipts: 20,
+        writeOff: 15,
+        endingBalance: 45,
+        unit: 'л',
+      },
+    ],
+    createdAt: new Date(Date.now() - 2 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * day).toISOString(),
+  },
+  {
+    id: 'bal-2',
+    date: new Date(Date.now() - 1 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    items: [
+      {
+        productId: 'prod-3',
+        productName: 'Молоко коровье',
+        beginningBalance: 80,
+        receipts: 100,
+        writeOff: 60,
+        endingBalance: 120,
+        unit: 'л',
+      },
+      {
+        productId: 'prod-4',
+        productName: 'Яйцо куриное',
+        beginningBalance: 500,
+        receipts: 300,
+        writeOff: 200,
+        endingBalance: 600,
+        unit: 'шт',
+      },
+    ],
+    createdAt: new Date(Date.now() - 1 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * day).toISOString(),
+  },
+];
 
 /** Достаёт сегменты пути по шаблону вида /v1/admin/organizations/:id/members. */
 function match(pattern: string, path: string): Record<string, string> | null {
@@ -974,6 +1099,94 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     if (!found) throw new Error('mock: строка порционника не найдена');
     found.headcount = Math.max(0, body.headcount);
     return { date: body.date, entries } as T;
+  }
+
+  // Склад: приходы
+  if (route === '/v1/warehouse-receipts' && method === 'GET') {
+    return { receipts: warehouseReceipts, total: warehouseReceipts.length } as T;
+  }
+
+  if (route === '/v1/warehouse-receipts' && method === 'POST') {
+    const body = options.body as {
+      date: string;
+      invoiceNumber: string;
+      warehouseId: string;
+      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+    };
+    const productMap: Record<string, string> = {
+      'prod-1': 'Мука пшеничная',
+      'prod-2': 'Масло подсолнечное',
+      'prod-3': 'Молоко коровье',
+      'prod-4': 'Яйцо куриное',
+    };
+    const unitMap: Record<string, string> = {
+      'prod-1': 'кг',
+      'prod-2': 'л',
+      'prod-3': 'л',
+      'prod-4': 'шт',
+    };
+    const receipt = {
+      id: `rec-${Date.now()}`,
+      date: body.date,
+      invoiceNumber: body.invoiceNumber,
+      warehouseId: body.warehouseId,
+      items: body.items.map((item, idx) => ({
+        id: `rec-item-${Date.now()}-${idx}`,
+        productId: item.productId,
+        productName: productMap[item.productId] || 'Неизвестный товар',
+        quantity: item.quantity,
+        unit: unitMap[item.productId] || 'шт',
+        unitPrice: item.unitPrice,
+        totalPrice: item.quantity * item.unitPrice,
+      })),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    warehouseReceipts.unshift(receipt);
+    return { receipt } as T;
+  }
+
+  // Склад: остатки
+  if (route === '/v1/warehouse-balances' && method === 'GET') {
+    return { balances: warehouseBalances, total: warehouseBalances.length } as T;
+  }
+
+  if (route === '/v1/warehouse-balances' && method === 'POST') {
+    const body = options.body as {
+      date: string;
+      warehouseId: string;
+      items: Array<{ productId: string; endingBalance: number }>;
+    };
+    const productMap: Record<string, string> = {
+      'prod-1': 'Мука пшеничная',
+      'prod-2': 'Масло подсолнечное',
+      'prod-3': 'Молоко коровье',
+      'prod-4': 'Яйцо куриное',
+    };
+    const unitMap: Record<string, string> = {
+      'prod-1': 'кг',
+      'prod-2': 'л',
+      'prod-3': 'л',
+      'prod-4': 'шт',
+    };
+    const balance = {
+      id: `bal-${Date.now()}`,
+      date: body.date,
+      warehouseId: body.warehouseId,
+      items: body.items.map((item) => ({
+        productId: item.productId,
+        productName: productMap[item.productId] || 'Неизвестный товар',
+        beginningBalance: Math.floor(Math.random() * 100),
+        receipts: Math.floor(Math.random() * 50),
+        writeOff: Math.floor(Math.random() * 30),
+        endingBalance: item.endingBalance,
+        unit: unitMap[item.productId] || 'шт',
+      })),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    warehouseBalances.unshift(balance);
+    return { balance } as T;
   }
 
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
