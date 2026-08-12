@@ -29,6 +29,22 @@ export interface AuthContextValue {
   getApiToken: () => Promise<string>;
   /** Организационный token (aud = urn:logto:organization:<id>). */
   getOrganizationToken: (organizationId: string) => Promise<string>;
+  /**
+   * Скоупы организационного токена. По ним фронт прячет разделы, которых у
+   * человека нет: Logto кладёт в токен только то, что реально выдано ролью.
+   *
+   * Это подсказка интерфейсу, а не защита — доступ решают перехватчики
+   * на бэкенде.
+   */
+  getOrganizationScopes: (organizationId: string) => Promise<string[]>;
+  /**
+   * Сбросить закэшированные токены, чтобы следующий запрос взял свежие.
+   *
+   * Нужно после того, как бэкенд поменял роль вошедшего: выданный токен
+   * несёт прежние скоупы до самого истечения, и обновить его может только
+   * клиент.
+   */
+  resetTokens: () => Promise<void>;
   /** Организации пользователя. */
   fetchOrganizations: () => Promise<Organization[]>;
 }

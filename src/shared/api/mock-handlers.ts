@@ -5,8 +5,8 @@ import type {
   OrganizationMember,
   OrganizationRole,
 } from '@/features/organizations/types';
-import type { Employee, StaffRole } from '@/features/staff/types';
-import { orgEmail } from '@/features/staff/org-email';
+import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
+import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
@@ -29,7 +29,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Как только ручка появится на сервере, префикс отсюда убирается — и запросы
  * сразу пойдут по сети, без правок в фичах.
  */
-export const MOCKED_PREFIXES = ['/v1/staff', '/v1/ttk', '/v1/menus', '/v1/objects'];
+export const MOCKED_PREFIXES = ['/v1/ttk', '/v1/menus', '/v1/objects'];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
 export function isMocked(path: string): boolean {
@@ -142,18 +142,47 @@ const invitations: Record<string, Invitation[]> = {
 
 // --- Администрирование: роли и персонал ---
 
-const section = (title: string) => ({ id: title, title });
+const section = (id: string, title: string) => ({ id, title });
+
+const ALL_SECTIONS = [
+  section('planning', 'Планирование'),
+  section('production', 'Производство'),
+  section('warehouse', 'Склад'),
+  section('finance', 'Финансы'),
+  section('documents', 'Документы'),
+  section('reference', 'Справочники'),
+  section('administration', 'Администрирование'),
+];
 
 const staffRoles: StaffRole[] = [
-  { id: 'r-admin', name: 'Администратор', sections: [], locked: true },
+  {
+    id: 'r-admin',
+    name: 'org-admin',
+    description: 'Администратор организации',
+    sections: ALL_SECTIONS,
+    fullAccess: true,
+  },
   {
     id: 'r-cook',
     name: 'Повар',
-    sections: [section('Планирование'), section('Производство'), section('Справочники')],
-    locked: false,
+    description: 'Планирование и производство',
+    sections: [ALL_SECTIONS[0], ALL_SECTIONS[1], ALL_SECTIONS[5]],
+    fullAccess: false,
   },
-  { id: 'r-store', name: 'Складовщик', sections: [section('Склад')], locked: false },
-  { id: 'r-book', name: 'Бухгалтер', sections: [section('Финансы')], locked: false },
+  {
+    id: 'r-store',
+    name: 'Складовщик',
+    description: 'Склад',
+    sections: [ALL_SECTIONS[2]],
+    fullAccess: false,
+  },
+  {
+    id: 'r-book',
+    name: 'Бухгалтер',
+    description: 'Финансы',
+    sections: [ALL_SECTIONS[3]],
+    fullAccess: false,
+  },
 ];
 
 const employees: Employee[] = [
@@ -164,24 +193,35 @@ const employees: Employee[] = [
   'Богданков;Никита;r-admin',
 ].map((row, index) => {
   const [lastName, firstName, roleId] = row.split(';');
+  // Последний ещё не заходил: пусть в моках будет виден и такой случай.
+  const registered = index < 4;
 
   return {
     id: `e-${index + 1}`,
     firstName,
     lastName,
     email: `${lastName.toLowerCase()}${firstName.toLowerCase()}@mail.ru`,
-    orgEmail: orgEmail(firstName, lastName),
+    orgEmail: '',
     roleId,
-    registeredAt: new Date(Date.UTC(2019, 1, 1 + index)).toISOString(),
-    snils: `00 000 000${index} 0${index}`,
-    inn: `00 0000 000 0${index}`,
-    passport: `012${index} 45678${index}`,
-    otherDoc: `DOC-${index + 1}`,
+    status: registered ? ('EMPLOYEE_STATUS_ACTIVE' as const) : ('EMPLOYEE_STATUS_INVITED' as const),
+    registeredAt: registered ? String(Date.UTC(2019, 1, 1 + index)) : '0',
+    createdAt: String(Date.UTC(2019, 0, 1 + index)),
   };
 });
 
-/** Пароль, который «выдаёт» сервер: в моках он предсказуемо случайный. */
-const newPassword = () => Math.random().toString(36).slice(2, 10);
+/** Документы отдаются только в карточке — в списке их нет, как и на бэке. */
+const employeeDocuments: Record<string, EmployeeDocuments> = Object.fromEntries(
+  employees.map((employee, index) => [
+    employee.id,
+    {
+      snils: `1122334459${index}`,
+      inn: `50010073225${index}`,
+      passportSeries: `012${index}`,
+      passportNumber: `45678${index}`,
+      otherDoc: `DOC-${index + 1}`,
+    },
+  ])
+);
 
 // --- ТТК ---
 
@@ -582,18 +622,9 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return { recipe: found } as T;
   }
 
-  // Администрирование: персонал и роли
+  // Администрирование: персонал и роли (staff.v1.StaffService)
   if (route === '/v1/staff-roles' && method === 'GET') {
     return { roles: staffRoles } as T;
-  }
-
-  const roleSections = match('/v1/staff-roles/:roleId/sections', route);
-  if (roleSections && method === 'PUT') {
-    const role = staffRoles.find((r) => r.id === roleSections.roleId);
-    if (!role) throw new Error('mock: роль не найдена');
-    role.sections = (options.body as { sectionIds: string[] }).sectionIds.map(section);
-
-    return { roleId: role.id } as T;
   }
 
   if (route === '/v1/staff' && method === 'GET') {
@@ -608,34 +639,66 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   if (route === '/v1/staff' && method === 'POST') {
-    const body = options.body as Omit<Employee, 'id' | 'orgEmail' | 'registeredAt'>;
-    const employee: Employee = {
-      ...body,
-      id: `e-${Date.now()}`,
-      orgEmail: orgEmail(body.firstName, body.lastName),
-      registeredAt: new Date().toISOString(),
+    const body = options.body as {
+      firstName: string;
+      lastName: string;
+      email: string;
+      orgEmail: string;
+      roleId: string;
+      documents?: EmployeeDocuments;
     };
-    employees.unshift(employee);
+    const created: Employee = {
+      id: `e-${Date.now()}`,
+      firstName: body.firstName,
+      lastName: body.lastName,
+      email: body.email.toLowerCase(),
+      orgEmail: body.orgEmail,
+      roleId: body.roleId,
+      // Приглашение отправлено, войти человек ещё не успел.
+      status: 'EMPLOYEE_STATUS_INVITED',
+      registeredAt: '0',
+      createdAt: String(Date.now()),
+    };
+    employees.unshift(created);
+    employeeDocuments[created.id] = body.documents ?? EMPTY_DOCUMENTS;
 
-    return { employee, password: newPassword() } as T;
+    return { employee: created } as T;
   }
 
-  const resetPassword = match('/v1/staff/:id/reset-password', route);
-  if (resetPassword && method === 'POST') {
-    return { password: newPassword() } as T;
+  const staffInvitation = match('/v1/staff/:id/invitation', route);
+  if (staffInvitation && method === 'POST') {
+    const found = employees.find((e) => e.id === staffInvitation.id);
+    if (!found) throw new Error('mock: сотрудник не найден');
+
+    return { employee: found } as T;
   }
 
   const employee = match('/v1/staff/:id', route);
+  if (employee && method === 'GET') {
+    const found = employees.find((e) => e.id === employee.id);
+    if (!found) throw new Error('mock: сотрудник не найден');
+
+    return {
+      employee: found,
+      documents: employeeDocuments[found.id] ?? EMPTY_DOCUMENTS,
+    } as T;
+  }
+
   if (employee && method === 'PATCH') {
     const found = employees.find((e) => e.id === employee.id);
     if (!found) throw new Error('mock: сотрудник не найден');
-    const body = options.body as Partial<Employee>;
-    Object.assign(found, body);
-    if (body.firstName !== undefined || body.lastName !== undefined) {
-      found.orgEmail = orgEmail(found.firstName, found.lastName);
+    const body = options.body as Partial<Employee> & { documents?: EmployeeDocuments };
+    const { documents, ...profile } = body;
+    Object.assign(found, profile);
+
+    if (documents) {
+      employeeDocuments[found.id] = documents;
     }
 
-    return { employee: found } as T;
+    return {
+      employee: found,
+      documents: employeeDocuments[found.id] ?? EMPTY_DOCUMENTS,
+    } as T;
   }
 
   if (employee && method === 'DELETE') {

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Flex, Icon, Table, Text, TextInput } from '@gravity-ui/uikit';
+import { Alert, Button, Card, Flex, Icon, Label, Table, Text, TextInput } from '@gravity-ui/uikit';
 import {
   ArrowUpArrowDown,
-  Key,
+  Envelope,
   Magnifier,
   Pencil,
   Persons,
@@ -16,14 +16,14 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useEmployees, useStaffRoles } from './api';
-import type { Employee } from './types';
+import { PAGE_SIZE, useEmployees, useStaffRoles } from './api';
+import type { Employee, EmployeeStatus } from './types';
 import { RoleAccessCard } from './role-access-card';
 import {
   AddEmployeeDialog,
   DeleteEmployeeDialog,
   EditEmployeeDialog,
-  ResetPasswordDialog,
+  ResendInvitationDialog,
 } from './staff-dialogs';
 
 /** Экран «Администрирование» из макета: доступы для ролей + персонал. */
@@ -32,7 +32,7 @@ export function StaffRoute() {
   const [addOpen, setAddOpen] = useState(false);
   const [toEdit, setToEdit] = useState<Employee | null>(null);
   const [toDelete, setToDelete] = useState<Employee | null>(null);
-  const [toReset, setToReset] = useState<Employee | null>(null);
+  const [toInvite, setToInvite] = useState<Employee | null>(null);
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
@@ -44,13 +44,13 @@ export function StaffRoute() {
         onAdd={() => setAddOpen(true)}
         onEdit={setToEdit}
         onDelete={setToDelete}
-        onReset={setToReset}
+        onInvite={setToInvite}
       />
 
       <AddEmployeeDialog open={addOpen} onClose={() => setAddOpen(false)} />
       <EditEmployeeDialog employee={toEdit} onClose={() => setToEdit(null)} />
       <DeleteEmployeeDialog employee={toDelete} onClose={() => setToDelete(null)} />
-      <ResetPasswordDialog employee={toReset} onClose={() => setToReset(null)} />
+      <ResendInvitationDialog employee={toInvite} onClose={() => setToInvite(null)} />
     </Flex>
   );
 }
@@ -61,14 +61,14 @@ function StaffCard({
   onAdd,
   onEdit,
   onDelete,
-  onReset,
+  onInvite,
 }: {
   search: string;
   onSearch: (value: string) => void;
   onAdd: () => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
-  onReset: (employee: Employee) => void;
+  onInvite: (employee: Employee) => void;
 }) {
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useEmployees(search);
@@ -76,13 +76,20 @@ function StaffCard({
 
   // Сортировка по дате регистрации живёт на клиенте: в макете это переключатель
   // в заголовке столбца, отдельного параметра у списка нет.
+  //
+  // Сравниваем числами, а не строками: epoch-миллисекунды приходят строкой
+  // (int64 в grpc-gateway), и лексикографически «9…» оказалось бы больше
+  // «10…». Не заходившие с нулём уезжают в конец при любом направлении.
   const employees = useMemo(() => {
     const list = [...(data?.employees ?? [])];
-    list.sort((a, b) =>
-      ascending
-        ? a.registeredAt.localeCompare(b.registeredAt)
-        : b.registeredAt.localeCompare(a.registeredAt)
-    );
+    list.sort((a, b) => {
+      const left = Number(a.registeredAt);
+      const right = Number(b.registeredAt);
+
+      if (left === 0 || right === 0) return left === right ? 0 : left === 0 ? 1 : -1;
+
+      return ascending ? left - right : right - left;
+    });
 
     return list;
   }, [data, ascending]);
@@ -137,14 +144,24 @@ function StaffCard({
           />
         )}
         {data && employees.length > 0 && (
-          <EmployeesTable
-            employees={employees}
-            ascending={ascending}
-            onToggleSort={() => setAscending((value) => !value)}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onReset={onReset}
-          />
+          <>
+            {data.total > employees.length && (
+              <div style={{ padding: '0 16px 8px' }}>
+                <Alert
+                  theme="info"
+                  message={`Показаны первые ${PAGE_SIZE} из ${data.total}. Уточните поиск, чтобы найти нужного.`}
+                />
+              </div>
+            )}
+            <EmployeesTable
+              employees={employees}
+              ascending={ascending}
+              onToggleSort={() => setAscending((value) => !value)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onInvite={onInvite}
+            />
+          </>
         )}
       </div>
     </Card>
@@ -157,14 +174,14 @@ function EmployeesTable({
   onToggleSort,
   onEdit,
   onDelete,
-  onReset,
+  onInvite,
 }: {
   employees: Employee[];
   ascending: boolean;
   onToggleSort: () => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
-  onReset: (employee: Employee) => void;
+  onInvite: (employee: Employee) => void;
 }) {
   const roles = useStaffRoles();
   const roleName = (roleId: string) =>
@@ -211,7 +228,7 @@ function EmployeesTable({
                 <Icon data={ArrowUpArrowDown} size={14} />
               </Flex>
             ),
-            template: (row) => row.registeredAt.slice(0, 10),
+            template: (row) => <RegisteredCell employee={row} />,
           },
           {
             id: 'role',
@@ -231,10 +248,14 @@ function EmployeesTable({
             className: 'admin-table__actions',
             template: (row) => (
               <Flex alignItems="center" justifyContent="flex-end" gap={1}>
-                <Button view="flat" size="s" onClick={() => onReset(row)}>
-                  <Icon data={Key} size={14} />
-                  Сброс пароля
-                </Button>
+                {/* Пока человек не зашёл — единственное осмысленное
+                    действие это выслать приглашение заново. */}
+                {row.status !== 'EMPLOYEE_STATUS_ACTIVE' && (
+                  <Button view="flat" size="s" onClick={() => onInvite(row)}>
+                    <Icon data={Envelope} size={14} />
+                    Пригласить заново
+                  </Button>
+                )}
                 <Button view="flat" size="s" title="Изменить" onClick={() => onEdit(row)}>
                   <Icon data={Pencil} size={16} />
                 </Button>
@@ -249,3 +270,34 @@ function EmployeesTable({
     </div>
   );
 }
+
+/**
+ * Колонка «Регистрация»: дата первого захода либо статус приглашения.
+ *
+ * Ноль в registeredAt означает, что человек ещё ни разу не входил — дата
+ * прочерком без пояснения выглядела бы поломкой, поэтому показываем, чего
+ * ждём.
+ */
+function RegisteredCell({ employee }: { employee: Employee }) {
+  const millis = Number(employee.registeredAt);
+
+  if (Number.isFinite(millis) && millis > 0) {
+    return <Text variant="body-1">{new Date(millis).toLocaleDateString('ru-RU')}</Text>;
+  }
+
+  return <Label theme={STATUS_THEME[employee.status]}>{STATUS_LABEL[employee.status]}</Label>;
+}
+
+const STATUS_LABEL: Record<EmployeeStatus, string> = {
+  EMPLOYEE_STATUS_UNSPECIFIED: 'неизвестно',
+  EMPLOYEE_STATUS_INVITED: 'ждёт входа',
+  EMPLOYEE_STATUS_ACTIVE: 'активен',
+  EMPLOYEE_STATUS_EXPIRED: 'приглашение истекло',
+};
+
+const STATUS_THEME: Record<EmployeeStatus, 'normal' | 'warning' | 'success'> = {
+  EMPLOYEE_STATUS_UNSPECIFIED: 'normal',
+  EMPLOYEE_STATUS_INVITED: 'normal',
+  EMPLOYEE_STATUS_ACTIVE: 'success',
+  EMPLOYEE_STATUS_EXPIRED: 'warning',
+};

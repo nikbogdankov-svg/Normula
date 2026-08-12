@@ -75,7 +75,15 @@ export const postSignOutRedirectUri = `${window.location.origin}/`;
 
 function LogtoAuthBridge({ children }: { children: ReactNode }) {
   const logto = useLogto();
-  const { signIn, signOut, getAccessToken, getOrganizationToken, fetchUserInfo } = logto;
+  const {
+    signIn,
+    signOut,
+    getAccessToken,
+    getOrganizationToken,
+    getOrganizationTokenClaims,
+    clearAllTokens,
+    fetchUserInfo,
+  } = logto;
   const apiResource = requireLogtoSettings().apiResource;
   const [user, setUser] = useState<AuthUser | null>(null);
 
@@ -93,6 +101,21 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     },
     [getOrganizationToken]
   );
+
+  // Скоуп в токене — строка через пробел, как в OAuth. Промах здесь не
+  // должен ронять интерфейс: без скоупов меню просто покажет базовый набор.
+  const getOrganizationScopes = useCallback(
+    async (organizationId: string): Promise<string[]> => {
+      const claims = await getOrganizationTokenClaims(organizationId);
+
+      return claims?.scope?.split(' ').filter(Boolean) ?? [];
+    },
+    [getOrganizationTokenClaims]
+  );
+
+  const resetTokens = useCallback(async () => {
+    await clearAllTokens();
+  }, [clearAllTokens]);
 
   const fetchOrganizations = useCallback(async (): Promise<Organization[]> => {
     // userinfo при scope Organizations содержит organization_data:
@@ -152,6 +175,8 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
       signOut: () => signOut(postSignOutRedirectUri),
       getApiToken,
       getOrganizationToken: getOrgToken,
+      getOrganizationScopes,
+      resetTokens,
       fetchOrganizations,
     }),
     [
@@ -162,6 +187,8 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
       signOut,
       getApiToken,
       getOrgToken,
+      getOrganizationScopes,
+      resetTokens,
       fetchOrganizations,
     ]
   );
