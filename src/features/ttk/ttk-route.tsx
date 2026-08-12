@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import { Button, Card, Flex, Icon, Label, Select, Text, TextInput } from '@gravity-ui/uikit';
-import { ArrowUpFromSquare, Magnifier, Plus, Printer } from '@gravity-ui/icons';
+import { Button, Flex, Icon, Select, Text, TextInput, Table } from '@gravity-ui/uikit';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpArrowDown,
+  ArrowUpFromSquare,
+  Magnifier,
+  Plus,
+  Printer,
+} from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -8,6 +16,7 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
+import { HighlightText } from '@/shared/ui/highlight-text';
 import { useCollections, useRecipes, type RecipeSort } from './api';
 import type { Recipe } from './types';
 import { RecipeDialog } from './recipe-dialog';
@@ -17,12 +26,13 @@ import './ttk-route.css';
 
 const ALL_COLLECTIONS = 'all';
 
-/** Раздел ТТК: панель фильтров и плитка карт в две колонки, как в макете. */
+/** Раздел ТТК: панель фильтров закреплена, скроллится таблица. */
 export function TtkRoute() {
   const { current } = useOrganizations();
   const [search, setSearch] = useState('');
   const [collectionId, setCollectionId] = useState(ALL_COLLECTIONS);
   const [sort, setSort] = useState<RecipeSort>('name');
+  const [ascending, setAscending] = useState(true);
   const [opened, setOpened] = useState<Recipe | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -32,113 +42,213 @@ export function TtkRoute() {
     search,
     collectionId: collectionId === ALL_COLLECTIONS ? '' : collectionId,
     sort,
+    ascending,
   });
 
+  const onSort = (column: RecipeSort) => {
+    if (sort === column) {
+      setAscending((value) => !value);
+      return;
+    }
+    setSort(column);
+    setAscending(true);
+  };
+
   return (
-    <Flex direction="column" gap={3} style={{ padding: 16 }}>
-      <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
+    <div className="ttk-page">
+      <Flex
+        className="ttk-page__toolbar"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        wrap
+      >
         <Flex alignItems="center" gap={2} wrap>
           <TextInput
+            size="l"
             placeholder="Поиск по имени"
             value={search}
             onUpdate={setSearch}
             hasClear
             startContent={
               <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
-                <Icon data={Magnifier} size={14} />
+                <Icon data={Magnifier} size={16} />
               </span>
             }
             style={{ width: 220 }}
           />
           <Select
-            width={200}
+            size="l"
+            width={260}
+            label="Сборник:"
             value={[collectionId]}
             onUpdate={(value) => setCollectionId(value[0] ?? ALL_COLLECTIONS)}
             options={[
-              { value: ALL_COLLECTIONS, content: 'ТТК сборники: Все' },
+              { value: ALL_COLLECTIONS, content: 'Все' },
               ...(collections.data?.collections ?? []).map((collection) => ({
                 value: collection.id,
                 content: collection.name,
               })),
             ]}
           />
-          <Select
-            width={190}
-            value={[sort]}
-            onUpdate={(value) => setSort((value[0] ?? 'name') as RecipeSort)}
-            options={[
-              { value: 'name', content: 'Сортировка: По имени' },
-              { value: 'price', content: 'Сортировка: По цене' },
-              { value: 'kcal', content: 'Сортировка: По калориям' },
-            ]}
-          />
         </Flex>
 
         <Flex alignItems="center" gap={2}>
-          <Button view="normal-contrast" onClick={() => window.print()} title="Печать">
+          <Button size="l" view="normal-contrast" onClick={() => window.print()} title="Печать">
             <Icon data={Printer} size={16} />
           </Button>
-          <Button view="normal-contrast" onClick={() => setImportOpen(true)}>
+          <Button size="l" view="normal-contrast" onClick={() => setImportOpen(true)}>
             <Icon data={ArrowUpFromSquare} size={16} />
             Импорт сборника
           </Button>
-          <Button view="normal-contrast" onClick={() => setCreateOpen(true)}>
+          <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
             Создать ТТК
           </Button>
         </Flex>
       </Flex>
 
-      {current === null && <NoOrganizationSelectedState />}
-      {current !== null && isPending && <LoadingState />}
-      {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
-      {data && data.recipes.length === 0 && (
-        <EmptyState text={search ? `Ничего не нашли по запросу «${search}»` : 'Карт пока нет'} />
-      )}
+      <div className="ttk-page__scroll">
+        {current === null && <NoOrganizationSelectedState />}
+        {current !== null && isPending && <LoadingState />}
+        {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
+        {data && data.recipes.length === 0 && (
+          <EmptyState text={search ? `Ничего не нашли по запросу «${search}»` : 'Карт пока нет'} />
+        )}
 
-      {data && data.recipes.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
-            gap: 8,
-          }}
-        >
-          {data.recipes.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} onOpen={() => setOpened(recipe)} />
-          ))}
-        </div>
-      )}
+        {data && data.recipes.length > 0 && (
+          <RecipesTable
+            recipes={data.recipes}
+            search={search}
+            sort={sort}
+            ascending={ascending}
+            onSort={onSort}
+            onOpen={setOpened}
+          />
+        )}
+      </div>
 
       <RecipeDialog recipe={opened} onClose={() => setOpened(null)} onRecipeChange={setOpened} />
       <ImportCollectionsDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <CreateRecipeDialog open={createOpen} onClose={() => setCreateOpen(false)} />
-    </Flex>
+    </div>
   );
 }
 
-function RecipeCard({ recipe, onOpen }: { recipe: Recipe; onOpen: () => void }) {
+function RecipesTable({
+  recipes,
+  search,
+  sort,
+  ascending,
+  onSort,
+  onOpen,
+}: {
+  recipes: Recipe[];
+  search: string;
+  sort: RecipeSort;
+  ascending: boolean;
+  onSort: (column: RecipeSort) => void;
+  onOpen: (recipe: Recipe) => void;
+}) {
   return (
-    <Card
-      type="action"
-      view="filled"
-      className="ttk-recipe-card"
-      style={{ padding: '10px 12px', cursor: 'pointer' }}
-      onClick={onOpen}
+    <div className="admin-table-wrap">
+      <Table
+        width="max"
+        className="admin-table"
+        data={recipes}
+        onRowClick={(row) => onOpen(row)}
+        columns={[
+          {
+            id: 'name',
+            name: () => (
+              <SortableHeader
+                label="Название"
+                column="name"
+                sort={sort}
+                ascending={ascending}
+                onSort={onSort}
+              />
+            ),
+            template: (row) => (
+              <Text variant="subheader-1">
+                <HighlightText text={row.name} query={search} />
+              </Text>
+            ),
+          },
+          {
+            id: 'collection',
+            name: 'Сборник',
+            template: (row) => row.collectionName || '—',
+          },
+          {
+            id: 'price',
+            name: () => (
+              <SortableHeader
+                label="Цена"
+                column="price"
+                sort={sort}
+                ascending={ascending}
+                onSort={onSort}
+                alignEnd
+              />
+            ),
+            align: 'end',
+            template: (row) => `${row.price} ₽`,
+          },
+          {
+            id: 'kcal',
+            name: 'Ккал',
+            align: 'end',
+            template: (row) => row.kcal,
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  column,
+  sort,
+  ascending,
+  onSort,
+  alignEnd,
+}: {
+  label: string;
+  column: RecipeSort;
+  sort: RecipeSort;
+  ascending: boolean;
+  onSort: (column: RecipeSort) => void;
+  alignEnd?: boolean;
+}) {
+  const active = sort === column;
+  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+
+  return (
+    <Flex
+      alignItems="center"
+      justifyContent={alignEnd ? 'flex-end' : 'flex-start'}
+      gap={1}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => onSort(column)}
+      title={
+        active
+          ? ascending
+            ? 'По возрастанию — нажмите для убывания'
+            : 'По убыванию — нажмите для возрастания'
+          : `Сортировать по: ${label}`
+      }
     >
-      <div className="ttk-recipe-card__title-row">
-        <Text variant="body-2" className="ttk-recipe-card__name">
-          {recipe.name}
-        </Text>
-        {recipe.collectionName && (
-          <Label theme="normal" className="ttk-recipe-card__tag" title={recipe.collectionName}>
-            {recipe.collectionName}
-          </Label>
-        )}
-      </div>
-      <Text variant="body-1" color="secondary">
-        {recipe.price} ₽ • {recipe.kcal} кКал
-      </Text>
-    </Card>
+      {label}
+      <span
+        style={{
+          display: 'inline-flex',
+          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
+        }}
+      >
+        <Icon data={icon} size={14} />
+      </span>
+    </Flex>
   );
 }

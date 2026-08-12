@@ -1,6 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { Button, Flex, Icon, Text, Tooltip } from '@gravity-ui/uikit';
-import { EllipsisVertical, LayoutSideContent, Moon, Sun } from '@gravity-ui/icons';
+import { Button, DropdownMenu, Flex, Icon, Text, Tooltip } from '@gravity-ui/uikit';
+import {
+  ArrowRightFromSquare,
+  EllipsisVertical,
+  LayoutSideContent,
+  Moon,
+  Sun,
+} from '@gravity-ui/icons';
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
 import { visibleNavGroups, type NavItem } from './nav';
@@ -22,8 +28,8 @@ const NAV_ICON_SIZE = 18;
 const TOOLTIP_DELAY = 120;
 
 /**
- * Боковое меню по макету: лого, переключатели темы и сворачивания,
- * сгруппированная навигация, карточка пользователя снизу.
+ * Боковое меню по макету: лого, сворачивание, сгруппированная навигация,
+ * меню пользователя (тема / выход) в трёх точках.
  *
  * Лого — временная текстовая заглушка «ЛОГО» вместо картинки.
  */
@@ -55,47 +61,22 @@ export function Sidebar({
         transition: 'width 0.15s ease',
       }}
     >
-      <div
-        style={{
-          height: 56,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          gap: 4,
-          padding: collapsed ? 0 : '0 12px 0 16px',
-        }}
-      >
+      <div className="sidebar-header">
+        <Tooltip
+          content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+          openDelay={TOOLTIP_DELAY}
+          rest={0}
+        >
+          <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
+            <Icon data={LayoutSideContent} size={BUTTON_ICON_SIZE} />
+          </Button>
+        </Tooltip>
+
         {!collapsed && (
-          <Text variant="subheader-2" color="brand">
+          <Text variant="subheader-2" color="brand" style={{ marginInlineStart: 'auto' }}>
             ЛОГО
           </Text>
         )}
-
-        <div style={{ display: 'flex', gap: 2 }}>
-          {/* В свёрнутом меню остаётся только кнопка разворачивания —
-              тема сворачивается вместе с остальным. */}
-          {!collapsed && (
-            <Tooltip
-              content={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-              openDelay={TOOLTIP_DELAY}
-              rest={0}
-            >
-              <Button view="flat" size="m" onClick={toggleTheme} aria-label="Переключить тему">
-                <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />
-              </Button>
-            </Tooltip>
-          )}
-
-          <Tooltip
-            content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
-            openDelay={TOOLTIP_DELAY}
-            rest={0}
-          >
-            <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
-              <Icon data={LayoutSideContent} size={BUTTON_ICON_SIZE} />
-            </Button>
-          </Tooltip>
-        </div>
       </div>
 
       <nav style={{ flexGrow: 1, overflowY: 'auto', paddingBottom: 12 }}>
@@ -111,20 +92,33 @@ export function Sidebar({
         ))}
       </nav>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--g-color-line-generic)',
-          padding: collapsed ? '12px 0' : '12px 8px 12px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          gap: 8,
-        }}
-      >
+      <div className="sidebar-footer">
+        <DropdownMenu
+          size="m"
+          popupProps={{ placement: collapsed ? 'right-end' : 'top-start' }}
+          renderSwitcher={(props) => (
+            <Button {...props} view="flat" size="m" aria-label="Меню аккаунта">
+              <Icon data={EllipsisVertical} size={BUTTON_ICON_SIZE} />
+            </Button>
+          )}
+          items={[
+            {
+              text: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема',
+              iconStart: <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />,
+              action: () => toggleTheme(),
+            },
+            {
+              text: 'Выйти',
+              iconStart: <Icon data={ArrowRightFromSquare} size={BUTTON_ICON_SIZE} />,
+              action: () => void signOut(),
+            },
+          ]}
+        />
+
         {!collapsed && (
           // Text рендерится инлайновым span, поэтому нужен явный столбец:
           // иначе название организации и роль слипаются в одну строку.
-          <Flex direction="column" style={{ overflow: 'hidden' }}>
+          <Flex direction="column" style={{ overflow: 'hidden', minWidth: 0 }}>
             <Text variant="body-1" ellipsis>
               {current ? current.name : 'Без организации'}
             </Text>
@@ -133,12 +127,6 @@ export function Sidebar({
             </Text>
           </Flex>
         )}
-
-        <Tooltip content="Выйти" openDelay={TOOLTIP_DELAY} rest={0}>
-          <Button view="flat" size="m" onClick={() => void signOut()} aria-label="Выйти">
-            <Icon data={EllipsisVertical} size={BUTTON_ICON_SIZE} />
-          </Button>
-        </Tooltip>
       </div>
     </aside>
   );

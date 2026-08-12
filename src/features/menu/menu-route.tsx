@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Button, Flex, Icon, Loader, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
-import { ChevronLeft, ChevronRight } from '@gravity-ui/icons';
+import { Button, Dialog, Flex, Icon, Loader, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import { ChevronLeft, ChevronRight, Gear } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
@@ -18,6 +18,7 @@ import {
   compareToNorm,
   formatMetric,
   normForDiet,
+  parseRuNumber,
   sumDishes,
   type DayNorm,
   type DayTotals,
@@ -117,6 +118,9 @@ function MenuByDates({ menuId }: { menuId: string }) {
   const toaster = useToaster();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
   const [organizationId, setOrganizationId] = useState(ORG_OPTIONS[0].value);
+  const [parametersOpen, setParametersOpen] = useState(false);
+  const [customPriceLimit, setCustomPriceLimit] = useState<number | null>(null);
+  const [parametersDraftLimit, setParametersDraftLimit] = useState<string>('');
   /** Локальная неделя просмотра — стрелки обновляют только календарь. */
   const [viewStartDate, setViewStartDate] = useState<string | null>(null);
   const [weekLoading, setWeekLoading] = useState(false);
@@ -129,27 +133,35 @@ function MenuByDates({ menuId }: { menuId: string }) {
   }, [menuId]);
 
   useEffect(() => {
+    const weekTimer = weekTimerRef;
+    const persistTimer = persistTimerRef;
     return () => {
-      if (weekTimerRef.current !== null) window.clearTimeout(weekTimerRef.current);
-      if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
+      if (weekTimer.current !== null) window.clearTimeout(weekTimer.current);
+      if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
     };
   }, []);
 
   const menu = data?.menu;
   const startDate = viewStartDate ?? menu?.startDate ?? startOfWeekMonday();
+  /** Пока startDate на сервере не совпал с просматриваемым — слоты ещё от другого периода. */
+  const periodSynced = menu?.startDate === startDate;
 
   useEffect(() => {
     if (!menu || menu.cycleDays === CYCLE_DAYS) return;
     updateMenu.mutate({ cycleDays: CYCLE_DAYS });
   }, [menu, updateMenu]);
 
+  useEffect(() => {
+    if (!periodSynced) setPicker(null);
+  }, [periodSynced]);
+
   const slotMap = useMemo(() => {
     const map = new Map<string, MenuDishRef[]>();
     for (const slot of menu?.slots ?? []) {
-      map.set(slotKey(slot.day, slot.mealId), slot.dishes);
+      map.set(slotKey(slot.day, slot.mealId), periodSynced ? slot.dishes : EMPTY_DISHES);
     }
     return map;
-  }, [menu?.slots]);
+  }, [menu?.slots, periodSynced]);
 
   const dayTotals = useMemo(() => {
     if (!menu) return new Map<number, DayTotals>();
@@ -200,6 +212,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
   const days = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1);
   const norm = normForDiet(menu.dietName);
+  const priceLimit = customPriceLimit ?? norm.price;
 
   const patchMenu = (patch: { startDate?: string; dietName?: string }) => {
     updateMenu.mutate(patch, {
@@ -219,21 +232,29 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
     pendingWeekRef.current = next;
     setWeekLoading(true);
+    setPicker(null);
 
     if (weekTimerRef.current !== null) window.clearTimeout(weekTimerRef.current);
+    if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
+
     weekTimerRef.current = window.setTimeout(() => {
       const pending = pendingWeekRef.current;
-      if (pending) setViewStartDate(pending);
       pendingWeekRef.current = null;
-      setWeekLoading(false);
-
-      // Сохраняем неделю в фоне, без дёрганья UI.
-      if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
-      if (pending) {
-        persistTimerRef.current = window.setTimeout(() => {
-          updateMenu.mutate({ startDate: pending });
-        }, 400);
+      if (!pending) {
+        setWeekLoading(false);
+        return;
       }
+
+      // Сначала переключаем период на сервере (свои слоты), потом обновляем календарь.
+      updateMenu.mutate(
+        { startDate: pending },
+        {
+          onSettled: () => {
+            setViewStartDate(pending);
+            setWeekLoading(false);
+          },
+        }
+      );
     }, 180);
   };
 
@@ -248,12 +269,11 @@ function MenuByDates({ menuId }: { menuId: string }) {
         alignItems="center"
         justifyContent="space-between"
         gap={3}
-        wrap
       >
-        <Flex alignItems="center" gap={2} wrap>
+        <Flex alignItems="center" gap={2}>
           <Button
             view="outlined"
-            size="m"
+            size="l"
             title="Предыдущий период"
             disabled={weekLoading}
             onClick={() => shiftPeriod(-1)}
@@ -262,13 +282,13 @@ function MenuByDates({ menuId }: { menuId: string }) {
           </Button>
           <TextInput
             className="menu-week-field"
-            size="m"
+            size="l"
             value={formatDateRange(startDate, CYCLE_DAYS)}
             readOnly
           />
           <Button
             view="outlined"
-            size="m"
+            size="l"
             title="Следующий период"
             disabled={weekLoading}
             onClick={() => shiftPeriod(1)}
@@ -277,7 +297,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
           </Button>
           <Button
             view="outlined"
-            size="m"
+            size="l"
             disabled={weekLoading}
             onClick={() => goToWeek(startOfWeekMonday())}
           >
@@ -285,8 +305,9 @@ function MenuByDates({ menuId }: { menuId: string }) {
           </Button>
         </Flex>
 
-        <Flex alignItems="center" gap={2} wrap>
+        <Flex alignItems="center" gap={2}>
           <Select
+            size="l"
             label="Организация:"
             width={300}
             value={[organizationId]}
@@ -294,12 +315,23 @@ function MenuByDates({ menuId }: { menuId: string }) {
             options={ORG_OPTIONS}
           />
           <Select
+            size="l"
             label="Диета:"
             width={200}
             value={[menu.dietName]}
             onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
             options={DIET_OPTIONS}
           />
+          <Button view="outlined" size="l" onClick={() => {
+              setParametersDraftLimit(
+                customPriceLimit !== null ? String(customPriceLimit) : String(norm.price)
+              );
+              setParametersOpen(true);
+            }}
+          >
+            <Icon data={Gear} size={16} />
+            Параметры
+          </Button>
         </Flex>
       </Flex>
 
@@ -351,7 +383,11 @@ function MenuByDates({ menuId }: { menuId: string }) {
                       <button
                         type="button"
                         className="menu-grid__cell-btn"
-                        onClick={() => setPicker({ day, mealId: meal.id })}
+                        disabled={!periodSynced || weekLoading}
+                        onClick={() => {
+                          if (!periodSynced || weekLoading) return;
+                          setPicker({ day, mealId: meal.id });
+                        }}
                       >
                         {dishes.length === 0 ? (
                           <span className="menu-grid__empty">+ блюдо</span>
@@ -404,15 +440,60 @@ function MenuByDates({ menuId }: { menuId: string }) {
         )}
       </div>
 
+      <Dialog open={parametersOpen} onClose={() => setParametersOpen(false)} size="s">
+        <Dialog.Header caption="Параметры" />
+        <Dialog.Divider />
+        <Dialog.Body>
+          <Flex direction="column" gap={3}>
+            <Text variant="body-1" color="secondary">
+              Укажите лимит цены на день. Если оставить пустым, будет использован лимит диеты.
+            </Text>
+            <TextInput
+              className="menu-price-input"
+              size="l"
+              type="number"
+              label="Лимит цены"
+              placeholder={`${norm.price}`}
+              value={parametersDraftLimit}
+              onUpdate={setParametersDraftLimit}
+              endContent={<Text color="secondary">₽</Text>}
+              style={{ width: '100%' }}
+            />
+          </Flex>
+        </Dialog.Body>
+        <Dialog.Divider />
+        <Dialog.Footer>
+          <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
+            <Button type="button" view="outlined" size="l" onClick={() => setParametersOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              view="action"
+              size="l"
+              onClick={() => {
+                setCustomPriceLimit(
+                  parametersDraftLimit.trim() === ''
+                    ? null
+                    : parseRuNumber(parametersDraftLimit)
+                );
+                setParametersOpen(false);
+              }}
+            >
+              Сохранить
+            </Button>
+          </Flex>
+        </Dialog.Footer>
+      </Dialog>
       <DishPickerDialog
         open={picker !== null}
         title={pickerTitle}
         dishes={pickerDishes}
-        priceLimit={norm.price}
+        priceLimit={priceLimit}
         dayPriceWithoutSlot={pickerDayPriceWithoutSlot}
         saving={updateSlot.isPending}
         onClose={() => setPicker(null)}
-        onSave={(dishes) => {
+        onSave={(dishes, force) => {
           if (!picker) return;
           const dayPrice =
             (dayTotals.get(picker.day)?.price ?? 0) -
@@ -422,11 +503,13 @@ function MenuByDates({ menuId }: { menuId: string }) {
             { day: picker.day, mealId: picker.mealId, dishes },
             {
               onSuccess: () => {
-                if (dayPrice > norm.price) {
+                if (dayPrice > priceLimit) {
                   toaster.add({
-                    name: 'menu-price-warning',
-                    title: 'Ячейка сохранена с превышением цены',
-                    content: `Цена дня ${Math.round(dayPrice)} ₽ выше лимита ${norm.price} ₽.`,
+                    name: force ? 'menu-price-allowed' : 'menu-price-warning',
+                    title: force
+                      ? 'Превышение разрешено и ячейка сохранена'
+                      : 'Ячейка сохранена с превышением цены',
+                    content: `Цена дня ${Math.round(dayPrice)} ₽ выше лимита ${priceLimit} ₽.`,
                     theme: 'warning',
                   });
                 } else {

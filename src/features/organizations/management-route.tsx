@@ -162,11 +162,7 @@ function OrganizationsTable({
           {
             id: 'name',
             name: 'Название',
-            template: (row) => (
-              <Text variant="body-1" style={{ fontWeight: 600 }}>
-                {row.name}
-              </Text>
-            ),
+            template: (row) => <Text variant="subheader-1">{row.name}</Text>,
           },
           {
             id: 'memberCount',

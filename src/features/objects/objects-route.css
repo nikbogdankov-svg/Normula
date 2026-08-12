@@ -1,51 +1,3 @@
-.objects-facility-bar-scroll {
-  overflow-x: auto;
-}
-
-.objects-facility-bar {
-  display: flex;
-  border: 1px solid var(--g-color-line-generic-solid);
-  border-radius: 12px;
-  background: var(--g-color-base-background);
-}
-
-.objects-facility-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 0;
-  min-width: 140px;
-  margin: 0;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 0;
-  background: var(--g-color-base-background);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.objects-facility-card:first-child {
-  border-radius: 11px 0 0 11px;
-}
-
-.objects-facility-card:last-child {
-  border-radius: 0 11px 11px 0;
-}
-
-.objects-facility-card:only-child {
-  border-radius: 11px;
-}
-
-.objects-facility-card:hover {
-  background: var(--g-color-base-generic-ultralight);
-}
-
-.objects-facility-card_active,
-.objects-facility-card_active:hover {
-  background: var(--g-color-base-generic);
-}
-
 .objects-facility-tables .g-table__table {
   table-layout: fixed;
   width: 100%;
@@ -53,11 +5,11 @@
 
 .objects-group-table .objects-group-row_no-divider .g-table__cell {
   border-block-end-color: transparent;
-  padding-block-end: 4px;
+  padding-block-end: 8px;
 }
 
 .objects-group-table .objects-group-row_continuation .g-table__cell {
-  padding-block-start: 4px;
+  padding-block-start: 8px;
 }
 
 /* Линия между ЛПУ внутри блюда — не пересекает столбец «Блюдо». */
@@ -74,4 +26,20 @@
 .objects-total-headcount {
   display: inline-block;
   padding-inline-start: 8px;
+}
+
+/* Отключаем ховер-эффект строк таблицы объектов. */
+.g-root .objects-group-table .g-table__body .g-table__row:hover,
+.g-root .objects-group-table .g-table__body .g-table__row:hover > .g-table__cell {
+  background-color: transparent;
+}
+
+/* Хедер колонки «Котел» — выравнивание вправо. */
+.g-root .objects-group-table .g-table__head .g-table__cell:last-child {
+  text-align: end;
+}
+
+/* Шрифт body-2 в таблице объектов. */
+.g-root .objects-group-table .g-table__cell {
+  font-size: var(--g-text-body-2-font-size);
 }

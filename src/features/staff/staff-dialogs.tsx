@@ -21,6 +21,7 @@ import {
   useUpdateEmployee,
 } from './api';
 import { EMPTY_DOCUMENTS, type Employee, type EmployeeDocuments } from './types';
+import { toWorkEmail, WORK_EMAIL_DOMAIN, workEmailLocalPart } from './work-email';
 import './staff-dialogs.css';
 
 /** Общая форма обоих шагов и обеих вкладок. */
@@ -103,7 +104,7 @@ function ProfileFields({
         type="email"
         value={form.email}
         onUpdate={(v) => onChange({ email: v })}
-        note="На неё придёт приглашение — по этой почте сотрудник и войдёт."
+        note="На неё придёт приглашение — по этой почте сотрудник и войдёт. Адрес должен существовать."
       />
       <Select
         size="l"
@@ -117,15 +118,21 @@ function ProfileFields({
           content: role.name,
         }))}
       />
-      {/* В макете поле заблокировано и заполняется само. Оставили обычным:
-          настоящих ящиков на домене организации нет, а выдумывать адрес,
-          на который ничего не дойдёт, — врать. */}
+      {/* Домен фиксирован, вводится только локальная часть — виджет из
+          макета. Поле необязательное и ни на что не влияет: приглашение
+          уходит на почту выше, а сюда пишут корпоративный адрес, если он
+          вообще есть. */}
       <TextInput
         size="l"
         label="E-mail организации:"
-        placeholder="Необязательно"
-        value={form.orgEmail}
-        onUpdate={(v) => onChange({ orgEmail: v })}
+        placeholder="i.ivanov"
+        value={workEmailLocalPart(form.orgEmail)}
+        onUpdate={(v) => onChange({ orgEmail: toWorkEmail(v) })}
+        endContent={
+          <Text variant="body-1" color="secondary">
+            {WORK_EMAIL_DOMAIN}
+          </Text>
+        }
       />
     </>
   );
