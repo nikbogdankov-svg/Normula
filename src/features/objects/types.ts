@@ -49,6 +49,21 @@ export interface UpdateTableHeadcountRequest {
   headcount: number;
 }
 
+/** Тело PATCH /v1/objects/facilities/:id — структура ЛПУ без численности. */
+export interface UpdateFacilityRequest {
+  name: string;
+  address: string;
+  kettleNumber: number;
+  departments: Array<{
+    id: string;
+    name: string;
+    tables: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>;
+}
+
 /** Строка выхода на раздачу (ОБЪЕКТ-04). */
 export interface DistributionRow {
   dishName: string;

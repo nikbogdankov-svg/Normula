@@ -10,7 +10,7 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { ArrowRight, Key, Lock, Pencil } from '@gravity-ui/icons';
+import { ArrowRight, Key, Pencil } from '@gravity-ui/icons';
 import {
   useCreateEmployee,
   useDeleteEmployee,
@@ -19,7 +19,7 @@ import {
   useUpdateEmployee,
 } from './api';
 import type { CreateEmployeeRequest, Employee } from './types';
-import { orgEmail } from './org-email';
+import { toWorkEmail, WORK_EMAIL_DOMAIN, workEmailLocalPart } from './work-email';
 import './staff-dialogs.css';
 
 /** Пустая форма: оба шага в одном состоянии. */
@@ -101,11 +101,15 @@ function EmployeeFormFields({
         </Flex>
         <TextInput
           size="l"
-          label="Почта:"
-          placeholder="example@mail.ru"
-          type="email"
-          value={form.email}
-          onUpdate={(v) => onChange({ email: v })}
+          label="Рабочая почта:"
+          placeholder="ivan.ivanov"
+          value={workEmailLocalPart(form.email)}
+          onUpdate={(v) => onChange({ email: toWorkEmail(v) })}
+          endContent={
+            <Text variant="body-1" color="secondary">
+              {WORK_EMAIL_DOMAIN}
+            </Text>
+          }
         />
         <Select
           size="l"
@@ -118,14 +122,6 @@ function EmployeeFormFields({
             value: role.id,
             content: role.name,
           }))}
-        />
-        <TextInput
-          size="l"
-          label="E-mail организации:"
-          placeholder="Доступен после ввода имени и фамилии"
-          value={orgEmail(form.firstName, form.lastName)}
-          disabled
-          startContent={<Icon data={Lock} size={16} />}
         />
       </>
     );
@@ -453,9 +449,14 @@ export function ResetPasswordDialog({
           <TextInput
             size="l"
             label="Почта для сброса:"
-            type="email"
-            value={email}
-            onUpdate={setEmail}
+            placeholder="ivan.ivanov"
+            value={workEmailLocalPart(email)}
+            onUpdate={(v) => setEmail(toWorkEmail(v))}
+            endContent={
+              <Text variant="body-1" color="secondary">
+                {WORK_EMAIL_DOMAIN}
+              </Text>
+            }
           />
         </Flex>
       </Dialog.Body>

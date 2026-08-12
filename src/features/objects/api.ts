@@ -3,6 +3,7 @@ import { useApi } from '@/shared/api/use-api';
 import type {
   DistributionPreviewResponse,
   KitchenResponse,
+  UpdateFacilityRequest,
   UpdateTableHeadcountRequest,
 } from './types';
 
@@ -30,7 +31,10 @@ export function useDistributionPreview() {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: [KEY] });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: [KEY] });
+    queryClient.invalidateQueries({ queryKey: ['portions'] });
+  };
 }
 
 export function useUpdateTableHeadcount() {
@@ -42,6 +46,20 @@ export function useUpdateTableHeadcount() {
       api.request<KitchenResponse>('/v1/objects/tables/headcount', {
         method: 'PATCH',
         body,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateFacility() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateFacilityRequest }) =>
+      api.request<KitchenResponse>(`/v1/objects/facilities/${id}`, {
+        method: 'PATCH',
+        body: patch,
       }),
     onSuccess: invalidate,
   });

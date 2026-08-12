@@ -7,6 +7,7 @@ import {
   Calendar,
   CircleRuble,
   Cubes3Overlap,
+  BookOpen,
   Files,
   FileText,
   Gear,
@@ -52,8 +53,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Производство',
     items: [
-      { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
-      { to: '/app/portions', label: 'Порционник', icon: Receipt, wip: true },
+      { to: '/app/portions', label: 'Порционник', icon: Receipt },
       { to: '/app/cooking-plan', label: 'План приготовления', icon: Calendar, wip: true },
       { to: '/app/products-layout', label: 'Раскладка продуктов', icon: Box, wip: true },
       {
@@ -67,9 +67,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Склад',
     items: [
-      { to: '/app/receipts', label: 'Приход', icon: ArrowRightToLine, wip: true },
-      { to: '/app/stock', label: 'Остатки', icon: Archive, wip: true },
-      { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine, wip: true },
+      { to: '/app/warehouse-receipts', label: 'Приход', icon: ArrowRightToLine },
+      { to: '/app/warehouse-balances', label: 'Остатки', icon: Archive },
+      { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine },
     ],
   },
   {
@@ -81,11 +81,15 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Документы',
-    items: [{ to: '/app/documents', label: 'Документы', icon: Files, wip: true }],
+    items: [
+      { to: '/app/journals', label: 'Журналы', icon: BookOpen },
+      { to: '/app/documents', label: 'Документы', icon: Files, wip: true },
+    ],
   },
   {
     title: 'Справочники',
     items: [
+      { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/norms', label: 'Нормы', icon: ListCheck, wip: true },
       { to: '/app/products', label: 'Продукты', icon: ShoppingCart, wip: true },
       { to: '/app/diets', label: 'Диеты', icon: Heart, wip: true },
