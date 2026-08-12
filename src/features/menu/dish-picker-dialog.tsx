@@ -26,7 +26,7 @@ export function DishPickerDialog({
   priceLimit: number;
   /** Сумма цен по другим приёмам этого дня (без текущей ячейки). */
   dayPriceWithoutSlot: number;
-  onSave: (dishes: MenuDishRef[]) => void;
+  onSave: (dishes: MenuDishRef[], force?: boolean) => void;
   onClose: () => void;
   saving?: boolean;
 }) {
@@ -173,13 +173,10 @@ export function DishPickerDialog({
                       </Text>
                     </Flex>
                     <Button
+                      type="button"
                       view="flat"
                       size="s"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        add(recipe.id);
-                      }}
+                      onClick={() => add(recipe.id)}
                     >
                       <Icon data={Plus} size={14} />
                       Добавить
@@ -199,10 +196,20 @@ export function DishPickerDialog({
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
-          <Button view="outlined" size="l" onClick={onClose}>
+          <Button type="button" view="outlined" size="l" onClick={onClose}>
             Отмена
           </Button>
-          <Button view="action" size="l" loading={saving} onClick={() => onSave(draft)}>
+          {overLimit && (
+            <Button
+              type="button"
+              view="outlined"
+              size="l"
+              onClick={() => onSave(draft, true)}
+            >
+              Разрешить
+            </Button>
+          )}
+          <Button type="button" view="action" size="l" loading={saving} onClick={() => onSave(draft)}>
             <Icon data={FloppyDisk} size={16} />
             Сохранить
           </Button>

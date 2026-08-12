@@ -37,7 +37,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={value}>
-      <ThemeProvider theme={theme}>{children}</ThemeProvider>
+      <ThemeProvider theme={theme} lang="ru">
+        {children}
+      </ThemeProvider>
     </ThemeContext.Provider>
   );
 }

@@ -24,7 +24,7 @@ export interface UpdatePortionHeadcountRequest {
 }
 
 /** Верхний переключатель экрана. */
-export type PortionsView = 'headcount' | 'dishes';
+export type PortionsView = 'organizations' | 'dishes';
 
 /** Строка раздачи по блюдам. */
 export interface DishDistributionRow {
