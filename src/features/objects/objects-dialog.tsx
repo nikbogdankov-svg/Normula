@@ -206,7 +206,7 @@ export function EditFacilityDialog({
 
   return (
     <Dialog open onClose={close} size="m">
-      <Dialog.Header caption="Редактирование ЛПУ" />
+      <Dialog.Header caption="Редактирование организацию" />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>

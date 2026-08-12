@@ -36,6 +36,7 @@ export const MOCKED_PREFIXES = [
   '/v1/objects',
   '/v1/portions',
   '/v1/warehouse',
+  '/v1/write-offs',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -595,6 +596,107 @@ const warehouseBalances = [
     ],
     createdAt: new Date(Date.now() - 1 * day).toISOString(),
     updatedAt: new Date(Date.now() - 1 * day).toISOString(),
+  },
+];
+
+const writeOffs = [
+  {
+    id: 'wo-1',
+    type: 'exceptional',
+    date: new Date(Date.now() - 2 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    reason: 'Истёк срок годности',
+    items: [
+      {
+        id: 'wo-1-item-1',
+        productId: 'prod-3',
+        productName: 'Молоко коровье',
+        quantity: 12,
+        unit: 'л',
+        unitPrice: 65,
+        totalPrice: 780,
+      },
+      {
+        id: 'wo-1-item-2',
+        productId: 'prod-4',
+        productName: 'Яйцо куриное',
+        quantity: 40,
+        unit: 'шт',
+        unitPrice: 12,
+        totalPrice: 480,
+      },
+    ],
+    createdAt: new Date(Date.now() - 2 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * day).toISOString(),
+  },
+  {
+    id: 'wo-2',
+    type: 'exceptional',
+    date: new Date(Date.now() - 1 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    reason: 'Бой при транспортировке',
+    items: [
+      {
+        id: 'wo-2-item-1',
+        productId: 'prod-2',
+        productName: 'Масло подсолнечное',
+        quantity: 3,
+        unit: 'л',
+        unitPrice: 120,
+        totalPrice: 360,
+      },
+    ],
+    createdAt: new Date(Date.now() - 1 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * day).toISOString(),
+  },
+  {
+    id: 'wo-3',
+    type: 'daily',
+    date: new Date(Date.now() - 1 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    reason: 'Ежедневное списание',
+    items: [
+      {
+        id: 'wo-3-item-1',
+        productId: 'prod-1',
+        productName: 'Мука пшеничная',
+        quantity: 5,
+        unit: 'кг',
+        unitPrice: 45,
+        totalPrice: 225,
+      },
+      {
+        id: 'wo-3-item-2',
+        productId: 'prod-3',
+        productName: 'Молоко коровье',
+        quantity: 8,
+        unit: 'л',
+        unitPrice: 65,
+        totalPrice: 520,
+      },
+    ],
+    createdAt: new Date(Date.now() - 1 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * day).toISOString(),
+  },
+  {
+    id: 'wo-4',
+    type: 'daily',
+    date: new Date(Date.now() - 3 * day).toISOString(),
+    warehouseId: 'warehouse-central',
+    reason: 'Ежедневное списание',
+    items: [
+      {
+        id: 'wo-4-item-1',
+        productId: 'prod-4',
+        productName: 'Яйцо куриное',
+        quantity: 60,
+        unit: 'шт',
+        unitPrice: 12,
+        totalPrice: 720,
+      },
+    ],
+    createdAt: new Date(Date.now() - 3 * day).toISOString(),
+    updatedAt: new Date(Date.now() - 3 * day).toISOString(),
   },
 ];
 
@@ -1191,6 +1293,55 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     };
     warehouseBalances.unshift(balance);
     return { balance } as T;
+  }
+
+  // Склад: списания
+  if (route === '/v1/write-offs' && method === 'GET') {
+    const type = params.get('type') ?? '';
+    const found = type ? writeOffs.filter((item) => item.type === type) : writeOffs;
+    return { writeOffs: found, total: found.length } as T;
+  }
+
+  if (route === '/v1/write-offs' && method === 'POST') {
+    const body = options.body as {
+      type: string;
+      date: string;
+      warehouseId: string;
+      reason: string;
+      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+    };
+    const productMap: Record<string, string> = {
+      'prod-1': 'Мука пшеничная',
+      'prod-2': 'Масло подсолнечное',
+      'prod-3': 'Молоко коровье',
+      'prod-4': 'Яйцо куриное',
+    };
+    const unitMap: Record<string, string> = {
+      'prod-1': 'кг',
+      'prod-2': 'л',
+      'prod-3': 'л',
+      'prod-4': 'шт',
+    };
+    const writeOff = {
+      id: `wo-${Date.now()}`,
+      type: body.type,
+      date: body.date,
+      warehouseId: body.warehouseId,
+      reason: body.reason,
+      items: body.items.map((item, idx) => ({
+        id: `wo-item-${Date.now()}-${idx}`,
+        productId: item.productId,
+        productName: productMap[item.productId] || 'Неизвестный товар',
+        quantity: item.quantity,
+        unit: unitMap[item.productId] || 'шт',
+        unitPrice: item.unitPrice,
+        totalPrice: item.quantity * item.unitPrice,
+      })),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    writeOffs.unshift(writeOff);
+    return { writeOff } as T;
   }
 
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);

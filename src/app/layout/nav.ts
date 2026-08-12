@@ -69,7 +69,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/app/warehouse-receipts', label: 'Приход', icon: ArrowRightToLine },
       { to: '/app/warehouse-balances', label: 'Остатки', icon: Archive },
-      { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine, wip: true },
+      { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine },
     ],
   },
   {

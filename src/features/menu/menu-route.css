@@ -1,6 +1,8 @@
 /* Сетка меню: приёмы × дни + итог на день. */
 .menu-toolbar {
   flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .menu-week-field {
@@ -150,6 +152,17 @@
 
 .menu-grid__slot {
   padding: 0;
+}
+
+.menu-price-input input::-webkit-outer-spin-button,
+.menu-price-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.menu-price-input input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .menu-grid__cell-btn {

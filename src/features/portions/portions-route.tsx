@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { DatePicker } from '@gravity-ui/date-components';
+import { dateTime } from '@gravity-ui/date-utils';
 import {
   Button,
   Card,
@@ -11,7 +13,7 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { Printer, Receipt } from '@gravity-ui/icons';
+import { Printer, Receipt, TriangleExclamation } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -35,7 +37,7 @@ export function PortionsRoute() {
   const { current } = useOrganizations();
   const kitchen = useKitchen();
   const [date, setDate] = useState(todayIso);
-  const [view, setView] = useState<PortionsView>('headcount');
+  const [view, setView] = useState<PortionsView>('organizations');
   const [selectedId, setSelectedId] = useState<string>(ALL_FACILITIES);
   const portions = usePortionsDay(date);
   const dishes = useDishDistribution(date);
@@ -70,6 +72,7 @@ export function PortionsRoute() {
     ? null
     : (facilities.find((facility) => facility.id === selectedId) ?? facilities[0] ?? null);
 
+  const isFutureDate = date > todayIso();
   const headcountOf = (facilityId: string, departmentId: string, tableId: string) => {
     const entry = portions.data?.entries.find(
       (item) =>
@@ -83,19 +86,18 @@ export function PortionsRoute() {
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
       <Flex alignItems="center" gap={3} wrap>
-        <TextInput
+        <DatePicker
           size="l"
-          value={date}
-          onUpdate={setDate}
+          value={dateTime({ input: date })}
+          onUpdate={(value) => setDate(value?.toISOString().slice(0, 10) ?? todayIso())}
           style={{ width: 180 }}
-          controlProps={{ type: 'date' }}
         />
         <SegmentedRadioGroup
           size="l"
           value={view}
           onUpdate={(value) => setView(value as PortionsView)}
         >
-          <SegmentedRadioGroup.Option value="headcount" content="Численность" />
+          <SegmentedRadioGroup.Option value="organizations" content="По организациям" />
           <SegmentedRadioGroup.Option value="dishes" content="По блюдам" />
         </SegmentedRadioGroup>
       </Flex>
@@ -113,14 +115,15 @@ export function PortionsRoute() {
             <Text variant="subheader-2">{view === 'dishes' ? 'По блюдам' : 'Порционник'}</Text>
           </Flex>
           <Flex alignItems="center" gap={2}>
-            {view === 'headcount' && facilities.length > 0 && (
+            {view === 'organizations' && facilities.length > 0 && (
               <Select
                 size="m"
                 width={260}
                 label="Организация:"
+                title="Организация:"
                 value={[showAll ? ALL_FACILITIES : (selected?.id ?? ALL_FACILITIES)]}
                 onUpdate={(value) => setSelectedId(value[0] ?? ALL_FACILITIES)}
-                placeholder="Выберите ЛПУ"
+                placeholder="Выберите школу, например школа 5"
                 options={[
                   { value: ALL_FACILITIES, content: 'Все' },
                   ...facilities.map((facility) => ({
@@ -143,29 +146,70 @@ export function PortionsRoute() {
             paddingBottom: 8,
           }}
         >
-          {view === 'headcount' && (
+          {view === 'organizations' && (
             <>
-              {portions.isPending && <LoadingState />}
-              {portions.isError && (
-                <ErrorState error={portions.error} onRetry={() => void portions.refetch()} />
+              {isFutureDate && !portions.isPending && !portions.isError ? (
+                <Flex
+                  direction="column"
+                  alignItems="center"
+                  gap={4}
+                  style={{
+                    padding: 10,
+                    borderRadius: 8,
+                    margin: '0 16px 8px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 8,
+                      background: 'var(--g-color-base-generic)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon data={TriangleExclamation} size={20} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Text variant="subheader-2">Эта дата в будущем</Text>
+                    <Text variant="body-2">Еще нет данных на эту дату</Text>
+                  </div>
+                  <Button view="action" onClick={() => setDate(todayIso())}>
+                    Перейти на сегодня
+                  </Button>
+                </Flex>
+              ) : (
+                <>
+                  {portions.isPending && <LoadingState />}
+                  {portions.isError && (
+                    <ErrorState error={portions.error} onRetry={() => void portions.refetch()} />
+                  )}
+                  {!portions.isPending && !portions.isError && facilities.length === 0 && (
+                    <EmptyState text="Сначала добавьте ЛПУ в разделе «Объекты»" />
+                  )}
+                  {!portions.isPending && !portions.isError && facilities.length > 0 && showAll && (
+                    <SummaryPortionsTable
+                      date={date}
+                      facilities={facilities}
+                      headcountOf={headcountOf}
+                    />
+                  )}
+                  {!portions.isPending &&
+                    !portions.isError &&
+                    facilities.length > 0 &&
+                    !showAll &&
+                    selected && (
+                      <DepartmentPortionsTable
+                        date={date}
+                        facility={selected}
+                        headcountOf={headcountOf}
+                      />
+                    )}
+                </>
               )}
-              {!portions.isPending && !portions.isError && facilities.length === 0 && (
-                <EmptyState text="Сначала добавьте ЛПУ в разделе «Объекты»" />
-              )}
-              {!portions.isPending && !portions.isError && facilities.length > 0 && showAll && (
-                <SummaryPortionsTable facilities={facilities} headcountOf={headcountOf} />
-              )}
-              {!portions.isPending &&
-                !portions.isError &&
-                facilities.length > 0 &&
-                !showAll &&
-                selected && (
-                  <DepartmentPortionsTable
-                    date={date}
-                    facility={selected}
-                    headcountOf={headcountOf}
-                  />
-                )}
             </>
           )}
 
@@ -310,15 +354,23 @@ function DepartmentPortionsTable({
 }
 
 function SummaryPortionsTable({
+  date,
   facilities,
   headcountOf,
 }: {
+  date: string;
   facilities: Facility[];
   headcountOf: (facilityId: string, departmentId: string, tableId: string) => number;
 }) {
+  const update = useUpdatePortionHeadcount();
+  const toaster = useToaster();
+
   const rows = useMemo(() => {
     type Row = {
       id: string;
+      facilityId: string;
+      departmentId: string;
+      tableId: string;
       facilityName: string;
       departmentName: string;
       tableName: string;
@@ -336,6 +388,9 @@ function SummaryPortionsTable({
     for (const facility of facilities) {
       const facilityRows: {
         id: string;
+        facilityId: string;
+        departmentId: string;
+        tableId: string;
         facilityName: string;
         departmentName: string;
         tableName: string;
@@ -347,6 +402,9 @@ function SummaryPortionsTable({
           grand += headcount;
           facilityRows.push({
             id: `${facility.id}-${department.id}-${table.id}`,
+            facilityId: facility.id,
+            departmentId: department.id,
+            tableId: table.id,
             facilityName: facility.name,
             departmentName: department.name,
             tableName: table.name,
@@ -447,7 +505,34 @@ function SummaryPortionsTable({
               row.isTotal ? (
                 <span className="portions-total-headcount">{row.headcount}</span>
               ) : (
-                row.headcount
+                <TextInput
+                  type="number"
+                  size="s"
+                  value={String(row.headcount)}
+                  controlProps={{ min: 0 }}
+                  style={{ width: 96 }}
+                  onUpdate={(value) => {
+                    const headcount = Math.max(0, Number(value) || 0);
+                    update.mutate(
+                      {
+                        date,
+                        facilityId: row.facilityId,
+                        departmentId: row.departmentId,
+                        tableId: row.tableId,
+                        headcount,
+                      },
+                      {
+                        onError: (e) =>
+                          toaster.add({
+                            name: 'portions-headcount',
+                            title: 'Не удалось сохранить',
+                            content: e.message,
+                            theme: 'danger',
+                          }),
+                      }
+                    );
+                  }}
+                />
               ),
           },
         ]}

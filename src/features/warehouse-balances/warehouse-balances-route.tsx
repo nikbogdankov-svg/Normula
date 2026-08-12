@@ -1,20 +1,27 @@
-import { useState } from 'react';
-import { Button, Card, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
+import { useEffect, useState } from 'react';
+import { Button, Card, Flex, Icon, Select, Text, TextInput } from '@gravity-ui/uikit';
 import { Magnifier, Archive } from '@gravity-ui/icons';
+import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
+import { HighlightText } from '@/shared/ui/highlight-text';
 import { useApi } from '@/shared/api/use-api';
 import { useBalances } from './api';
 import type { WarehouseBalance } from './types';
 import './warehouse-balances-route.css';
 
-const MOCK_WAREHOUSE_ID = 'warehouse-central';
-
 export function WarehouseBalancesRoute() {
   const api = useApi();
+  const { organizations } = useOrganizations();
+  const [warehouseId, setWarehouseId] = useState('');
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<WarehouseBalance | null>(null);
 
-  const { data, isLoading, error } = useBalances(MOCK_WAREHOUSE_ID);
+  useEffect(() => {
+    if (!organizations?.length) return;
+    setWarehouseId((current) => current || organizations[0].id);
+  }, [organizations]);
+
+  const { data, isLoading, error } = useBalances(warehouseId);
 
   if (api.organizationId === null) {
     return (
@@ -62,16 +69,15 @@ export function WarehouseBalancesRoute() {
         unit: item.unit,
         isFirstBatchOfProduct: batchIndex === 0,
         isLastBatchOfProduct: batchIndex === item.batches.length - 1,
-      })),
-    ),
+      }))
+    )
   );
 
   const filteredRows = rows.filter((row) => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
     return (
-      row.productName.toLowerCase().includes(query) ||
-      row.batchNumber.toLowerCase().includes(query)
+      row.productName.toLowerCase().includes(query) || row.batchNumber.toLowerCase().includes(query)
     );
   });
 
@@ -89,6 +95,22 @@ export function WarehouseBalancesRoute() {
             <Text variant="subheader-2">Остатки товаров</Text>
           </Flex>
           <Flex alignItems="center" gap={2} wrap>
+            <Select
+              size="m"
+              width={220}
+              label="Склад:"
+              placeholder="Выберите школу, больницу или учреждение"
+              value={[warehouseId]}
+              onUpdate={(value) => setWarehouseId(value[0] ?? '')}
+              options={
+                organizations?.length
+                  ? organizations.map((organization) => ({
+                      value: organization.id,
+                      content: organization.name,
+                    }))
+                  : []
+              }
+            />
             <TextInput
               size="m"
               placeholder="Поиск по товару или партии"
@@ -136,8 +158,16 @@ export function WarehouseBalancesRoute() {
                       .filter(Boolean)
                       .join(' ')}
                   >
-                    <td>{row.isFirstBatchOfProduct ? row.productName : ''}</td>
-                    <td>{row.batchNumber}</td>
+                    <td>
+                      {row.isFirstBatchOfProduct ? (
+                        <HighlightText text={row.productName} query={search} />
+                      ) : (
+                        ''
+                      )}
+                    </td>
+                    <td>
+                      <HighlightText text={row.batchNumber} query={search} />
+                    </td>
                     <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
                     <td>{row.price} ₽</td>
                     <td>

@@ -1,0 +1,133 @@
+/* Нижний drawer деталей организации. */
+.accounts-drawer {
+  z-index: 100000;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.accounts-drawer[data-floating-ui-status='initial'],
+.accounts-drawer[data-floating-ui-status='close'] {
+  background-color: transparent;
+}
+
+.g-drawer__item.accounts-drawer__panel,
+.accounts-drawer__panel {
+  background: #f2f2f2 !important;
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+  max-height: calc(90vh + 40px);
+  overflow: hidden !important;
+}
+
+.accounts-drawer__panel .g-drawer__item-content {
+  box-sizing: border-box;
+  height: 100%;
+  background: #f2f2f2;
+}
+
+.accounts-drawer__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: calc(90vh + 40px);
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+.accounts-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-block: 16px;
+  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+.accounts-drawer__body {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px;
+  box-sizing: border-box;
+  background: #f2f2f2;
+}
+
+.accounts-drawer__body .admin-table-wrap {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.accounts-drawer__footer {
+  width: 100%;
+  border-top: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+.accounts-drawer__footer-inner {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  width: min(100%, 1100px);
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.accounts-drawer__body .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.accounts-drawer__body .admin-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
+}
+
+.accounts-drawer__body .admin-table tbody tr {
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.accounts-drawer__body .admin-table tbody tr:hover td {
+  background-color: transparent;
+}
+
+.accounts-drawer__body .admin-table tbody td {
+  padding: 12px 16px;
+}
+
+.accounts-drawer__body .admin-table tbody tr.accounts-drawer__department-row {
+  border-top: 2px solid var(--g-color-line-generic);
+}
+
+.accounts-drawer__body .admin-table tbody .admin-table__row_last {
+  border-bottom: none;
+}
+
+.accounts-drawer__body .admin-table tbody tr.accounts-drawer__meal-row td {
+  background-color: var(--g-color-bg-secondary);
+  font-weight: 600;
+}
+
+.accounts-drawer__body .admin-table tbody tr.accounts-drawer__diet-row td {
+  padding-left: 40px;
+  color: var(--g-color-text-secondary);
+  font-size: 13px;
+}
+
+.accounts-drawer__body .admin-table tbody .admin-table__row_total {
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: none;
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
+}

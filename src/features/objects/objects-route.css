@@ -5,11 +5,11 @@
 
 .objects-group-table .objects-group-row_no-divider .g-table__cell {
   border-block-end-color: transparent;
-  padding-block-end: 4px;
+  padding-block-end: 8px;
 }
 
 .objects-group-table .objects-group-row_continuation .g-table__cell {
-  padding-block-start: 4px;
+  padding-block-start: 8px;
 }
 
 /* Линия между ЛПУ внутри блюда — не пересекает столбец «Блюдо». */
@@ -26,4 +26,20 @@
 .objects-total-headcount {
   display: inline-block;
   padding-inline-start: 8px;
+}
+
+/* Отключаем ховер-эффект строк таблицы объектов. */
+.g-root .objects-group-table .g-table__body .g-table__row:hover,
+.g-root .objects-group-table .g-table__body .g-table__row:hover > .g-table__cell {
+  background-color: transparent;
+}
+
+/* Хедер колонки «Котел» — выравнивание вправо. */
+.g-root .objects-group-table .g-table__head .g-table__cell:last-child {
+  text-align: end;
+}
+
+/* Шрифт body-2 в таблице объектов. */
+.g-root .objects-group-table .g-table__cell {
+  font-size: var(--g-text-body-2-font-size);
 }
