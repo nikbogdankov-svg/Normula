@@ -3,27 +3,59 @@ import { useApi } from '@/shared/api/use-api';
 import type {
   CreateEmployeeRequest,
   CreateEmployeeResponse,
-  Employee,
+  GetEmployeeResponse,
   ListEmployeesResponse,
   ListStaffRolesResponse,
-  ResetPasswordResponse,
+  ResendInvitationResponse,
+  UpdateEmployeeRequest,
+  UpdateEmployeeResponse,
 } from './types';
 
 /**
  * API раздела «Администрирование». Данные организационные, поэтому токен
- * организационный (дефолт useApi), а organizationId входит в queryKey.
+ * организационный (дефолт useApi), а organizationId входит в queryKey:
+ * сменил организацию в шапке — получил другой список, а не чужой из кэша.
  */
 
 const KEY = 'staff';
+
+/**
+ * Размер страницы. Пагинации в макете нет, поэтому берём потолок, который
+ * разрешает бэкенд (maxPageSize = 100), и показываем предупреждение, если
+ * сотрудников оказалось больше — молча обрезать список нельзя.
+ */
+export const PAGE_SIZE = 100;
 
 export function useEmployees(search: string) {
   const api = useApi();
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, search],
-    queryFn: () =>
-      api.request<ListEmployeesResponse>(`/v1/staff?search=${encodeURIComponent(search)}`),
+    queryKey: [KEY, 'list', api.organizationId, search],
+    queryFn: () => {
+      const query = new URLSearchParams({
+        page: '1',
+        pageSize: String(PAGE_SIZE),
+        search,
+      });
+
+      return api.request<ListEmployeesResponse>(`/v1/staff?${query.toString()}`);
+    },
     enabled: api.organizationId !== null,
+  });
+}
+
+/**
+ * Карточка целиком: профиль и документы одним запросом. Отдельного запроса
+ * под вкладку «Документы» нет намеренно — карточка маленькая, а второй
+ * round-trip при переключении вкладки был бы заметен.
+ */
+export function useEmployeeCard(employeeId: string | null) {
+  const api = useApi();
+
+  return useQuery({
+    queryKey: [KEY, 'card', api.organizationId, employeeId],
+    queryFn: () => api.request<GetEmployeeResponse>(`/v1/staff/${employeeId}`),
+    enabled: api.organizationId !== null && employeeId !== null,
   });
 }
 
@@ -37,6 +69,7 @@ export function useStaffRoles() {
   });
 }
 
+/** Инвалидация всего раздела после любой мутации. */
 function useInvalidate() {
   const queryClient = useQueryClient();
 
@@ -50,7 +83,9 @@ export function useCreateEmployee() {
   return useMutation({
     mutationFn: (body: CreateEmployeeRequest) =>
       api.request<CreateEmployeeResponse>('/v1/staff', { method: 'POST', body }),
-    onSuccess: invalidate,
+    // Инвалидация и при ошибке: карточка могла создаться, а письмо не уйти —
+    // тогда сотрудник уже есть в списке, и не показать его было бы враньём.
+    onSettled: invalidate,
   });
 }
 
@@ -59,8 +94,8 @@ export function useUpdateEmployee() {
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<CreateEmployeeRequest> }) =>
-      api.request<{ employee: Employee }>(`/v1/staff/${id}`, { method: 'PATCH', body: patch }),
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateEmployeeRequest }) =>
+      api.request<UpdateEmployeeResponse>(`/v1/staff/${id}`, { method: 'PATCH', body: patch }),
     onSuccess: invalidate,
   });
 }
@@ -76,24 +111,19 @@ export function useDeleteEmployee() {
   });
 }
 
-export function useResetPassword() {
-  const api = useApi();
-
-  return useMutation({
-    mutationFn: (id: string) =>
-      api.request<ResetPasswordResponse>(`/v1/staff/${id}/reset-password`, { method: 'POST' }),
-  });
-}
-
-export function useSetRoleSections() {
+/**
+ * Выслать приглашение заново. Заменяет «Сброс пароля» из макета: паролей
+ * сервис не выдаёт и не хранит, человек задаёт его сам при регистрации.
+ */
+export function useResendInvitation() {
   const api = useApi();
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: ({ roleId, sectionIds }: { roleId: string; sectionIds: string[] }) =>
-      api.request<{ roleId: string }>(`/v1/staff-roles/${roleId}/sections`, {
-        method: 'PUT',
-        body: { sectionIds },
+    mutationFn: (id: string) =>
+      api.request<ResendInvitationResponse>(`/v1/staff/${id}/invitation`, {
+        method: 'POST',
+        body: {},
       }),
     onSuccess: invalidate,
   });
