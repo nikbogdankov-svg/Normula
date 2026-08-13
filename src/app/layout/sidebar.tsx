@@ -9,7 +9,7 @@ import {
 } from '@gravity-ui/icons';
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
-import { NAV_GROUPS, type NavItem } from './nav';
+import { visibleNavGroups, type NavItem } from './nav';
 import './sidebar.css';
 
 const EXPANDED_WIDTH = 250;
@@ -42,7 +42,11 @@ export function Sidebar({
 }) {
   const { theme, toggleTheme } = useAppTheme();
   const { signOut } = useAuth();
-  const { current } = useOrganizations();
+  const { current, scopes } = useOrganizations();
+
+  // Пункты, которых у человека нет, не рисуем вовсе: показать и убрать
+  // после загрузки скоупов было бы заметнее, чем дорисовать с задержкой.
+  const groups = visibleNavGroups(scopes);
 
   return (
     <aside
@@ -76,7 +80,7 @@ export function Sidebar({
       </div>
 
       <nav style={{ flexGrow: 1, overflowY: 'auto', paddingBottom: 12 }}>
-        {NAV_GROUPS.map((group, index) => (
+        {groups.map((group, index) => (
           <div key={group.title}>
             {!collapsed && <div className="sidebar-group__title">{group.title}</div>}
             {collapsed &&

@@ -431,6 +431,12 @@ function SummaryPortionsTable({
       ...data,
       {
         id: '__grand',
+        // Идентификаторов у итоговой строки нет — заглушки нужны, чтобы
+        // объединение с обычными строками осталось однородным. Читаются
+        // они только в ветке isTotal === false, то есть никогда.
+        facilityId: '__grand',
+        departmentId: '__grand',
+        tableId: '__grand',
         facilityName: 'Всего',
         departmentName: '',
         tableName: '',

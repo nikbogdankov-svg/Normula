@@ -59,7 +59,7 @@ export function CostRoute() {
           <TextInput
             value={priceLimit}
             type="number"
-            width={220}
+            style={{ width: 220 }}
             label="Лимит цены питания"
             placeholder="Введите лимит ₽"
             onUpdate={(value) => setPriceLimit(value)}

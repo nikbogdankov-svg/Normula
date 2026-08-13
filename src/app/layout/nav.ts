@@ -29,6 +29,15 @@ export interface NavItem {
   icon: IconData;
   /** Раздел ещё не нарисован — страница показывает заглушку. */
   wip?: boolean;
+  /**
+   * Организационный скоуп, без которого пункт не показывается и роут
+   * отдаёт заглушку «нет доступа».
+   *
+   * Это вежливость, а не защита: по-настоящему доступ закрывают
+   * перехватчики на бэкенде. Смысл в том, чтобы не рекламировать раздел,
+   * который всё равно ответит отказом.
+   */
+  scope?: string;
 }
 
 /** Группа пунктов с заголовком, как в макете. */
@@ -98,7 +107,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Администрирование',
     items: [
-      { to: '/app/management', label: 'Управление', icon: Cubes3Overlap },
+      // Администрирование организаций платформы: доступно только
+      // платформенному администратору, у администратора организации
+      // этого скоупа в токене нет.
+      { to: '/app/management', label: 'Управление', icon: Cubes3Overlap, scope: 'manage:platform' },
       { to: '/app/administration', label: 'Администрирование', icon: Gear },
       { to: '/app/profile', label: 'Мой профиль', icon: Person },
     ],
@@ -107,3 +119,23 @@ export const NAV_GROUPS: NavGroup[] = [
 
 /** Плоский список пунктов — из него собираются роуты. */
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
+
+/**
+ * Виден ли пункт при таком наборе скоупов.
+ *
+ * scopes === null означает «ещё не знаем»: пункты со скоупом прячем до
+ * выяснения. Показать и тут же убрать — хуже, чем дорисовать с задержкой.
+ */
+export function isNavItemVisible(item: NavItem, scopes: string[] | null): boolean {
+  if (!item.scope) return true;
+
+  return scopes !== null && scopes.includes(item.scope);
+}
+
+/** Группы без скрытых пунктов; пустые группы отбрасываются целиком. */
+export function visibleNavGroups(scopes: string[] | null): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => isNavItemVisible(item, scopes)),
+  })).filter((group) => group.items.length > 0);
+}
