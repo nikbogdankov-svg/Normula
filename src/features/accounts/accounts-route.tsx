@@ -133,6 +133,10 @@ export function AccountsRoute() {
     allowCloseRef.current = false;
     const frame = requestAnimationFrame(() => setOpen(true));
     return () => cancelAnimationFrame(frame);
+    // Зависимость сужена намеренно: панель раскрывается при смене
+    // организации, а не на каждое обновление объекта selected — иначе
+    // анимация проигрывалась бы заново на ровном месте.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.organization]);
 
   useEffect(() => {
@@ -301,7 +305,7 @@ export function AccountsRoute() {
                       ];
 
                       if (department.meals?.length) {
-                        department.meals.forEach((meal, mealIndex) => {
+                        department.meals.forEach((meal) => {
                           rows.push(
                             <tr
                               key={`meal-${department.name}-${meal.name}`}

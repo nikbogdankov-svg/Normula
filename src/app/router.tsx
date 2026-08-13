@@ -1,8 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from '@/shared/auth';
 import { WipPage } from '@/shared/ui/wip-page';
+import { NoAccessPage } from '@/shared/ui/no-access';
+import { useOrganizations } from '@/shared/auth';
 import { AppLayout } from './layout/app-layout';
-import { NAV_ITEMS } from './layout/nav';
+import { NAV_ITEMS, isNavItemVisible, type NavItem } from './layout/nav';
 import { LandingRoute } from './routes/landing';
 import { CallbackRoute } from './routes/callback';
 import { NotFoundRoute } from './routes/not-found';
@@ -44,10 +46,31 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/accounts': <AccountsRoute />,
 };
 
-const appChildren = NAV_ITEMS.map((item) => ({
-  path: item.to.replace('/app/', ''),
-  element: DESIGNED_ROUTES[item.to] ?? <WipPage title={item.label} />,
-}));
+/**
+ * Роут пункта, закрытого скоупом.
+ *
+ * Скрыть пункт в меню недостаточно: адрес остаётся рабочим, и по прямой
+ * ссылке человек попал бы на страницу, которая всё равно получит отказ от
+ * бэкенда и покажет ошибку загрузки. Лучше сказать честно и сразу.
+ */
+function GuardedRoute({ item, children }: { item: NavItem; children: React.ReactElement }) {
+  const { scopes } = useOrganizations();
+
+  if (!isNavItemVisible(item, scopes)) {
+    return <NoAccessPage title={item.label} />;
+  }
+
+  return children;
+}
+
+const appChildren = NAV_ITEMS.map((item) => {
+  const element = DESIGNED_ROUTES[item.to] ?? <WipPage title={item.label} />;
+
+  return {
+    path: item.to.replace('/app/', ''),
+    element: item.scope ? <GuardedRoute item={item}>{element}</GuardedRoute> : element,
+  };
+});
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingRoute /> },

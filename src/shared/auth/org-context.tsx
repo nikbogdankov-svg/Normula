@@ -16,6 +16,14 @@ interface OrgContextValue {
   organizations: Organization[] | null;
   /** Текущая выбранная организация (null — ещё не выбрана / нет ни одной). */
   current: Organization | null;
+  /**
+   * Скоупы токена текущей организации (null — ещё грузятся).
+   *
+   * По ним меню прячет разделы, которых у человека нет. Пока null, меню
+   * показывает только заведомо общедоступное: показать лишнее и убрать —
+   * хуже, чем дорисовать пункт с задержкой.
+   */
+  scopes: string[] | null;
   setCurrent: (organizationId: string) => void;
 }
 
@@ -27,8 +35,9 @@ const OrgContext = createContext<OrgContextValue | null>(null);
  * useApi — здесь только выбор.
  */
 export function OrgProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, fetchOrganizations } = useAuth();
+  const { isAuthenticated, fetchOrganizations, getOrganizationScopes } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[] | null>(null);
+  const [scopes, setScopes] = useState<string[] | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(() =>
     localStorage.getItem(STORAGE_KEY)
   );
@@ -59,6 +68,32 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [organizations, currentId]);
 
+  // Скоупы перечитываются при смене организации: в разных организациях у
+  // одного человека могут быть разные роли.
+  useEffect(() => {
+    if (!isAuthenticated || !currentId) {
+      setScopes(null);
+      return;
+    }
+
+    let cancelled = false;
+    setScopes(null);
+
+    getOrganizationScopes(currentId)
+      .then((value) => {
+        if (!cancelled) setScopes(value);
+      })
+      .catch(() => {
+        // Не смогли прочитать — считаем, что особых прав нет. Так меню
+        // недосчитается пункта, но не покажет недоступный.
+        if (!cancelled) setScopes([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, currentId, getOrganizationScopes]);
+
   const setCurrent = useCallback((organizationId: string) => {
     localStorage.setItem(STORAGE_KEY, organizationId);
     setCurrentId(organizationId);
@@ -68,9 +103,10 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     () => ({
       organizations,
       current: organizations?.find((o) => o.id === currentId) ?? null,
+      scopes,
       setCurrent,
     }),
-    [organizations, currentId, setCurrent]
+    [organizations, currentId, scopes, setCurrent]
   );
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;
