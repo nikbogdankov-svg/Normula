@@ -20,7 +20,7 @@ import {
 } from '@/shared/ui/states';
 import { PAGE_SIZE, useEmployees, useStaffRoles } from './api';
 import type { Employee, EmployeeStatus } from './types';
-import { RoleAccessCard } from './role-access-card';
+import './staff-route.css';
 import {
   AddEmployeeDialog,
   DeleteEmployeeDialog,
@@ -40,8 +40,6 @@ export function StaffRoute() {
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
-      <RoleAccessCard />
-
       <StaffCard
         search={search}
         onSearch={setSearch}
@@ -236,14 +234,16 @@ function EmployeesTable({
             ),
             width: '28%',
             template: (row) => (
-              <Text variant="subheader-1">{`${row.firstName} ${row.lastName}`.trim() || '—'}</Text>
+              <Text variant="body-2">
+                {`${row.firstName} ${row.lastName}`.trim() || '—'}
+              </Text>
             ),
           },
           {
             id: 'email',
-            name: 'Почта',
+            name: () => <Text variant="body-2">Почта</Text>,
             width: '32%',
-            template: (row) => <Text variant="body-1">{row.email}</Text>,
+            template: (row) => <Text variant="body-2">{row.email}</Text>,
           },
           {
             id: 'registeredAt',
@@ -260,12 +260,13 @@ function EmployeesTable({
           },
           {
             id: 'role',
-            name: 'Роль',
-            template: (row) => <Text variant="subheader-1">{roleName(row.roleId)}</Text>,
+            name: () => <Text variant="body-2">Роль</Text>,
+            width: '22%',
+            template: (row) => <Text variant="body-2">{roleName(row.roleId)}</Text>,
           },
           {
             id: 'actions',
-            name: 'Действия',
+            name: '',
             // Узкая колонка по ширине кнопок — остальное место уходит имени/почте.
             width: 0,
             align: 'end',
@@ -311,7 +312,7 @@ function RegisteredCell({ employee }: { employee: Employee }) {
   const millis = Number(employee.registeredAt);
 
   if (Number.isFinite(millis) && millis > 0) {
-    return <Text variant="body-1">{new Date(millis).toLocaleDateString('ru-RU')}</Text>;
+    return <Text variant="body-2">{new Date(millis).toLocaleDateString('ru-RU')}</Text>;
   }
 
   return <Label theme={STATUS_THEME[employee.status]}>{STATUS_LABEL[employee.status]}</Label>;
@@ -361,7 +362,7 @@ function SortableHeader({
           : `Сортировать по: ${label}`
       }
     >
-      {label}
+      <Text variant="body-2">{label}</Text>
       <span
         style={{
           display: 'inline-flex',
