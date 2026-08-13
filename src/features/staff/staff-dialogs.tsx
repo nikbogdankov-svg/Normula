@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Button,
   Dialog,
@@ -70,9 +70,13 @@ function toastError(toaster: ReturnType<typeof useToaster>, name: string, error:
 function ProfileFields({
   form,
   onChange,
+  withOrgEmail = true,
+  showPasswordNote = true,
 }: {
   form: EmployeeForm;
   onChange: (patch: Partial<EmployeeForm>) => void;
+  withOrgEmail?: boolean;
+  showPasswordNote?: boolean;
 }) {
   const roles = useStaffRoles();
 
@@ -104,7 +108,11 @@ function ProfileFields({
         type="email"
         value={form.email}
         onUpdate={(v) => onChange({ email: v })}
-        note="На неё придёт приглашение — по этой почте сотрудник и войдёт. Адрес должен существовать."
+        note={
+          <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
+            На эту почту придет пароль, с которым сотрудник войдет в систему.
+          </Text>
+        }
       />
       <Select
         size="l"
@@ -122,18 +130,20 @@ function ProfileFields({
           макета. Поле необязательное и ни на что не влияет: приглашение
           уходит на почту выше, а сюда пишут корпоративный адрес, если он
           вообще есть. */}
-      <TextInput
-        size="l"
-        label="E-mail организации:"
-        placeholder="i.ivanov"
-        value={workEmailLocalPart(form.orgEmail)}
-        onUpdate={(v) => onChange({ orgEmail: toWorkEmail(v) })}
-        endContent={
-          <Text variant="body-1" color="secondary">
-            {WORK_EMAIL_DOMAIN}
-          </Text>
-        }
-      />
+      {withOrgEmail && (
+        <TextInput
+          size="l"
+          label="E-mail организации:"
+          placeholder="i.ivanov"
+          value={workEmailLocalPart(form.orgEmail)}
+          onUpdate={(v) => onChange({ orgEmail: toWorkEmail(v) })}
+          endContent={
+            <Text variant="body-1" color="secondary">
+              {WORK_EMAIL_DOMAIN}
+            </Text>
+          }
+        />
+      )}
     </>
   );
 }
@@ -243,7 +253,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
             Шаг {step}/2
           </Text>
           {step === 1 ? (
-            <ProfileFields form={form} onChange={set} />
+            <ProfileFields form={form} onChange={set} withOrgEmail={false} />
           ) : (
             <DocumentFields documents={form.documents} onChange={setDoc} />
           )}
@@ -292,6 +302,8 @@ export function EditEmployeeDialog({
   const toaster = useToaster();
   const [tab, setTab] = useState<EditTab>('general');
   const [form, setForm] = useState(EMPTY);
+  const outerRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!card.data) return;
@@ -304,6 +316,33 @@ export function EditEmployeeDialog({
       documents: card.data.documents,
     });
   }, [card.data]);
+
+  // Animate dialog body height when tab or content changes for smooth resize.
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+
+    // Measure previous and next heights and animate between them.
+    const prevHeight = outer.clientHeight || inner.scrollHeight;
+    const nextHeight = inner.scrollHeight;
+
+    // Set to previous explicit height, then to new height to trigger transition.
+    outer.style.height = `${prevHeight}px`;
+    // Force reflow
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    outer.offsetHeight;
+    outer.style.transition = 'height 180ms ease';
+    outer.style.height = `${nextHeight}px`;
+
+    const onEnd = () => {
+      // Allow natural height after transition.
+      outer.style.height = 'auto';
+      outer.style.transition = '';
+      outer.removeEventListener('transitionend', onEnd);
+    };
+    outer.addEventListener('transitionend', onEnd);
+  }, [tab, card.data, employee]);
 
   useEffect(() => {
     if (employee) setTab('general');
@@ -357,16 +396,20 @@ export function EditEmployeeDialog({
         <div style={{ marginTop: 12, borderBottom: '1px solid var(--g-color-line-generic)' }} />
       </div>
       <Dialog.Body>
-        <Flex direction="column" gap={3}>
-          {card.isPending && <LoadingState />}
-          {card.isError && <ErrorState error={card.error} onRetry={() => void card.refetch()} />}
-          {card.data &&
-            (tab === 'general' ? (
-              <ProfileFields form={form} onChange={set} />
-            ) : (
-              <DocumentFields documents={form.documents} onChange={setDoc} />
-            ))}
-        </Flex>
+        <div style={{ overflow: 'hidden' }} ref={outerRef}>
+          <div ref={innerRef}>
+            <Flex direction="column" gap={3}>
+              {card.isPending && <LoadingState />}
+              {card.isError && <ErrorState error={card.error} onRetry={() => void card.refetch()} />}
+                  {card.data &&
+                    (tab === 'general' ? (
+                      <ProfileFields form={form} onChange={set} withOrgEmail={false} showPasswordNote={false} />
+                    ) : (
+                      <DocumentFields documents={form.documents} onChange={setDoc} />
+                    ))}
+            </Flex>
+          </div>
+        </div>
       </Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer>

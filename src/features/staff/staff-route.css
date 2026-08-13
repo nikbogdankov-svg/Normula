@@ -1,0 +1,5 @@
+/* Отключаем ховер-эффект строк таблицы Персонал. */
+.g-root .admin-table .g-table__body .g-table__row:hover,
+.g-root .admin-table .g-table__body .g-table__row:hover > .g-table__cell {
+  background-color: transparent;
+}
