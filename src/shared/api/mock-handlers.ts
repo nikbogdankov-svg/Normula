@@ -184,6 +184,7 @@ const employees: Employee[] = [
     inn: `00 0000 000 0${index}`,
     passport: `012${index} 45678${index}`,
     otherDoc: `DOC-${index + 1}`,
+    status: 'active',
   };
 });
 
@@ -854,11 +855,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   if (route === '/v1/staff' && method === 'POST') {
-    const body = options.body as Omit<Employee, 'id' | 'registeredAt'>;
+    const body = options.body as Omit<Employee, 'id' | 'registeredAt' | 'status'>;
     const employee: Employee = {
       ...body,
       id: `e-${Date.now()}`,
       registeredAt: new Date().toISOString(),
+      // Новый сотрудник ещё не принял приглашение — он «в процессе».
+      status: 'pending',
     };
     employees.unshift(employee);
 

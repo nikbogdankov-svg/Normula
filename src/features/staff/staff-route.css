@@ -1,0 +1,20 @@
+/* Тег «ждем ответа» для сотрудников в процессе — фон как у кнопки
+   в состоянии загрузки (Base Generic Button Loading). */
+.employee-pending-tag {
+  background-color: var(--g-color-base-generic);
+  color: var(--g-color-text-secondary);
+}
+
+/* Отключаем ховер-эффект строк таблицы Персонал. */
+.g-root .admin-table .g-table__body .g-table__row:hover,
+.g-root .admin-table .g-table__body .g-table__row:hover > .g-table__cell {
+  background-color: transparent;
+}
+
+/* Вся строка сотрудника «в процессе» — тот же серый фон, что у кнопки
+   в состоянии загрузки (Base Generic Button Loading). Идёт после hover-правила,
+   чтобы при наведении фон строки не сбрасывался в transparent. */
+.g-root .admin-table .g-table__body .employee-pending-row .g-table__cell,
+.g-root .admin-table .g-table__body .employee-pending-row:hover .g-table__cell {
+  background-color: var(--g-color-base-generic);
+}

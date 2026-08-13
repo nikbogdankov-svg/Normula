@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Flex, Icon, Table, Text, TextInput } from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, Label, Table, Text, TextInput } from '@gravity-ui/uikit';
 import {
   ArrowDown,
   ArrowUp,
@@ -20,6 +20,7 @@ import {
 } from '@/shared/ui/states';
 import { useEmployees, useStaffRoles } from './api';
 import type { Employee } from './types';
+import './staff-route.css';
 import {
   AddEmployeeDialog,
   DeleteEmployeeDialog,
@@ -191,6 +192,9 @@ function EmployeesTable({
         width="max"
         className="admin-table"
         data={employees}
+        getRowDescriptor={(row) =>
+          row.status === 'pending' ? { classNames: ['employee-pending-row'] } : undefined
+        }
         columns={[
           {
             id: 'name',
@@ -205,7 +209,12 @@ function EmployeesTable({
             ),
             width: '28%',
             template: (row) => (
-              <Text variant="subheader-1">{`${row.firstName} ${row.lastName}`.trim() || '—'}</Text>
+              <Flex alignItems="center" gap={1}>
+                <Text variant="subheader-1">{`${row.firstName} ${row.lastName}`.trim() || '—'}</Text>
+                {row.status === 'pending' && (
+                  <Label className="employee-pending-tag">ждем ответа</Label>
+                )}
+              </Flex>
             ),
           },
           {
@@ -243,7 +252,7 @@ function EmployeesTable({
               <Flex alignItems="center" justifyContent="flex-end" gap={1}>
                 <Button view="flat-secondary" size="s" onClick={() => onReset(row)}>
                   <Icon data={Key} size={14} />
-                  Сброс пароля
+                  {row.status === 'pending' ? 'Отправить снова' : 'Сброс пароля'}
                 </Button>
                 <Button view="flat-secondary" size="s" title="Изменить" onClick={() => onEdit(row)}>
                   <Icon data={Pencil} size={16} />

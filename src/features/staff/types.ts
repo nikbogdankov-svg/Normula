@@ -35,6 +35,11 @@ export interface Employee {
   inn: string;
   passport: string;
   otherDoc: string;
+  /**
+   * Статус сотрудника. Новый сотрудник находится «в процессе» (pending) —
+   * ждёт активации, пока не принял приглашение.
+   */
+  status: 'active' | 'pending';
 }
 
 export interface ListEmployeesResponse {
