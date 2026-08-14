@@ -25,7 +25,7 @@
   transition: background-color 0.12s ease;
 }
 
-.admin-table tbody tr:hover td{
+.admin-table tbody tr:hover td {
   background-color: var(--g-color-base-simple-hover);
 }
 

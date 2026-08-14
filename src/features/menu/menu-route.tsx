@@ -1,5 +1,15 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Button, Dialog, Flex, Icon, Loader, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import {
+  Button,
+  Dialog,
+  Flex,
+  Icon,
+  Loader,
+  Select,
+  Text,
+  TextInput,
+  useToaster,
+} from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, Gear } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
@@ -264,12 +274,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
   return (
     <div className="menu-page">
-      <Flex
-        className="menu-toolbar"
-        alignItems="center"
-        justifyContent="space-between"
-        gap={3}
-      >
+      <Flex className="menu-toolbar" alignItems="center" justifyContent="space-between" gap={3}>
         <Flex alignItems="center" gap={2}>
           <Button
             view="outlined"
@@ -322,7 +327,10 @@ function MenuByDates({ menuId }: { menuId: string }) {
             onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
             options={DIET_OPTIONS}
           />
-          <Button view="outlined" size="l" onClick={() => {
+          <Button
+            view="outlined"
+            size="l"
+            onClick={() => {
               setParametersDraftLimit(
                 customPriceLimit !== null ? String(customPriceLimit) : String(norm.price)
               );
@@ -473,9 +481,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
               size="l"
               onClick={() => {
                 setCustomPriceLimit(
-                  parametersDraftLimit.trim() === ''
-                    ? null
-                    : parseRuNumber(parametersDraftLimit)
+                  parametersDraftLimit.trim() === '' ? null : parseRuNumber(parametersDraftLimit)
                 );
                 setParametersOpen(false);
               }}
