@@ -1,0 +1,80 @@
+# CI фронтенда. Пайплайн запускается ТОЛЬКО на merge request — это глобальное
+# правило workflow ниже, отдельным джобам свои rules не нужны. Push'и (в любую
+# ветку), теги и расписания пайплайн не создают: деплой делает Dokploy по
+# своей ветке, а проверки имеют смысл до вливания, а не после.
+#
+# Чтобы красный пайплайн действительно блокировал merge, в настройках проекта
+# должно быть включено Settings → Merge requests → «Pipelines must succeed».
+
+stages:
+  - validate
+  - lint
+  - build
+
+default:
+  interruptible: true
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ---------- validate ----------
+
+# В master можно вливать только staging: тот же поток, что у бэкендов
+# (staging → master = выкат в prod). Джоба падает на любом другом источнике
+# и, при включённом «Pipelines must succeed», блокирует merge.
+check-branch:
+  stage: validate
+  image: alpine:3.19
+  script:
+    - |
+      SOURCE="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}"
+      TARGET="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+      echo "MR: ${SOURCE} → ${TARGET}"
+
+      if [ "$TARGET" = "master" ] && [ "$SOURCE" != "staging" ]; then
+        echo "❌ В master можно делать MR только из staging."
+        echo "   Влейте изменения сначала в staging: ${SOURCE} → staging → master."
+        exit 1
+      fi
+
+      echo "✅ Направление MR допустимо."
+
+# ---------- lint ----------
+
+# Тот же состав проверок, что локальный npm run check, кроме vite build:
+# сборку в боевых условиях проверяет docker-build ниже. Все три проверки
+# на максимальной строгости: eslint не пропускает ни одного warning
+# (--max-warnings 0 зашит в скрипт lint), prettier — ни одного файла мимо
+# формата, tsc — весь проект.
+lint:
+  stage: lint
+  image: node:22-alpine
+  variables:
+    npm_config_cache: "${CI_PROJECT_DIR}/.npm"
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm
+  script:
+    - npm ci --prefer-offline --loglevel=error
+    - npm run typecheck
+    - npm run lint
+    - npm run format:check
+
+# ---------- build ----------
+
+# Собирает тот же образ и тем же Dockerfile, что Dokploy на деплое: если
+# джоба зелёная, деплой не упадёт на сборке. Образ никуда не пушится —
+# это именно проверка.
+docker-build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - docker build --pull -t onemore-frontend:ci .
