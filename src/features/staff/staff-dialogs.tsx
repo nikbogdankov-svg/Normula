@@ -57,11 +57,45 @@ function isProfileReady(form: EmployeeForm): boolean {
   );
 }
 
+/**
+ * Соответствие технических сообщений бэкенда текстам плашки.
+ *
+ * Бэкенд оборачивает ошибки контекстом («create employee: …»), поэтому
+ * совпадение ищется по подстроке, а не по равенству. Неопознанное сообщение
+ * показывается как есть: спрятать его значило бы оставить человека гадать.
+ */
+const ERROR_TEXTS: [match: RegExp, title: string, hint?: string][] = [
+  [/СНИЛС checksum/, 'СНИЛС неверный', 'Не сошлось контрольное число — проверьте цифры'],
+  [/ИНН checksum/, 'ИНН неверный', 'Не сошлись контрольные разряды — проверьте цифры'],
+  [/СНИЛС must contain/, 'СНИЛС неверный', 'В СНИЛС должно быть 11 цифр'],
+  [/ИНН must contain/, 'ИНН неверный', 'В ИНН должно быть 12 цифр'],
+  [/серия паспорта must contain/, 'Серия паспорта неверна', 'В серии должно быть 4 цифры'],
+  [/номер паспорта must contain/, 'Номер паспорта неверен', 'В номере должно быть 6 цифр'],
+  [
+    /contains a non-digit/,
+    'Недопустимые символы',
+    'В номерах документов допустимы только цифры, пробелы, точки и дефисы',
+  ],
+  [/email .*is invalid|email is empty/, 'Почта указана с ошибкой', 'Проверьте адрес'],
+  [/first name is empty/, 'Не заполнено имя'],
+  [/last name is empty/, 'Не заполнена фамилия'],
+  [/already registered/, 'Сотрудник уже зарегистрирован', 'Повторное приглашение не требуется'],
+  [/already exists/, 'Такой сотрудник уже есть', 'Эта почта занята другой карточкой'],
+  [
+    /email was not sent/,
+    'Письмо не отправилось',
+    'Карточка сохранена — вышлите приглашение заново из списка',
+  ],
+];
+
 function toastError(toaster: ReturnType<typeof useToaster>, name: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : '';
+  const known = ERROR_TEXTS.find(([match]) => match.test(message));
+
   toaster.add({
     name,
-    title: 'Ошибка',
-    content: error instanceof Error ? error.message : 'Неизвестная ошибка',
+    title: known ? known[1] : 'Ошибка',
+    content: known ? known[2] : message || 'Неизвестная ошибка',
     theme: 'danger',
   });
 }
@@ -109,9 +143,14 @@ function ProfileFields({
         value={form.email}
         onUpdate={(v) => onChange({ email: v })}
         note={
-          <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
-            На эту почту придет пароль, с которым сотрудник войдет в систему.
-          </Text>
+          // Пароль не присылается: в письме ссылка, по которой человек сам
+          // задаст пароль при регистрации. Подсказка нужна только мастеру
+          // добавления — в редактировании письмо не отправляется.
+          showPasswordNote ? (
+            <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
+              На эту почту придёт приглашение — по ссылке сотрудник задаст пароль и войдёт.
+            </Text>
+          ) : undefined
         }
       />
       <Select
@@ -400,13 +439,20 @@ export function EditEmployeeDialog({
           <div ref={innerRef}>
             <Flex direction="column" gap={3}>
               {card.isPending && <LoadingState />}
-              {card.isError && <ErrorState error={card.error} onRetry={() => void card.refetch()} />}
-                  {card.data &&
-                    (tab === 'general' ? (
-                      <ProfileFields form={form} onChange={set} withOrgEmail={false} showPasswordNote={false} />
-                    ) : (
-                      <DocumentFields documents={form.documents} onChange={setDoc} />
-                    ))}
+              {card.isError && (
+                <ErrorState error={card.error} onRetry={() => void card.refetch()} />
+              )}
+              {card.data &&
+                (tab === 'general' ? (
+                  <ProfileFields
+                    form={form}
+                    onChange={set}
+                    withOrgEmail={false}
+                    showPasswordNote={false}
+                  />
+                ) : (
+                  <DocumentFields documents={form.documents} onChange={setDoc} />
+                ))}
             </Flex>
           </div>
         </div>

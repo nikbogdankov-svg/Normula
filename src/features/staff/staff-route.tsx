@@ -234,9 +234,7 @@ function EmployeesTable({
             ),
             width: '28%',
             template: (row) => (
-              <Text variant="body-2">
-                {`${row.firstName} ${row.lastName}`.trim() || '—'}
-              </Text>
+              <Text variant="body-2">{`${row.firstName} ${row.lastName}`.trim() || '—'}</Text>
             ),
           },
           {
