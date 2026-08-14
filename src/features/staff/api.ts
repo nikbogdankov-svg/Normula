@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToaster } from '@gravity-ui/uikit';
 import { useApi } from '@/shared/api/use-api';
+import { toastError, toastSuccess } from './toasts';
 import type {
   CreateEmployeeRequest,
   CreateEmployeeResponse,
@@ -76,13 +78,29 @@ function useInvalidate() {
   return () => queryClient.invalidateQueries({ queryKey: [KEY] });
 }
 
+/**
+ * Тосты живут здесь, на уровне useMutation, а не в mutate() диалогов:
+ * колбэки mutate() TanStack не вызывает, если компонент размонтировался до
+ * ответа. Запросы к Logto идут секунды, и уйти со страницы раньше ответа —
+ * обычное дело; плашка об итоге обязана появиться всё равно. Диалогам в
+ * mutate() остаётся только их собственный UI: закрыться и сбросить форму.
+ */
 export function useCreateEmployee() {
   const api = useApi();
   const invalidate = useInvalidate();
+  const toaster = useToaster();
 
   return useMutation({
     mutationFn: (body: CreateEmployeeRequest) =>
       api.request<CreateEmployeeResponse>('/v1/staff', { method: 'POST', body }),
+    onSuccess: (_, body) =>
+      toastSuccess(
+        toaster,
+        'employee-created',
+        'Сотрудник добавлен',
+        `Приглашение отправлено на ${body.email}`
+      ),
+    onError: (e) => toastError(toaster, 'employee-add', e),
     // Инвалидация и при ошибке: карточка могла создаться, а письмо не уйти —
     // тогда сотрудник уже есть в списке, и не показать его было бы враньём.
     onSettled: invalidate,
@@ -92,22 +110,32 @@ export function useCreateEmployee() {
 export function useUpdateEmployee() {
   const api = useApi();
   const invalidate = useInvalidate();
+  const toaster = useToaster();
 
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateEmployeeRequest }) =>
       api.request<UpdateEmployeeResponse>(`/v1/staff/${id}`, { method: 'PATCH', body: patch }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toastSuccess(toaster, 'employee-updated', 'Данные сотрудника обновлены');
+      return invalidate();
+    },
+    onError: (e) => toastError(toaster, 'employee-edit', e),
   });
 }
 
 export function useDeleteEmployee() {
   const api = useApi();
   const invalidate = useInvalidate();
+  const toaster = useToaster();
 
   return useMutation({
     mutationFn: (id: string) =>
       api.request<Record<string, never>>(`/v1/staff/${id}`, { method: 'DELETE' }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      toastSuccess(toaster, 'employee-deleted', 'Сотрудник удалён');
+      return invalidate();
+    },
+    onError: (e) => toastError(toaster, 'employee-delete', e),
   });
 }
 
@@ -118,6 +146,7 @@ export function useDeleteEmployee() {
 export function useResendInvitation() {
   const api = useApi();
   const invalidate = useInvalidate();
+  const toaster = useToaster();
 
   return useMutation({
     mutationFn: (id: string) =>
@@ -125,6 +154,10 @@ export function useResendInvitation() {
         method: 'POST',
         body: {},
       }),
-    onSuccess: invalidate,
+    onSuccess: (data) => {
+      toastSuccess(toaster, 'employee-invited', 'Приглашение отправлено', data.employee.email);
+      return invalidate();
+    },
+    onError: (e) => toastError(toaster, 'employee-invite', e),
   });
 }
