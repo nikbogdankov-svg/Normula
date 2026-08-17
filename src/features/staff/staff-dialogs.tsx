@@ -8,7 +8,6 @@ import {
   Select,
   Text,
   TextInput,
-  useToaster,
 } from '@gravity-ui/uikit';
 import { ArrowRight, Envelope, Pencil } from '@gravity-ui/icons';
 import { ErrorState, LoadingState } from '@/shared/ui/states';
@@ -55,15 +54,6 @@ function isProfileReady(form: EmployeeForm): boolean {
     form.email.trim() !== '' &&
     form.roleId !== ''
   );
-}
-
-function toastError(toaster: ReturnType<typeof useToaster>, name: string, error: unknown): void {
-  toaster.add({
-    name,
-    title: 'Ошибка',
-    content: error instanceof Error ? error.message : 'Неизвестная ошибка',
-    theme: 'danger',
-  });
 }
 
 /** Поля профиля — первый шаг мастера и вкладка «Общая информация». */
@@ -213,7 +203,6 @@ function DocumentFields({
 /** Двухшаговое добавление сотрудника из макета. */
 export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const create = useCreateEmployee();
-  const toaster = useToaster();
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState(EMPTY);
 
@@ -227,22 +216,11 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
     onClose();
   };
 
+  // Тосты об итоге живут в useCreateEmployee — здесь только судьба диалога.
+  // При ошибке он остаётся открытым намеренно: карточка могла создаться,
+  // а письмо не уйти, и человек должен увидеть, что пошло не так.
   const submit = () => {
-    create.mutate(form, {
-      onSuccess: () => {
-        toaster.add({
-          name: 'employee-created',
-          title: 'Сотрудник добавлен',
-          content: `Приглашение отправлено на ${form.email.trim()}`,
-          theme: 'success',
-        });
-        close();
-      },
-      // Карточка могла создаться, а письмо не уйти. Закрывать диалог нельзя:
-      // человек должен увидеть, что пошло не так, а сотрудник уже в списке —
-      // приглашение оттуда высылается заново.
-      onError: (e) => toastError(toaster, 'employee-add', e),
-    });
+    create.mutate(form, { onSuccess: close });
   };
 
   return (
@@ -301,7 +279,6 @@ export function EditEmployeeDialog({
 }) {
   const card = useEmployeeCard(employee?.id ?? null);
   const update = useUpdateEmployee();
-  const toaster = useToaster();
   const [tab, setTab] = useState<EditTab>('general');
   const [form, setForm] = useState(EMPTY);
   const outerRef = useRef<HTMLDivElement | null>(null);
@@ -363,20 +340,7 @@ export function EditEmployeeDialog({
   };
 
   const submit = () => {
-    update.mutate(
-      { id: employee.id, patch: form },
-      {
-        onSuccess: () => {
-          toaster.add({
-            name: 'employee-updated',
-            title: 'Данные сотрудника обновлены',
-            theme: 'success',
-          });
-          close();
-        },
-        onError: (e) => toastError(toaster, 'employee-edit', e),
-      }
-    );
+    update.mutate({ id: employee.id, patch: form }, { onSuccess: close });
   };
 
   return (
@@ -402,13 +366,20 @@ export function EditEmployeeDialog({
           <div ref={innerRef}>
             <Flex direction="column" gap={3}>
               {card.isPending && <LoadingState />}
-              {card.isError && <ErrorState error={card.error} onRetry={() => void card.refetch()} />}
-                  {card.data &&
-                    (tab === 'general' ? (
-                      <ProfileFields form={form} onChange={set} withOrgEmail={false} showPasswordNote={false} />
-                    ) : (
-                      <DocumentFields documents={form.documents} onChange={setDoc} />
-                    ))}
+              {card.isError && (
+                <ErrorState error={card.error} onRetry={() => void card.refetch()} />
+              )}
+              {card.data &&
+                (tab === 'general' ? (
+                  <ProfileFields
+                    form={form}
+                    onChange={set}
+                    withOrgEmail={false}
+                    showPasswordNote={false}
+                  />
+                ) : (
+                  <DocumentFields documents={form.documents} onChange={setDoc} />
+                ))}
             </Flex>
           </div>
         </div>
@@ -444,18 +415,11 @@ export function DeleteEmployeeDialog({
   onClose: () => void;
 }) {
   const remove = useDeleteEmployee();
-  const toaster = useToaster();
 
   if (!employee) return null;
 
   const submit = () => {
-    remove.mutate(employee.id, {
-      onSuccess: () => {
-        toaster.add({ name: 'employee-deleted', title: 'Сотрудник удалён', theme: 'success' });
-        onClose();
-      },
-      onError: (e) => toastError(toaster, 'employee-delete', e),
-    });
+    remove.mutate(employee.id, { onSuccess: onClose });
   };
 
   return (
@@ -495,25 +459,13 @@ export function ResendInvitationDialog({
   onClose: () => void;
 }) {
   const resend = useResendInvitation();
-  const toaster = useToaster();
 
   if (!employee) return null;
 
   const fullName = `${employee.firstName} ${employee.lastName}`.trim();
 
   const submit = () => {
-    resend.mutate(employee.id, {
-      onSuccess: () => {
-        toaster.add({
-          name: 'employee-invited',
-          title: 'Приглашение отправлено',
-          content: employee.email,
-          theme: 'success',
-        });
-        onClose();
-      },
-      onError: (e) => toastError(toaster, 'employee-invite', e),
-    });
+    resend.mutate(employee.id, { onSuccess: onClose });
   };
 
   return (

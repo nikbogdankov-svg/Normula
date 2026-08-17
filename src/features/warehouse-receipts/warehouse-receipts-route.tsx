@@ -128,7 +128,7 @@ export function WarehouseReceiptsRoute() {
                       Кол-во товаров
                     </Text>
                   </th>
-                   <th style={{ width: 140 }}>
+                  <th style={{ width: 140 }}>
                     <Text variant="body-1" color="secondary">
                       Сумма
                     </Text>

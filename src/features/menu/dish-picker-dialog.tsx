@@ -172,12 +172,7 @@ export function DishPickerDialog({
                         {wouldExceed && ' · превысит лимит'}
                       </Text>
                     </Flex>
-                    <Button
-                      type="button"
-                      view="flat"
-                      size="s"
-                      onClick={() => add(recipe.id)}
-                    >
+                    <Button type="button" view="flat" size="s" onClick={() => add(recipe.id)}>
                       <Icon data={Plus} size={14} />
                       Добавить
                     </Button>
@@ -200,16 +195,17 @@ export function DishPickerDialog({
             Отмена
           </Button>
           {overLimit && (
-            <Button
-              type="button"
-              view="outlined"
-              size="l"
-              onClick={() => onSave(draft, true)}
-            >
+            <Button type="button" view="outlined" size="l" onClick={() => onSave(draft, true)}>
               Разрешить
             </Button>
           )}
-          <Button type="button" view="action" size="l" loading={saving} onClick={() => onSave(draft)}>
+          <Button
+            type="button"
+            view="action"
+            size="l"
+            loading={saving}
+            onClick={() => onSave(draft)}
+          >
             <Icon data={FloppyDisk} size={16} />
             Сохранить
           </Button>

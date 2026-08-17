@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Button, Card, Flex, Icon, SegmentedRadioGroup, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import {
+  Button,
+  Card,
+  Flex,
+  Icon,
+  SegmentedRadioGroup,
+  Text,
+  TextInput,
+  useToaster,
+} from '@gravity-ui/uikit';
 import { Plus, Magnifier, ArrowLeftFromLine } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
@@ -64,9 +73,7 @@ export function WriteOffsRoute() {
   const filteredRows = data.writeOffs.filter((writeOff) => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
-    return (
-      writeOff.reason.toLowerCase().includes(query) || writeOff.date.includes(query)
-    );
+    return writeOff.reason.toLowerCase().includes(query) || writeOff.date.includes(query);
   });
 
   return (
