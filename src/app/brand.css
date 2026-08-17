@@ -145,3 +145,13 @@ body,
 .g-select-control_open .g-select-control__chevron-icon {
   transform: rotate(180deg);
 }
+
+/* SegmentedRadioGroup: выбранный сегмент серый, а не брендовый зелёный. */
+.g-root .g-segmented-radio-group__option_checked .g-segmented-radio-group__option-text {
+  color: var(--g-color-text-primary);
+}
+
+.g-root .g-segmented-radio-group__option_checked::after {
+  background-color: var(--g-color-base-generic);
+  border-color: var(--g-color-line-generic);
+}

@@ -54,6 +54,10 @@ export interface Recipe {
 export interface ListRecipesResponse {
   recipes: Recipe[];
   total: number;
+  /** Текущая страница (1-based). */
+  page: number;
+  /** Количество карт на странице. */
+  pageSize: number;
 }
 
 export interface ListCollectionsResponse {

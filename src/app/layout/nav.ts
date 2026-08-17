@@ -1,12 +1,11 @@
 import {
-  Archive,
-  ArrowLeftFromLine,
-  ArrowRightArrowLeft,
-  ArrowRightToLine,
-  Box,
-  Calendar,
-  CircleRuble,
-  Cubes3Overlap,
+   Archive,
+   ArrowLeftFromLine,
+   ArrowRightArrowLeft,
+   ArrowRightToLine,
+   Box,
+   Calendar,
+   Cubes3Overlap,
   BookOpen,
   Files,
   FileText,
@@ -84,7 +83,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Финансы',
     items: [
-      { to: '/app/cost', label: 'Себестоимость', icon: CircleRuble, wip: true },
       { to: '/app/accounts', label: 'Счета', icon: Wallet, wip: true },
     ],
   },

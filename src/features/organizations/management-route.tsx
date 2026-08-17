@@ -53,7 +53,7 @@ export function ManagementRoute() {
             )}
           </Flex>
 
-          <Button view="outlined" onClick={() => setCreateOpen(true)}>
+          <Button view="normal" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
             Добавить
           </Button>
