@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Flex, Icon, Select, Text, TextInput, Table } from '@gravity-ui/uikit';
+import { Button, Flex, Icon, Pagination, Select, Text, TextInput, Table } from '@gravity-ui/uikit';
 import {
   ArrowDown,
   ArrowUp,
@@ -26,6 +26,17 @@ import './ttk-route.css';
 
 const ALL_COLLECTIONS = 'all';
 
+const getDefaultPageSize = () => {
+  if (typeof window === 'undefined') {
+    return 20;
+  }
+
+  const availableHeight = window.innerHeight - 280;
+  const rowCount = Math.max(10, Math.floor(availableHeight / 48));
+
+  return Math.min(50, rowCount);
+};
+
 /** Раздел ТТК: панель фильтров закреплена, скроллится таблица. */
 export function TtkRoute() {
   const { current } = useOrganizations();
@@ -33,6 +44,8 @@ export function TtkRoute() {
   const [collectionId, setCollectionId] = useState(ALL_COLLECTIONS);
   const [sort, setSort] = useState<RecipeSort>('name');
   const [ascending, setAscending] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(() => getDefaultPageSize());
   const [opened, setOpened] = useState<Recipe | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -43,15 +56,18 @@ export function TtkRoute() {
     collectionId: collectionId === ALL_COLLECTIONS ? '' : collectionId,
     sort,
     ascending,
+    page,
+    pageSize,
   });
 
   const onSort = (column: RecipeSort) => {
     if (sort === column) {
       setAscending((value) => !value);
-      return;
+    } else {
+      setSort(column);
+      setAscending(true);
     }
-    setSort(column);
-    setAscending(true);
+    setPage(1);
   };
 
   return (
@@ -68,21 +84,27 @@ export function TtkRoute() {
             size="l"
             placeholder="Поиск по имени"
             value={search}
-            onUpdate={setSearch}
+            onUpdate={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
             hasClear
             startContent={
               <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
                 <Icon data={Magnifier} size={16} />
               </span>
             }
-            style={{ width: 220 }}
+            style={{ width: 300 }}
           />
           <Select
             size="l"
             width={260}
             label="Сборник:"
             value={[collectionId]}
-            onUpdate={(value) => setCollectionId(value[0] ?? ALL_COLLECTIONS)}
+            onUpdate={(value) => {
+              setCollectionId(value[0] ?? ALL_COLLECTIONS);
+              setPage(1);
+            }}
             options={[
               { value: ALL_COLLECTIONS, content: 'Все' },
               ...(collections.data?.collections ?? []).map((collection) => ({
@@ -109,22 +131,43 @@ export function TtkRoute() {
       </Flex>
 
       <div className="ttk-page__scroll">
-        {current === null && <NoOrganizationSelectedState />}
-        {current !== null && isPending && <LoadingState />}
-        {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
-        {data && data.recipes.length === 0 && (
-          <EmptyState text={search ? `Ничего не нашли по запросу «${search}»` : 'Карт пока нет'} />
-        )}
+        <div className="ttk-page__list">
+          {current === null && <NoOrganizationSelectedState />}
+          {current !== null && isPending && <LoadingState />}
+          {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
+          {data && data.recipes.length === 0 && (
+            <EmptyState text={search ? `Ничего не нашли по запросу «${search}»` : 'Карт ТТК пока нет'} />
+          )}
 
-        {data && data.recipes.length > 0 && (
-          <RecipesTable
-            recipes={data.recipes}
-            search={search}
-            sort={sort}
-            ascending={ascending}
-            onSort={onSort}
-            onOpen={setOpened}
-          />
+          {data && data.recipes.length > 0 && (
+            <RecipesTable
+              recipes={data.recipes}
+              search={search}
+              sort={sort}
+              ascending={ascending}
+              onSort={onSort}
+              onOpen={setOpened}
+            />
+          )}
+        </div>
+
+        {data && !isPending && data.total > 0 && (
+          <div className="ttk-page__footer">
+            <Text variant="body-1" color="secondary">
+              Всего: {data.total}
+            </Text>
+            <Pagination
+              page={Math.min(page, Math.max(1, Math.ceil(data.total / pageSize)))}
+              pageSize={pageSize}
+              total={data.total}
+              pageSizeOptions={[10, 20, 50]}
+              onUpdate={(nextPage, nextPageSize) => {
+                const maxPage = Math.max(1, Math.ceil(data.total / nextPageSize));
+                setPage(Math.min(Math.max(1, nextPage), maxPage));
+                setPageSize(nextPageSize);
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -170,7 +213,7 @@ function RecipesTable({
               />
             ),
             template: (row) => (
-              <Text variant="subheader-1">
+              <Text variant="subheader-2">
                 <HighlightText text={row.name} query={search} />
               </Text>
             ),
@@ -178,7 +221,7 @@ function RecipesTable({
           {
             id: 'collection',
             name: 'Сборник',
-            template: (row) => row.collectionName || '—',
+            template: (row) => <Text variant="body-2">{row.collectionName || '—'}</Text>,
           },
           {
             id: 'price',
@@ -193,13 +236,19 @@ function RecipesTable({
               />
             ),
             align: 'end',
-            template: (row) => `${row.price} ₽`,
+            template: (row) => <Text variant="body-2">{row.price} ₽</Text>,
           },
           {
             id: 'kcal',
-            name: 'Ккал',
+            name: () => (
+              <Flex alignItems="center" justifyContent="flex-end" style={{ width: '100%' }}>
+                <Text variant="body-2" color="secondary">
+                  Ккал
+                </Text>
+              </Flex>
+            ),
             align: 'end',
-            template: (row) => row.kcal,
+            template: (row) => <Text variant="body-2">{row.kcal}</Text>,
           },
         ]}
       />

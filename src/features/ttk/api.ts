@@ -21,9 +21,13 @@ export function useRecipes(params: {
   collectionId: string;
   sort: RecipeSort;
   ascending?: boolean;
+  page?: number;
+  pageSize?: number;
 }) {
   const api = useApi();
   const ascending = params.ascending ?? true;
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 10;
 
   return useQuery({
     queryKey: [KEY, api.organizationId, { ...params, ascending }],
@@ -33,6 +37,8 @@ export function useRecipes(params: {
         collectionId: params.collectionId,
         sort: params.sort,
         order: ascending ? 'asc' : 'desc',
+        page: String(page),
+        pageSize: String(pageSize),
       });
 
       return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);

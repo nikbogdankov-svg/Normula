@@ -144,6 +144,47 @@
   font-weight: var(--g-text-body-font-weight);
 }
 
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:first-child,
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:first-child {
+  width: 28%;
+}
+
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:nth-child(2),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(2),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:nth-child(3),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(3),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:nth-child(4),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(4),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:nth-child(5),
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(5) {
+  width: 15.5%;
+}
+
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__head .g-table__cell:last-child,
+.ttk-recipe-drawer__table-wrap .g-table__table .g-table__body .g-table__row .g-table__cell:last-child {
+  width: 10%;
+}
+
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell,
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell {
+  width: 20% !important;
+}
+
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:first-child,
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:first-child,
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:nth-child(2),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(2),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:nth-child(3),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(3),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:nth-child(4),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(4),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:nth-child(5),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:nth-child(5),
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__head .g-table__cell:last-child,
+.ttk-recipe-drawer__table-wrap_nutrition .g-table__table .g-table__body .g-table__row .g-table__cell:last-child {
+  width: 20% !important;
+}
+
 .ttk-recipe-drawer__footer {
   display: flex;
   justify-content: flex-end;

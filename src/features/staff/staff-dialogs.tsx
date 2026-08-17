@@ -109,9 +109,11 @@ function ProfileFields({
         value={form.email}
         onUpdate={(v) => onChange({ email: v })}
         note={
-          <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
-            На эту почту придет пароль, с которым сотрудник войдет в систему.
-          </Text>
+          showPasswordNote ? (
+            <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
+              На эту почту придет пароль, с которым сотрудник войдет в систему
+            </Text>
+          ) : undefined
         }
       />
       <Select
