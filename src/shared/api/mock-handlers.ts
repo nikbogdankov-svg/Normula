@@ -795,7 +795,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       return a.name.localeCompare(b.name, 'ru') * dir;
     });
 
-    return { recipes: sorted, total: sorted.length } as T;
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const pageSize = Math.max(1, Number(params.get('pageSize')) || 10);
+    const total = sorted.length;
+    const start = (page - 1) * pageSize;
+    const pageRecipes = sorted.slice(start, start + pageSize);
+
+    return { recipes: pageRecipes, total, page, pageSize } as T;
   }
 
   if (route === '/v1/ttk' && method === 'POST') {

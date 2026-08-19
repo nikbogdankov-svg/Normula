@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
 import type {
   CreateRecipeRequest,
@@ -21,9 +21,13 @@ export function useRecipes(params: {
   collectionId: string;
   sort: RecipeSort;
   ascending?: boolean;
+  page?: number;
+  pageSize?: number;
 }) {
   const api = useApi();
   const ascending = params.ascending ?? true;
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 10;
 
   return useQuery({
     queryKey: [KEY, api.organizationId, { ...params, ascending }],
@@ -33,9 +37,45 @@ export function useRecipes(params: {
         collectionId: params.collectionId,
         sort: params.sort,
         order: ascending ? 'asc' : 'desc',
+        page: String(page),
+        pageSize: String(pageSize),
       });
 
       return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);
+    },
+    enabled: api.organizationId !== null,
+  });
+}
+
+export function useInfiniteRecipes(params: {
+  search: string;
+  collectionId: string;
+  sort: RecipeSort;
+  ascending?: boolean;
+  pageSize?: number;
+}) {
+  const api = useApi();
+  const ascending = params.ascending ?? true;
+  const pageSize = params.pageSize ?? 20;
+
+  return useInfiniteQuery({
+    queryKey: [KEY, api.organizationId, { ...params, ascending }],
+    queryFn: ({ pageParam }) => {
+      const query = new URLSearchParams({
+        search: params.search,
+        collectionId: params.collectionId,
+        sort: params.sort,
+        order: ascending ? 'asc' : 'desc',
+        page: String(pageParam),
+        pageSize: String(pageSize),
+      });
+
+      return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const maxPage = Math.max(1, Math.ceil(lastPage.total / lastPage.pageSize));
+      return lastPage.page < maxPage ? lastPage.page + 1 : undefined;
     },
     enabled: api.organizationId !== null,
   });

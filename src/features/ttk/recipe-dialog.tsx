@@ -162,7 +162,7 @@ export function RecipeDialog({
         <div className="ttk-recipe-drawer__mode" hidden={mode !== 'view'}>
           <div className="ttk-recipe-drawer__header">
             <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-2">{view.name}</Text>
+              <Text variant="subheader-3">{view.name}</Text>
               <Label theme="normal" size="s">
                 Выход порции: {view.portionYield}
               </Label>
@@ -198,26 +198,55 @@ export function RecipeDialog({
                   },
                 ]}
                 columns={[
-                  { id: 'name', name: 'Наименование' },
-                  { id: 'grossPerPortion', name: '1 порция, Брутто, г', align: 'right' },
-                  { id: 'netPerPortion', name: '1 порция, Нетто, г', align: 'right' },
-                  { id: 'grossPer100', name: '100 порций, Брутто, кг', align: 'right' },
-                  { id: 'netPer100', name: '100 порций, Нетто, кг', align: 'right' },
-                  { id: 'pricePerKg', name: 'Цена за 1кг', align: 'right' },
+                  {
+                    id: 'name',
+                    name: 'Наименование',
+                    template: (row) => <Text variant="body-2">{row.name}</Text>,
+                  },
+                  {
+                    id: 'grossPerPortion',
+                    name: '1 порция, Брутто, г',
+                    align: 'right',
+                    template: (row) => <Text variant="body-2">{row.grossPerPortion}</Text>,
+                  },
+                  {
+                    id: 'netPerPortion',
+                    name: '1 порция, Нетто, г',
+                    align: 'right',
+                    template: (row) => <Text variant="body-2">{row.netPerPortion}</Text>,
+                  },
+                  {
+                    id: 'grossPer100',
+                    name: '100 порций, Брутто, кг',
+                    align: 'right',
+                    template: (row) => <Text variant="body-2">{row.grossPer100}</Text>,
+                  },
+                  {
+                    id: 'netPer100',
+                    name: '100 порций, Нетто, кг',
+                    align: 'right',
+                    template: (row) => <Text variant="body-2">{row.netPer100}</Text>,
+                  },
+                  {
+                    id: 'pricePerKg',
+                    name: 'Цена за 1кг',
+                    align: 'right',
+                    template: (row) => <Text variant="body-2">{row.pricePerKg}</Text>,
+                  },
                 ]}
               />
             </div>
 
-            <div className="ttk-recipe-drawer__table-wrap">
+            <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
               <Table
                 width="max"
                 data={[view.nutrition]}
                 columns={[
-                  { id: 'protein', name: 'Белки, г', align: 'center' },
-                  { id: 'fat', name: 'Жиры, г', align: 'center' },
-                  { id: 'carbs', name: 'Углеводы, г', align: 'center' },
-                  { id: 'kcal', name: 'Энерг. ценность, ккал', align: 'center' },
-                  { id: 'vitaminC', name: 'Витамин С, мг', align: 'center' },
+                  { id: 'protein', name: 'Белки, г', align: 'center', template: (row) => <Text variant="body-2">{row.protein}</Text> },
+                  { id: 'fat', name: 'Жиры, г', align: 'center', template: (row) => <Text variant="body-2">{row.fat}</Text> },
+                  { id: 'carbs', name: 'Углеводы, г', align: 'center', template: (row) => <Text variant="body-2">{row.carbs}</Text> },
+                  { id: 'kcal', name: 'Энерг. ценность, ккал', align: 'center', template: (row) => <Text variant="body-2">{row.kcal}</Text> },
+                  { id: 'vitaminC', name: 'Витамин С, мг', align: 'center', template: (row) => <Text variant="body-2">{row.vitaminC}</Text> },
                 ]}
               />
             </div>
@@ -237,7 +266,7 @@ export function RecipeDialog({
         <div className="ttk-recipe-drawer__mode" hidden={mode !== 'edit'}>
           <div className="ttk-recipe-drawer__header">
             <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-2">Редактировать ТТК</Text>
+              <Text variant="subheader-3">Редактировать ТТК</Text>
             </div>
             <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
               <Icon data={Xmark} size={20} />

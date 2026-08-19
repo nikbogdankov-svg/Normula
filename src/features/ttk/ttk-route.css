@@ -8,39 +8,211 @@
   height: 100%;
   overflow: hidden;
   padding: 16px;
-  gap: 12px;
+  gap: 8px;
 }
 
 .ttk-page__toolbar {
   flex-shrink: 0;
+  margin: 0;
 }
 
+/* Карточка таблицы: без обводки и внешних отступов; шапка и футер
+   фиксируются, скроллится только список строк. Серый фон без закругления. */
 .ttk-page__scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
+}
+
+/* Список строк — единственная скроллируемая область. */
+.ttk-page__scroll .ttk-page__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+  /* padding-inline: 16px; */
+}
+
+/* Только .admin-table-wrap должен скроллиться. Внутренние контейнеры Gravity UI
+   создают свои scroll-контексты (overflow: auto) и ломают sticky-шапку —
+   переводим их в visible, чтобы у thead был один скроллируемый предок. */
+.ttk-page__scroll .admin-table-wrap .g-table,
+.ttk-page__scroll .admin-table-wrap .g-table__scroll-container {
+  overflow: visible;
+}
+
+/* Шапка находится вне прокручиваемого контейнера и всегда остаётся сверху. */
+.ttk-page__header .admin-table .g-table__head,
+.ttk-page__header .admin-table .g-table__head .g-table__cell {
+  background: var(--ttk-thead-bg, var(--onemore-card-bg));
+}
+
+.ttk-page__header .admin-table .g-table__body {
+  display: none;
+}
+
+/* Заголовок body-таблицы не нужен: шапка отрисована отдельным блоком выше. */
+.ttk-page__scroll .ttk-page__table-body .g-table__head {
+  display: none;
+}
+
+/* Строки-карточки: вертикальные зазоры между строками. */
+.ttk-page__scroll .ttk-page__list .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: 0;
+}
+
+/* Линии ячеек больше не нужны — их место заняли зазоры. */
+.ttk-page__scroll .ttk-page__list .admin-table .g-table__cell {
+  border-block-end: none;
+}
+
+/* Фиксированная шапка со скруглением внешних углов и боковыми отступами.
+   Ширины колонок дублируют правила body-таблицы, чтобы колонки шапки
+   (в т.ч. «Цена») совпадали с колонками карточек. */
+.ttk-page__header .admin-table .g-table__head .g-table__cell:first-child {
+  width: 30%;
+  min-width: 220px;
+  border-radius: 6px 0 0 6px;
+  background-clip: padding-box;
+  padding-inline-start: 12px;
+}
+/* Сборнику — больше места, чтобы название входило целиком. */
+.ttk-page__header .admin-table .g-table__head .g-table__cell:nth-child(2) {
+  width: 45%;
+}
+
+.ttk-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  border-radius: 0 6px 6px 0;
+  background-clip: padding-box;
+  padding-inline-end: 12px;
+}
+
+.ttk-page__header {
+  flex-shrink: 0;
+  margin-block-end: 0;
+}
+
+.ttk-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+
+/* Белые карточки-строки со скруглением углов. */
+.ttk-page__scroll .ttk-page__list .admin-table .g-table__body .g-table__row .g-table__cell {
   background: var(--onemore-card-bg);
-  border: 1px solid var(--g-color-line-generic);
-  border-radius: var(--g-border-radius-l);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.ttk-page__scroll
+  .ttk-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:first-child {
+  border-radius: 8px 0 0 8px;
+  background-clip: padding-box;
+}
+
+.ttk-page__scroll
+  .ttk-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:last-child {
+  border-radius: 0 8px 8px 0;
+  background-clip: padding-box;
+}
+
+/* Hover строки-карточки: переопределяем глобальный стиль brand.css,
+   чтобы подсветка ложилась поверх белого фона ячеек. */
+.ttk-page__scroll
+  .ttk-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row_interactive:hover
+  > .g-table__cell {
+  background-color: var(--g-color-base-simple-hover);
 }
 
 .ttk-page__scroll .admin-table-wrap {
-  padding-inline: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  /* Шапка прилегает к верхнему и боковым краям, строки разделены на 8px. */
+  padding: 0 0 8px;
+  margin: 0;
+}
+
+.ttk-page__scroll .admin-table {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+}
+
+/* Убираем только верхний зазор body-таблицы под фиксированным header. */
+.ttk-page__scroll .ttk-page__table-body {
+  margin-top: -8px;
+}
+
+.ttk-page__scroll .admin-table .g-table__table,
+.ttk-page__scroll .admin-table .g-table__table_width_max {
+  height: auto;
+}
+
+/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело): при
+   table-layout: auto браузер считает ширины по контенту, и колонки шапки
+   не совпадают с колонками карточек. С fixed колонки распределяются
+   одинаково — название 30%, сборник 45%, остальные поровну. */
+.ttk-page__header .admin-table .g-table__table,
+.ttk-page__scroll .ttk-page__table-body .g-table__table {
+  table-layout: fixed;
+}
+
+/* Фиксированная высота карточек строк, чтобы при малом числе записей они не тянулись на весь контейнер. */
+.ttk-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell {
+  height: 24px;
+  /* min-height: 40px; */
+  max-height: 40px;
 }
 
 /* Отступ контента в ячейках — линии строк идут на всю ширину. */
 .ttk-page__scroll .admin-table .g-table__cell:first-child {
-  padding-inline-start: 16px;
+  width: 30%;
+  min-width: 220px;
+  padding-inline-start: 0;
+}
+
+/* Сборнику — больше места, чтобы название входило целиком. */
+.ttk-page__scroll .admin-table .g-table__cell:nth-child(2) {
+  width: 45%;
 }
 
 .ttk-page__scroll .admin-table .g-table__cell:last-child {
-  padding-inline-end: 16px;
+  padding-inline-end: 0;
 }
 
-/* Шапка таблицы остаётся видимой при скролле списка. */
-.ttk-page__scroll .admin-table .g-table__head .g-table__cell {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--onemore-card-bg);
+/* Сентинел для бесконечного скролла: невидимый маркер в конце списка. */
+.ttk-page__sentinel {
+  height: 1px;
+}
+
+/* Индикатор подгрузки следующей страницы. */
+.ttk-page__loading-more {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card, Drawer, Flex, Icon, Text } from '@gravity-ui/uikit';
-import { Printer, Xmark } from '@gravity-ui/icons';
+import { Printer, Xmark, Wallet } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
@@ -166,14 +166,12 @@ export function AccountsRoute() {
       <Card view="filled" style={{ padding: 0, margin: 16 }}>
         <Flex
           alignItems="center"
-          justifyContent="space-between"
-          gap={4}
+          // justifyContent="space-between"
+          gap={2}
           style={{ padding: '12px 16px' }}
         >
+          <Icon data={Wallet} size={16} />
           <Text variant="subheader-2">Счета</Text>
-          <Text variant="body-2" color="secondary">
-            Кликните строку организации, чтобы увидеть отделения
-          </Text>
         </Flex>
 
         <div
