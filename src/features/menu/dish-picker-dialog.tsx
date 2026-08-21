@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Dialog, Divider, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
+import { Button, Dialog, Divider, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
 import { FloppyDisk, Magnifier, Plus, TrashBin } from '@gravity-ui/icons';
 import { useRecipes } from '@/features/ttk/api';
-import { canAddWithinPriceLimit, formatMetric, parseRuNumber, sumDishes } from './norms';
+import { formatMetric, parseRuNumber, sumDishes } from './norms';
 import type { MenuDishRef } from './types';
 
 /**
@@ -87,10 +87,9 @@ export function DishPickerDialog({
       <Dialog.Body>
         <Flex direction="column" gap={4}>
           <Flex direction="column" gap={2}>
-            <Text variant="subheader-1">В ячейке</Text>
             {draft.length === 0 ? (
               <Text variant="body-1" color="secondary">
-                Блюд пока нет — добавьте из ТТК ниже.
+                Блюд пока нет - добавьте из ТТК ниже.
               </Text>
             ) : (
               draft.map((dish) => (
@@ -99,16 +98,18 @@ export function DishPickerDialog({
                     <Text variant="body-2" ellipsis>
                       {dish.name}
                     </Text>
-                    <Text variant="caption-2" color="secondary">
-                      {dish.portionYield || '—'} · {dish.kcal} ккал · {dish.price} ₽
+                    <Text variant="body-1" color="secondary">
+                      {dish.kcal} ккал · {dish.price} ₽
                     </Text>
                   </Flex>
                   <Button
+                    type="button"
                     view="flat"
                     size="m"
-                    title="Убрать"
                     onClick={() =>
-                      setDraft((current) => current.filter((row) => row.recipeId !== dish.recipeId))
+                      setDraft((current) =>
+                        current.filter((currentDish) => currentDish.recipeId !== dish.recipeId)
+                      )
                     }
                   >
                     <Icon data={TrashBin} size={16} />
@@ -116,13 +117,10 @@ export function DishPickerDialog({
                 </Flex>
               ))
             )}
-            <Text variant="caption-2" color={overLimit ? 'danger' : 'secondary'}>
+            <Text variant="subheader-2" color={overLimit ? 'danger' : 'primary'}>
               Цена дня: {formatMetric(dayPrice)} / {formatMetric(priceLimit)} ₽
-              {overLimit
-                ? ` · превышение на ${formatMetric(dayPrice - priceLimit)} ₽`
-                : ` · остаток ${formatMetric(remaining)} ₽`}
+              {overLimit ? ` · превышение на ${formatMetric(Math.abs(remaining))} ₽` : ` · осталось ${formatMetric(remaining)} ₽`}
             </Text>
-            {overLimit && <Alert theme="warning" title="Превышен лимит цены" />}
           </Flex>
 
           <Divider />
@@ -155,29 +153,20 @@ export function DishPickerDialog({
             )}
             <Flex direction="column" gap={1} style={{ maxHeight: 260, overflow: 'auto' }}>
               {available.map((recipe) => {
-                const wouldExceed = !canAddWithinPriceLimit(
-                  dayPriceWithoutSlot,
-                  draftPrice,
-                  recipe.price,
-                  priceLimit
-                );
+                const wouldExceed = dayPriceWithoutSlot + draftPrice + recipe.price > priceLimit;
+
                 return (
                   <Flex key={recipe.id} alignItems="center" gap={2}>
                     <Flex direction="column" style={{ flex: 1, minWidth: 0 }}>
                       <Text variant="body-2" ellipsis>
                         {recipe.name}
                       </Text>
-                      <Text variant="caption-2" color={wouldExceed ? 'danger' : 'secondary'}>
-                        {recipe.portionYield || '—'} · {recipe.kcal} ккал · {recipe.price} ₽
+                      <Text variant="body-1" color={wouldExceed ? 'secondary' : 'secondary'}>
+                        {recipe.kcal} ккал · {recipe.price} ₽
                         {wouldExceed && ' · превысит лимит'}
                       </Text>
                     </Flex>
-                    <Button
-                      type="button"
-                      view="flat"
-                      size="s"
-                      onClick={() => add(recipe.id)}
-                    >
+                    <Button type="button" view="flat" size="s" onClick={() => add(recipe.id)}>
                       <Icon data={Plus} size={14} />
                       Добавить
                     </Button>
@@ -199,16 +188,6 @@ export function DishPickerDialog({
           <Button type="button" view="outlined" size="l" onClick={onClose}>
             Отмена
           </Button>
-          {overLimit && (
-            <Button
-              type="button"
-              view="outlined"
-              size="l"
-              onClick={() => onSave(draft, true)}
-            >
-              Разрешить
-            </Button>
-          )}
           <Button type="button" view="action" size="l" loading={saving} onClick={() => onSave(draft)}>
             <Icon data={FloppyDisk} size={16} />
             Сохранить
