@@ -1083,7 +1083,13 @@ function DayTotalCell({
   return (
     <div className="menu-grid__total-stack">
       <div className="menu-grid__metric">
-        <span className={metricClass(kcalStatus)}>{formatMetric(totals.kcal)} ккал</span>
+        <MetricLine
+          actual={totals.kcal}
+          norm={norm.kcal}
+          digits={0}
+          unit=" ккал"
+          compare={compareToNorm}
+        />
       </div>
       <div className="menu-grid__metric">
         <NormValue actual={totals.protein} norm={norm.protein} digits={0} prefix="Б " />

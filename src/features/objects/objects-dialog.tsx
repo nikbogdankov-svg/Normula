@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Flex, Icon, Text, TextInput, useToaster } from '@gravity-ui/uikit';
-import { Check, Pencil, Plus, TrashBin } from '@gravity-ui/icons';
-import { useUpdateFacility } from './api';
-import type { Facility, UpdateFacilityRequest } from './types';
-import './objects-dialog.css';
+import { Button, Drawer, Icon, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
+import { useCreateKitchen, useUpdateFacility } from './api';
+import type { Facility, KitchenUnit, UpdateFacilityRequest } from './types';
+import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
+import './kitchen-drawer.css';
 
 const TABLE_TYPES = [
   { id: 'main', label: 'Основной', storageName: 'Основная' },
@@ -21,8 +22,14 @@ type DepartmentForm = {
 };
 
 type FacilityForm = {
+  id: string;
   name: string;
   departments: DepartmentForm[];
+};
+
+type KitchenForm = {
+  name: string;
+  facilities: FacilityForm[];
 };
 
 function tableNameToTypeId(name: string): TableTypeId | null {
@@ -40,8 +47,15 @@ const emptyDepartment = (): DepartmentForm => ({
   tableIds: {},
 });
 
+const emptyFacility = (): FacilityForm => ({
+  id: `fac-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  name: '',
+  departments: [emptyDepartment()],
+});
+
 function facilityToForm(facility: Facility): FacilityForm {
   return {
+    id: facility.id,
     name: facility.name,
     departments: facility.departments.map((department) => {
       const tableIds: Partial<Record<TableTypeId, string>> = {};
@@ -70,11 +84,18 @@ function facilityToForm(facility: Facility): FacilityForm {
   };
 }
 
-function formToPatch(form: FacilityForm, facility: Facility): UpdateFacilityRequest {
+function kitchenToForm(kitchen: KitchenUnit): KitchenForm {
+  return {
+    name: kitchen.name,
+    facilities: kitchen.facilities.map(facilityToForm),
+  };
+}
+
+function facilityFormToPatch(form: FacilityForm, original: Facility): UpdateFacilityRequest {
   return {
     name: form.name.trim(),
-    address: facility.address,
-    kettleNumber: facility.kettleNumber,
+    address: original.address,
+    kettleNumber: original.kettleNumber,
     departments: form.departments.map((department) => ({
       id: department.id,
       name: department.name.trim(),
@@ -91,12 +112,40 @@ function formToPatch(form: FacilityForm, facility: Facility): UpdateFacilityRequ
   };
 }
 
-function isFormReady(form: FacilityForm): boolean {
+function isFormReady(form: KitchenForm): boolean {
   if (!form.name.trim()) return false;
-  if (form.departments.length === 0) return false;
-  return form.departments.every(
-    (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
+  if (form.facilities.length === 0) return false;
+  return form.facilities.every(
+    (facility) =>
+      facility.name.trim() !== '' &&
+      facility.departments.length > 0 &&
+      facility.departments.every(
+        (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
+      )
   );
+}
+
+function hasChanges(form: KitchenForm, original: KitchenUnit): boolean {
+  if (form.name.trim() !== original.name) return true;
+  if (form.facilities.length !== original.facilities.length) return true;
+
+  for (let i = 0; i < form.facilities.length; i++) {
+    const facForm = form.facilities[i];
+    const facOrig = original.facilities.find((f) => f.id === facForm.id);
+    if (!facOrig) return true;
+    if (facForm.name.trim() !== facOrig.name) return true;
+    if (facForm.departments.length !== facOrig.departments.length) return true;
+
+    for (let j = 0; j < facForm.departments.length; j++) {
+      const deptForm = facForm.departments[j];
+      const deptOrig = facOrig.departments.find((d) => d.id === deptForm.id);
+      if (!deptOrig) return true;
+      if (deptForm.name.trim() !== deptOrig.name) return true;
+      if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
+    }
+  }
+
+  return false;
 }
 
 function TableTypeChip({
@@ -120,199 +169,369 @@ function TableTypeChip({
   );
 }
 
-/** Редактирование ЛПУ по макету: название, отделения и выбор столов. */
-export function EditFacilityDialog({
+function FacilityBlock({
   facility,
-  onClose,
+  facilityIndex,
+  onUpdate,
+  onRemove,
+  canRemove,
 }: {
-  facility: Facility | null;
-  onClose: () => void;
+  facility: FacilityForm;
+  facilityIndex: number;
+  onUpdate: (index: number, patch: Partial<FacilityForm>) => void;
+  onRemove: (index: number) => void;
+  canRemove: boolean;
 }) {
-  const update = useUpdateFacility();
-  const toaster = useToaster();
-  const [form, setForm] = useState<FacilityForm | null>(null);
-
-  useEffect(() => {
-    if (!facility) {
-      setForm(null);
-      return;
-    }
-    setForm(facilityToForm(facility));
-  }, [facility]);
-
-  if (!facility || !form) return null;
-
-  const updateDepartment = (index: number, patch: Partial<DepartmentForm>) => {
-    setForm((value) => {
-      if (!value) return value;
-      return {
-        ...value,
-        departments: value.departments.map((department, i) =>
-          i === index ? { ...department, ...patch } : department
-        ),
-      };
+  const updateDepartment = (deptIndex: number, patch: Partial<DepartmentForm>) => {
+    onUpdate(facilityIndex, {
+      departments: facility.departments.map((d, i) => (i === deptIndex ? { ...d, ...patch } : d)),
     });
   };
 
-  const toggleTableType = (departmentIndex: number, typeId: TableTypeId) => {
-    const department = form.departments[departmentIndex];
+  const toggleTableType = (deptIndex: number, typeId: TableTypeId) => {
+    const department = facility.departments[deptIndex];
     const selected = department.selectedTypes.includes(typeId);
 
     if (selected) {
       if (department.selectedTypes.length <= 1) return;
-      updateDepartment(departmentIndex, {
+      updateDepartment(deptIndex, {
         selectedTypes: department.selectedTypes.filter((item) => item !== typeId),
       });
       return;
     }
 
-    updateDepartment(departmentIndex, {
+    updateDepartment(deptIndex, {
       selectedTypes: [...department.selectedTypes, typeId],
     });
   };
 
-  const close = () => {
-    setForm(null);
+  return (
+    <Flex direction="column" gap={2} className="kitchen-drawer__facility-block">
+      <Flex gap={2} alignItems="flex-end">
+        <TextInput
+          size="l"
+          label="Название ЛПУ:"
+          placeholder="Больница №1"
+          value={facility.name}
+          onUpdate={(value) => onUpdate(facilityIndex, { name: value })}
+          style={{ flex: 1 }}
+        />
+        {canRemove && (
+          <Button
+            view="flat"
+            size="l"
+            title="Удалить ЛПУ"
+            aria-label="Удалить ЛПУ"
+            onClick={() => onRemove(facilityIndex)}
+          >
+            <Icon data={TrashBin} size={18} />
+          </Button>
+        )}
+      </Flex>
+
+      {facility.departments.map((department, deptIndex) => (
+        <Flex
+          key={department.id}
+          direction="column"
+          gap={2}
+          className="kitchen-drawer__department"
+        >
+          <Flex gap={2} alignItems="flex-end">
+            <TextInput
+              size="l"
+              label="Отделение:"
+              placeholder="Терапия"
+              value={department.name}
+              onUpdate={(value) => updateDepartment(deptIndex, { name: value })}
+              style={{ flex: 1 }}
+            />
+            {facility.departments.length > 1 && (
+              <Button
+                view="flat"
+                size="l"
+                title="Удалить отделение"
+                aria-label="Удалить отделение"
+                onClick={() =>
+                  onUpdate(facilityIndex, {
+                    departments: facility.departments.filter((_, i) => i !== deptIndex),
+                  })
+                }
+              >
+                <Icon data={TrashBin} size={18} />
+              </Button>
+            )}
+          </Flex>
+
+          <Text variant="body-1" className="kitchen-drawer__table-hint">
+            Стол (должен быть выбран хотя бы один)
+          </Text>
+
+          <Flex gap={2} wrap>
+            {TABLE_TYPES.map((type) => (
+              <TableTypeChip
+                key={type.id}
+                label={type.label}
+                selected={department.selectedTypes.includes(type.id)}
+                onClick={() => toggleTableType(deptIndex, type.id)}
+              />
+            ))}
+          </Flex>
+        </Flex>
+      ))}
+
+      <Button
+        view="flat"
+        size="m"
+        onClick={() =>
+          onUpdate(facilityIndex, {
+            departments: [...facility.departments, emptyDepartment()],
+          })
+        }
+        style={{ alignSelf: 'flex-start' }}
+      >
+        <Icon data={Plus} size={16} />
+        Добавить отделение
+      </Button>
+    </Flex>
+  );
+}
+
+function Flex({
+  direction,
+  gap,
+  alignItems,
+  justifyContent,
+  wrap,
+  style,
+  className,
+  children,
+}: {
+  direction?: string;
+  gap?: number;
+  alignItems?: string;
+  justifyContent?: string;
+  wrap?: boolean;
+  style?: React.CSSProperties;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={className}
+      style={{
+        display: 'flex',
+        flexDirection: direction as React.CSSProperties['flexDirection'],
+        gap: gap ? `${gap * 4}px` : undefined,
+        alignItems: alignItems as React.CSSProperties['alignItems'],
+        justifyContent: justifyContent as React.CSSProperties['justifyContent'],
+        flexWrap: wrap ? 'wrap' : undefined,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Редактирование / создание пищеблока в нижнем drawer. */
+export function EditFacilityDialog({
+  kitchen,
+  mode = 'edit',
+  onClose,
+}: {
+  kitchen: KitchenUnit | null;
+  mode?: 'edit' | 'create';
+  onClose: () => void;
+}) {
+  const height = useDrawerHeight();
+  const update = useUpdateFacility();
+  const create = useCreateKitchen();
+  const toaster = useToaster();
+  const [form, setForm] = useState<KitchenForm | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (mode === 'edit' && !kitchen) {
+      setVisible(false);
+      return;
+    }
+    if (mode === 'create') {
+      setForm({ name: '', facilities: [emptyFacility()] });
+    } else if (kitchen) {
+      setForm(kitchenToForm(kitchen));
+    }
+    setMounted(true);
+    const frame = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, [kitchen, mode]);
+
+  useEffect(() => {
+    if (visible || !mounted) return;
+    const timer = window.setTimeout(() => setMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [visible, mounted]);
+
+  const requestClose = () => {
+    setVisible(false);
     onClose();
   };
 
-  const submit = () => {
-    if (!isFormReady(form)) return;
-
-    update.mutate(
-      {
-        id: facility.id,
-        patch: formToPatch(form, facility),
-      },
-      {
-        onSuccess: () => {
-          toaster.add({
-            name: 'facility-updated',
-            title: 'ЛПУ обновлено',
-            theme: 'success',
-          });
-          close();
-        },
-        onError: (e) =>
-          toaster.add({
-            name: 'facility-edit',
-            title: 'Не удалось сохранить',
-            content: e.message,
-            theme: 'danger',
-          }),
-      }
-    );
+  const updateFacility = (index: number, patch: Partial<FacilityForm>) => {
+    setForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        facilities: current.facilities.map((f, i) => (i === index ? { ...f, ...patch } : f)),
+      };
+    });
   };
 
+  const removeFacility = (index: number) => {
+    setForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        facilities: current.facilities.filter((_, i) => i !== index),
+      };
+    });
+  };
+
+  const submit = () => {
+    if (!form || !isFormReady(form)) return;
+
+    if (mode === 'create') {
+      create.mutate(form.name, {
+        onSuccess: () => {
+          toaster.add({ name: 'kitchen-created', title: 'Пищеблок создан', theme: 'success' });
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({ name: 'kitchen-create', title: 'Не удалось создать', content: e.message, theme: 'danger' }),
+      });
+      return;
+    }
+
+    if (!kitchen) return;
+
+    const facilityUpdates = form.facilities.map((facilityForm) => {
+      const original = kitchen.facilities.find((f) => f.id === facilityForm.id);
+      if (!original) return Promise.resolve();
+      return update.mutateAsync({
+        id: original.id,
+        patch: facilityFormToPatch(facilityForm, original),
+      });
+    });
+
+    Promise.all(facilityUpdates)
+      .then(() => {
+        toaster.add({
+          name: 'kitchen-updated',
+          title: 'Пищеблок обновлён',
+          theme: 'success',
+        });
+        requestClose();
+      })
+      .catch((e: Error) =>
+        toaster.add({
+          name: 'kitchen-edit',
+          title: 'Не удалось сохранить',
+          content: e.message,
+          theme: 'danger',
+        }),
+      );
+  };
+
+  if (!mounted || !form) return null;
+
+  const ready = isFormReady(form);
+  const changed = kitchen ? hasChanges(form, kitchen) : false;
+
   return (
-    <Dialog open onClose={close} size="m">
-      <Dialog.Header caption="Редактирование организацию" />
-      <Dialog.Divider />
-      <Dialog.Body>
-        <Flex direction="column" gap={3}>
-          <TextInput
-            size="l"
-            label="Название:"
-            placeholder="Больница №1"
-            value={form.name}
-            onUpdate={(value) =>
-              setForm((current) => (current ? { ...current, name: value } : current))
-            }
-            autoFocus
-          />
+    <Drawer
+      open={visible}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
+      placement="bottom"
+      size={height}
+      maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
+      contentOverflow="auto"
+      className="kitchen-drawer"
+      contentClassName="kitchen-drawer__panel"
+    >
+      <div className="kitchen-drawer__card">
+        <div className="kitchen-drawer__header">
+          <div className="kitchen-drawer__header-inner">
+            <Text variant="subheader-3">
+              {mode === 'create' ? 'Создать пищеблок' : 'Редактирование пищеблока'}
+            </Text>
+            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Icon data={Xmark} size={20} />
+            </Button>
+          </div>
+        </div>
 
-          {form.departments.map((department, departmentIndex) => (
-            <Flex
-              key={department.id}
-              direction="column"
-              gap={2}
-              className="objects-facility-dialog__department"
+        <div className="kitchen-drawer__body">
+          <Flex direction="column" gap={3}>
+            <TextInput
+              size="l"
+              label="Название пищеблока:"
+              placeholder="Центральный пищеблок"
+              value={form.name}
+              onUpdate={(value) =>
+                setForm((current) => (current ? { ...current, name: value } : current))
+              }
+              autoFocus
+            />
+
+            {form.facilities.map((facility, facilityIndex) => (
+              <FacilityBlock
+                key={facility.id}
+                facility={facility}
+                facilityIndex={facilityIndex}
+                onUpdate={updateFacility}
+                onRemove={removeFacility}
+                canRemove={form.facilities.length > 1}
+              />
+            ))}
+
+            <Button
+              view="normal-contrast"
+              size="l"
+              onClick={() =>
+                setForm((current) =>
+                  current
+                    ? { ...current, facilities: [...current.facilities, emptyFacility()] }
+                    : current
+                )
+              }
+              style={{ alignSelf: 'flex-start' }}
             >
-              <Flex gap={2} alignItems="flex-end">
-                <TextInput
-                  size="l"
-                  label="Отделение:"
-                  placeholder="Терапия"
-                  value={department.name}
-                  onUpdate={(value) => updateDepartment(departmentIndex, { name: value })}
-                  style={{ flex: 1 }}
-                />
-                {form.departments.length > 1 && (
-                  <Button
-                    view="flat"
-                    size="l"
-                    title="Удалить отделение"
-                    aria-label="Удалить отделение"
-                    onClick={() =>
-                      setForm((current) =>
-                        current
-                          ? {
-                              ...current,
-                              departments: current.departments.filter(
-                                (_, index) => index !== departmentIndex
-                              ),
-                            }
-                          : current
-                      )
-                    }
-                  >
-                    <Icon data={TrashBin} size={18} />
-                  </Button>
-                )}
-              </Flex>
+              <Icon data={Plus} size={16} />
+              Добавить ЛПУ
+            </Button>
+          </Flex>
+        </div>
 
-              <Text variant="body-1" className="objects-facility-dialog__table-hint">
-                Стол (должен быть выбран хотя бы один)
-              </Text>
-
-              <Flex gap={2} wrap>
-                {TABLE_TYPES.map((type) => (
-                  <TableTypeChip
-                    key={type.id}
-                    label={type.label}
-                    selected={department.selectedTypes.includes(type.id)}
-                    onClick={() => toggleTableType(departmentIndex, type.id)}
-                  />
-                ))}
-              </Flex>
-            </Flex>
-          ))}
-
-          <Button
-            view="normal"
-            size="m"
-            onClick={() =>
-              setForm((current) =>
-                current
-                  ? { ...current, departments: [...current.departments, emptyDepartment()] }
-                  : current
-              )
-            }
-            style={{ alignSelf: 'flex-start' }}
-          >
-            <Icon data={Plus} size={16} />
-            Добавить отделение
-          </Button>
-        </Flex>
-      </Dialog.Body>
-      <Dialog.Divider />
-      <Dialog.Footer>
-        <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
-          <Button view="flat" size="l" onClick={close}>
-            Отмена
-          </Button>
-          <Button
-            view="action"
-            size="l"
-            loading={update.isPending}
-            disabled={!isFormReady(form)}
-            onClick={submit}
-          >
-            <Icon data={Pencil} size={16} />
-            Изменить
-          </Button>
-        </Flex>
-      </Dialog.Footer>
-    </Dialog>
+        <div className="kitchen-drawer__footer">
+          <div className="kitchen-drawer__footer-inner">
+            <Button view="outlined" size="l" onClick={requestClose}>
+              Отмена
+            </Button>
+            <Button
+              view="action"
+              size="l"
+              loading={mode === 'create' ? create.isPending : update.isPending}
+              disabled={!ready || (mode === 'edit' && !changed)}
+              onClick={submit}
+            >
+              <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
+              {mode === 'create' ? 'Создать' : 'Сохранить'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Drawer>
   );
 }

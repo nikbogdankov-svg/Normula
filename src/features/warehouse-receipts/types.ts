@@ -18,6 +18,17 @@ export interface ReceiptItem {
   unit: string; // "кг", "л", "шт"
   unitPrice: number;
   totalPrice: number;
+  // Приёмочный контроль (бракераж сырья): заполняется на уровне товара.
+  packaging?: string;
+  productionDate?: string; // yyyy-MM-dd
+  manufacturer?: string;
+  supplier?: string;
+  documentNumber?: string; // декларация/свидетельство/ветсанэкспертиза
+  documentType?: string;
+  organoleptic?: string;
+  storageConditions?: string;
+  expiryDate?: string; // yyyy-MM-dd
+  note?: string;
 }
 
 /** Ответ на создание прихода. */

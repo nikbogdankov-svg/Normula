@@ -6,6 +6,16 @@
   min-height: 0;
 }
 
+.journals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.journals-card {
+  padding: 16px;
+}
+
 .journal-drawer {
   display: flex;
   flex-direction: column;
@@ -26,12 +36,4 @@
 .journal-drawer__footer {
   padding: 12px 20px 20px;
   border-top: 1px solid var(--g-color-line-generic);
-}
-
-.journals-page .admin-table .g-table__cell:first-child {
-  padding-inline-start: 0;
-}
-
-.journals-page .admin-table .g-table__cell:last-child {
-  padding-inline-end: 0;
 }

@@ -1,13 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Flex, Icon, Text } from '@gravity-ui/uikit';
-import { Xmark } from '@gravity-ui/icons';
+import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import type { WarehouseReceipt } from './types';
+import type { ReceiptItem, WarehouseReceipt } from './types';
 import './warehouse-receipt-drawer.css';
+
+function Cell({ value }: { value?: string }) {
+  if (!value) {
+    return (
+      <Text variant="body-2" color="secondary">
+        —
+      </Text>
+    );
+  }
+  return <Text variant="body-2">{value}</Text>;
+}
+
+/** Дополнительная информация о товаре, раскрываемая шевроном. */
+function ItemDetails({ item }: { item: ReceiptItem }) {
+  const rows: [string, string?][] = [
+    ['Фасовка', item.packaging],
+    ['Дата выработки', item.productionDate],
+    ['Тип документа', item.documentType],
+    ['Органолептика', item.organoleptic],
+    ['Условия хранения', item.storageConditions],
+    ['Примечание', item.note],
+  ];
+
+  return (
+    <div className="warehouse-receipt-drawer__details">
+      {rows.map(([label, value]) => (
+        <div key={label} className="warehouse-receipt-drawer__details-row">
+          <Text variant="body-1" color="secondary">
+            {label}
+          </Text>
+          {value ? (
+            <Cell value={value} />
+          ) : (
+            <Text variant="body-2" color="secondary">
+              —
+            </Text>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * Детали накладной как нижний Drawer (desktop).
- * Просмотр в нижней панели.
+ * Просмотр в нижней панели: приёмочный контроль продукции по каждому товару.
  */
 export function ReceiptDrawer({
   receipt,
@@ -19,7 +61,20 @@ export function ReceiptDrawer({
   const height = useDrawerHeight();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<WarehouseReceipt | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const allowCloseRef = useRef(false);
+
+  const toggleItem = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!receipt) {
@@ -55,8 +110,6 @@ export function ReceiptDrawer({
 
   if (!view) return null;
 
-  const totalSum = view.items.reduce((sum, item) => sum + item.totalPrice, 0);
-
   return (
     <Drawer
       open={open}
@@ -88,7 +141,7 @@ export function ReceiptDrawer({
         </div>
 
         <div className="warehouse-receipt-drawer__body">
-          <Flex direction="column" gap={3}>
+          <Flex direction="column" gap={4}>
             <Flex direction="column" gap={1}>
               <Text variant="body-2" color="secondary">
                 Номер: <strong>{view.invoiceNumber}</strong>
@@ -98,41 +151,52 @@ export function ReceiptDrawer({
               </Text>
             </Flex>
 
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Товар</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Кол-во</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Ед.</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Цена</th>
-                    <th style={{ width: 120, textAlign: 'right' }}>Сумма</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.productName}</td>
-                      <td style={{ textAlign: 'right' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{item.unit}</td>
-                      <td style={{ textAlign: 'right' }}>{item.unitPrice.toFixed(2)}</td>
-                      <td style={{ textAlign: 'right' }}>{item.totalPrice.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  <tr className="admin-table__row_total">
-                    <td>
-                      <strong>Всего</strong>
-                    </td>
-                    <td />
-                    <td />
-                    <td />
-                    <td style={{ textAlign: 'right' }}>
-                      <strong>{totalSum.toFixed(2)} ₽</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <Flex direction="column" gap={2}>
+              <div className="warehouse-receipt-drawer__items">
+                <div className="warehouse-receipt-drawer__items-head">
+                  <span>Товар</span>
+                  <span>Изготовитель</span>
+                  <span>Поставщик</span>
+                  <span>Номер док-та</span>
+                  <span>Срок реал.</span>
+                  <span></span>
+                </div>
+
+                {view.items.map((item) => {
+                  const expanded = expandedIds.has(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`warehouse-receipt-drawer__card${
+                        expanded ? ' warehouse-receipt-drawer__card_expanded' : ''
+                      }`}
+                    >
+                      <div className="warehouse-receipt-drawer__card-main">
+                        <div className="warehouse-receipt-drawer__card-name">
+                          <Text variant="body-2">{item.productName}</Text>
+                          <Text variant="body-2" color="secondary">
+                            {item.quantity} {item.unit}
+                          </Text>
+                        </div>
+                        <Cell value={item.manufacturer} />
+                        <Cell value={item.supplier} />
+                        <Cell value={item.documentNumber} />
+                        <Cell value={item.expiryDate} />
+                        <Button
+                          view="flat"
+                          size="xs"
+                          onClick={() => toggleItem(item.id)}
+                          aria-label="Больше информации"
+                        >
+                          <Icon data={expanded ? ChevronUp : ChevronDown} size={16} />
+                        </Button>
+                      </div>
+                      {expanded && <ItemDetails item={item} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </Flex>
           </Flex>
         </div>
       </div>

@@ -3,6 +3,19 @@
   width: 100%;
 }
 
+/* Таблицы порционника набраны body-2. */
+.portions-group-table .g-table__cell {
+  font-size: var(--g-text-body-2-font-size);
+  line-height: var(--g-text-body-2-line-height);
+  vertical-align: top;
+}
+
+/* Правила из чужих фич (.admin-table thead th { text-align: left }) текут
+   глобально и перебивают align="end" uikit — усиливаем специфичность. */
+.portions-group-table .g-table__head .g-table__cell_align_end {
+  text-align: end;
+}
+
 .portions-group-table .objects-group-row_no-divider .g-table__cell {
   border-block-end-color: transparent;
   padding-block-end: 4px;
@@ -20,9 +33,44 @@
   border-block-end-color: transparent;
 }
 
+/* Линия над строками «Всего» — заметнее обычных разделителей;
+   нижний отступ последней строки возвращаем к дефолтному (в группировках
+   он сжат до 4px, а перед итогом так быть не должно). */
+.portions-group-table .portions-row_before-total .g-table__cell {
+  border-block-end-color: var(--g-color-line-generic);
+  padding-block-end: 10px;
+}
+
+/* Линия под «Всего» блюда — отделяет блок блюда от следующего. */
+.portions-group-table .portions-row_dish-total .g-table__cell {
+  border-block-end-color: var(--g-color-text-hint);
+  padding-block-end: 8px;
+}
+
 .portions-total-headcount {
   display: inline-block;
-  padding-inline-start: 8px;
+  /* Совпадает с правым внутренним отступом TextInput размера s. */
+  padding-inline-end: 8px;
+}
+
+.portions-group-table .portions-headcount-input {
+  margin-inline-start: auto;
+}
+
+.portions-group-table .portions-headcount-input input {
+  text-align: right;
+}
+
+/* Убираем нативные стрелки вверх/вниз у number-инпута. */
+.portions-headcount-input input::-webkit-outer-spin-button,
+.portions-headcount-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.portions-headcount-input input {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 /* Отключаем ховер-эффект строк таблицы порционника. */
