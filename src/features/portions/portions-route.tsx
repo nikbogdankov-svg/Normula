@@ -14,7 +14,14 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { Magnifier, Printer, Receipt, TriangleExclamation } from '@gravity-ui/icons';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Magnifier,
+  Printer,
+  Receipt,
+  TriangleExclamation,
+} from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -139,12 +146,30 @@ export function PortionsRoute() {
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
       <Flex alignItems="center" gap={3} wrap>
-        <DatePicker
-          size="l"
-          value={dateTime({ input: date })}
-          onUpdate={(value) => setDate(value ? value.format('YYYY-MM-DD') : todayIso())}
-          style={{ width: 180 }}
-        />
+        <Flex alignItems="center" gap={1}>
+          <Button
+            view="outlined"
+            size="l"
+            title="Предыдущий день"
+            onClick={() => setDate(shiftIso(date, -1))}
+          >
+            <Icon data={ChevronLeft} size={16} />
+          </Button>
+          <DatePicker
+            size="l"
+            value={dateTime({ input: date })}
+            onUpdate={(value) => setDate(value ? value.format('YYYY-MM-DD') : todayIso())}
+            style={{ width: 180 }}
+          />
+          <Button
+            view="outlined"
+            size="l"
+            title="Следующий день"
+            onClick={() => setDate(shiftIso(date, 1))}
+          >
+            <Icon data={ChevronRight} size={16} />
+          </Button>
+        </Flex>
         <SegmentedRadioGroup
           size="l"
           value={view}
@@ -165,7 +190,9 @@ export function PortionsRoute() {
         >
           <Flex alignItems="center" gap={2}>
             <Icon data={Receipt} size={16} />
-            <Text variant="subheader-2">{view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по ЛПУ'}</Text>
+            <Text variant="subheader-2">
+              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по ЛПУ'}
+            </Text>
           </Flex>
           <Flex alignItems="center" gap={2}>
             {view === 'organizations' && facilities.length > 0 && (
@@ -178,7 +205,9 @@ export function PortionsRoute() {
                   hasClear
                   style={{ width: 240 }}
                   startContent={
-                    <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                    <span
+                      style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
+                    >
                       <Icon data={Magnifier} size={16} />
                     </span>
                   }
@@ -211,7 +240,9 @@ export function PortionsRoute() {
                   hasClear
                   style={{ width: 240 }}
                   startContent={
-                    <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                    <span
+                      style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
+                    >
                       <Icon data={Magnifier} size={16} />
                     </span>
                   }

@@ -1,24 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Flex, Icon, Text } from '@gravity-ui/uikit';
+import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import type { ReceiptItem, WarehouseReceipt } from './types';
 import './warehouse-receipt-drawer.css';
 
-function Cell({ value }: { value?: string }) {
+function Cell({
+  value,
+  color = 'primary',
+  className,
+}: {
+  value?: string;
+  color?: 'primary' | 'secondary' | 'complementary';
+  className?: string;
+}) {
   if (!value) {
     return (
-      <Text variant="body-2" color="secondary">
+      <Text variant="body-2" color="secondary" className={className}>
         —
       </Text>
     );
   }
-  return <Text variant="body-2">{value}</Text>;
+  return (
+    <Text variant="body-2" color={color} className={className}>
+      {value}
+    </Text>
+  );
 }
 
 /** Дополнительная информация о товаре, раскрываемая шевроном. */
 function ItemDetails({ item }: { item: ReceiptItem }) {
   const rows: [string, string?][] = [
+    ['Изготовитель', item.manufacturer],
     ['Фасовка', item.packaging],
     ['Дата выработки', item.productionDate],
     ['Тип документа', item.documentType],
@@ -134,31 +147,31 @@ export function ReceiptDrawer({
     >
       <div className="warehouse-receipt-drawer__card">
         <div className="warehouse-receipt-drawer__header">
-          <Text variant="subheader-2">Накладная {view.invoiceNumber}</Text>
-          <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
-            <Icon data={Xmark} size={20} />
-          </Button>
+          <div className="warehouse-receipt-drawer__header-inner">
+            <Flex alignItems="center" gap={2}>
+              <Text variant="subheader-3">Накладная {view.invoiceNumber}</Text>
+              <Label theme="normal" size="m">
+                {new Date(view.date).toLocaleDateString('ru-RU').replaceAll('.', '/')}
+              </Label>
+            </Flex>
+            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Icon data={Xmark} size={20} />
+            </Button>
+          </div>
         </div>
 
         <div className="warehouse-receipt-drawer__body">
           <Flex direction="column" gap={4}>
-            <Flex direction="column" gap={1}>
-              <Text variant="body-2" color="secondary">
-                Номер: <strong>{view.invoiceNumber}</strong>
-              </Text>
-              <Text variant="body-2" color="secondary">
-                Дата: <strong>{new Date(view.date).toLocaleDateString('ru-RU')}</strong>
-              </Text>
-            </Flex>
-
             <Flex direction="column" gap={2}>
               <div className="warehouse-receipt-drawer__items">
                 <div className="warehouse-receipt-drawer__items-head">
-                  <span>Товар</span>
-                  <span>Изготовитель</span>
-                  <span>Поставщик</span>
-                  <span>Номер док-та</span>
-                  <span>Срок реал.</span>
+                  <Text variant="body-2">Товар</Text>
+                  <Text variant="body-2">Кол-во</Text>
+                  <Text variant="body-2">Поставщик</Text>
+                  <Text variant="body-2">Номер документа</Text>
+                  <Text variant="body-2" className="warehouse-receipt-drawer__cell-right">
+                    Срок реал.
+                  </Text>
                   <span></span>
                 </div>
 
@@ -174,17 +187,20 @@ export function ReceiptDrawer({
                       <div className="warehouse-receipt-drawer__card-main">
                         <div className="warehouse-receipt-drawer__card-name">
                           <Text variant="body-2">{item.productName}</Text>
-                          <Text variant="body-2" color="secondary">
-                            {item.quantity} {item.unit}
-                          </Text>
                         </div>
-                        <Cell value={item.manufacturer} />
-                        <Cell value={item.supplier} />
-                        <Cell value={item.documentNumber} />
-                        <Cell value={item.expiryDate} />
+                        <Text variant="body-2">
+                          {item.quantity} {item.unit}
+                        </Text>
+                        <Cell value={item.supplier} color="secondary" />
+                        <Cell value={item.documentNumber} color="secondary" />
+                        <Cell
+                          value={item.expiryDate}
+                          className="warehouse-receipt-drawer__cell-right"
+                        />
                         <Button
                           view="flat"
-                          size="xs"
+                          size="m"
+                          className="warehouse-receipt-drawer__toggle"
                           onClick={() => toggleItem(item.id)}
                           aria-label="Больше информации"
                         >

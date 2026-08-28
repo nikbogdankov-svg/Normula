@@ -38,15 +38,22 @@
 
 /* Шапка drawer'а. */
 .warehouse-receipt-drawer__header {
+  flex-shrink: 0;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+/* Контент шапки — шириной до 1100px, по центру. */
+.warehouse-receipt-drawer__header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-shrink: 0;
-  padding-block: 16px;
-  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
-  border-bottom: 1px solid var(--g-color-line-generic);
-  background: #f2f2f2;
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  box-sizing: border-box;
 }
 
 /* Контент drawer'а. */
@@ -65,12 +72,15 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
 }
 
 /* Шапка колонок над карточками (как шапка таблицы ТТК). */
 .warehouse-receipt-drawer__items-head {
   display: grid;
-  grid-template-columns: minmax(160px, 30%) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr) 40px;
+  grid-template-columns: minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr) minmax(80px, 0.5fr) 40px;
   gap: 8px;
   align-items: center;
   padding: 0 16px;
@@ -93,10 +103,20 @@
 /* Основная строка карточки: поля + шеврон. */
 .warehouse-receipt-drawer__card-main {
   display: grid;
-  grid-template-columns: minmax(160px, 30%) minmax(120px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr) 40px;
+  grid-template-columns: minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr) minmax(80px, 0.5fr) 40px;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 12px 12px 12px 16px;
+}
+
+/* Шеврон раскрытия — 12px от правого края карточки. */
+.warehouse-receipt-drawer__toggle {
+  justify-self: end;
+}
+
+/* Выравнивание колонки «Срок реализации» по правому краю. */
+.warehouse-receipt-drawer__cell-right {
+  justify-self: end;
 }
 
 .warehouse-receipt-drawer__card-name {
@@ -105,19 +125,25 @@
 }
 
 /* Раскрытая часть карточки с дополнительной информацией. */
-.warehouse-receipt-drawer__card_expanded .warehouse-receipt-drawer__card-main,
 .warehouse-receipt-drawer__card_expanded .warehouse-receipt-drawer__details {
   box-shadow: inset 0 1px 0 var(--g-color-line-generic);
+  padding: 12px 16px 16px;
+  animation: warehouse-receipt-drawer__fade 0.2s ease-out;
 }
 
-.warehouse-receipt-drawer__card_expanded .warehouse-receipt-drawer__details {
-  padding: 12px 16px 16px;
+@keyframes warehouse-receipt-drawer__fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .warehouse-receipt-drawer__details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px 24px;
+  gap: 16px 24px;
 }
 
 .warehouse-receipt-drawer__details-row {

@@ -2,37 +2,162 @@
   width: 100%;
 }
 
-.admin-table-wrap {
-  overflow-x: auto;
+/* Страница приходов: тулбар и шапка фиксированы, скроллится только таблица. */
+.wr-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  gap: 8px;
 }
 
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+.wr-page__toolbar {
+  flex-shrink: 0;
+  /* Ровно 12px между тулбаром и таблицей: 8px gap контейнера + 4px margin. */
+  margin: 0 0 4px;
 }
 
-.admin-table thead th {
-  padding: 12px 16px;
-  text-align: left;
-  border-bottom: 1px solid var(--g-color-line-generic);
-  font-weight: 600;
-  background-color: var(--g-color-bg-secondary);
+/* Карточка таблицы: без обводки; шапка и футер фиксируются,
+   скроллится только список строк. Серый фон без закругления. */
+.wr-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
 }
 
-.admin-table tbody tr {
-  border-bottom: 1px solid var(--g-color-line-generic);
-  transition: background-color 0.12s ease;
+/* Только .admin-table-wrap должен скроллиться. Внутренние контейнеры Gravity UI
+   создают свои scroll-контексты (overflow: auto) и ломают sticky-шапку —
+   переводим их в visible, чтобы у thead был один скроллируемый предок. */
+.wr-page__scroll .admin-table-wrap .g-table,
+.wr-page__scroll .admin-table-wrap .g-table__scroll-container {
+  overflow: visible;
 }
 
-.admin-table tbody tr:hover td{
+/* Шапка находится вне прокручиваемого контейнера и всегда остаётся сверху. */
+.wr-page__header .admin-table .g-table__head,
+.wr-page__header .admin-table .g-table__head .g-table__cell {
+  background: var(--wr-thead-bg, var(--onemore-card-bg));
+}
+
+.wr-page__header .admin-table .g-table__body {
+  display: none;
+}
+
+/* Заголовок body-таблицы не нужен: шапка отрисована отдельным блоком выше. */
+.wr-page__scroll .wr-page__table-body .g-table__head {
+  display: none;
+}
+
+/* Строки-карточки: вертикальные зазоры между строками. */
+.wr-page__scroll .wr-page__list .admin-table .g-table__table,
+.wr-page__scroll .wr-page__table-body .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: 0;
+}
+
+/* Линии ячеек больше не нужны — их место заняли зазоры. */
+.wr-page__scroll .wr-page__table-body .g-table__cell {
+  border-block-end: none;
+}
+
+/* Фиксированная шапка: правим скругление и боковые отступы. */
+.wr-page__header .admin-table .g-table__head .g-table__cell:first-child {
+  border-radius: 6px 0 0 6px;
+  background-clip: padding-box;
+  padding-inline-start: 12px;
+}
+
+.wr-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  border-radius: 0 6px 6px 0;
+  background-clip: padding-box;
+  padding-inline-end: 12px;
+}
+
+.wr-page__header {
+  flex-shrink: 0;
+  margin-block-end: 0;
+}
+
+.wr-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+
+/* Белые карточки-строки со скруглением углов. */
+.wr-page__scroll .wr-page__table-body .g-table__body .g-table__row .g-table__cell {
+  background: var(--onemore-card-bg);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.wr-page__scroll .wr-page__table-body .g-table__body .g-table__row .g-table__cell:first-child {
+  border-radius: 8px 0 0 8px;
+  background-clip: padding-box;
+}
+
+.wr-page__scroll .wr-page__table-body .g-table__body .g-table__row .g-table__cell:last-child {
+  border-radius: 0 8px 8px 0;
+  background-clip: padding-box;
+}
+
+/* Hover строки-карточки: переопределяем глобальный стиль brand.css,
+   чтобы подсветка ложилась поверх белого фона ячеек. */
+.wr-page__scroll
+  .wr-page__table-body
+  .g-table__body
+  .g-table__row_interactive:hover
+  > .g-table__cell {
   background-color: var(--g-color-base-simple-hover);
 }
 
-.admin-table tbody td {
-  padding: 12px 16px;
+.wr-page__scroll .admin-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 0 0 8px;
+  margin: 0;
 }
 
-.admin-table tbody .admin-table__row_last {
-  border-bottom: none;
+.wr-page__scroll .admin-table {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+}
+
+/* Убираем только верхний зазор body-таблицы под фиксированным header. */
+.wr-page__scroll .wr-page__table-body {
+  margin-top: -8px;
+}
+
+.wr-page__scroll .admin-table .g-table__table,
+.wr-page__scroll .admin-table .g-table__table_width_max {
+  height: auto;
+}
+
+/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело): при
+   table-layout: auto браузер считает ширины по контенту, и колонки шапки
+   не совпадают с колонками карточек. */
+.wr-page__header .admin-table .g-table__table,
+.wr-page__scroll .wr-page__table-body .g-table__table {
+  table-layout: fixed;
+}
+
+/* Отступ контента в ячейках — линии строк идут на всю ширину. */
+.wr-page__scroll .wr-page__table-body .g-table__cell:first-child {
+  padding-inline-start: 12px;
+}
+
+.wr-page__scroll .wr-page__table-body .g-table__cell:last-child {
+  padding-inline-end: 12px;
 }

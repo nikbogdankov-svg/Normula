@@ -1340,7 +1340,23 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       date: string;
       invoiceNumber: string;
       warehouseId: string;
-      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+      items: Array<{
+        productId?: string;
+        productName?: string;
+        unit?: string;
+        quantity: number;
+        unitPrice: number;
+        packaging?: string;
+        productionDate?: string;
+        manufacturer?: string;
+        supplier?: string;
+        documentNumber?: string;
+        documentType?: string;
+        organoleptic?: string;
+        storageConditions?: string;
+        expiryDate?: string;
+        note?: string;
+      }>;
     };
     const productMap: Record<string, string> = {
       'prod-1': 'Мука пшеничная',
@@ -1361,22 +1377,22 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       warehouseId: body.warehouseId,
       items: body.items.map((item, idx) => ({
         id: `rec-item-${Date.now()}-${idx}`,
-        productId: item.productId,
-        productName: productMap[item.productId] || 'Неизвестный товар',
+        productId: item.productId ?? `prod-${Date.now()}-${idx}`,
+        productName: item.productName || productMap[item.productId ?? ''] || 'Неизвестный товар',
         quantity: item.quantity,
-        unit: unitMap[item.productId] || 'шт',
+        unit: item.unit || unitMap[item.productId ?? ''] || 'шт',
         unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
-        packaging: '',
-        productionDate: '',
-        manufacturer: '',
-        supplier: '',
-        documentType: 'Декларация о соответствии',
-        documentNumber: '',
-        organoleptic: '',
-        storageConditions: '',
-        expiryDate: '',
-        note: '',
+        packaging: item.packaging ?? '',
+        productionDate: item.productionDate ?? '',
+        manufacturer: item.manufacturer ?? '',
+        supplier: item.supplier ?? '',
+        documentType: item.documentType ?? '',
+        documentNumber: item.documentNumber ?? '',
+        organoleptic: item.organoleptic ?? '',
+        storageConditions: item.storageConditions ?? '',
+        expiryDate: item.expiryDate ?? '',
+        note: item.note ?? '',
       })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

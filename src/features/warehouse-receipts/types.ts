@@ -37,9 +37,22 @@ export interface CreateReceiptRequest {
   invoiceNumber: string;
   warehouseId: string;
   items: Array<{
-    productId: string;
+    productId?: string;
+    productName?: string;
+    unit?: string;
     quantity: number;
     unitPrice: number;
+    // Приёмочный контроль (бракераж сырья): заполняется на уровне товара.
+    packaging?: string;
+    productionDate?: string; // yyyy-MM-dd
+    manufacturer?: string;
+    supplier?: string;
+    documentNumber?: string;
+    documentType?: string;
+    organoleptic?: string;
+    storageConditions?: string;
+    expiryDate?: string; // yyyy-MM-dd
+    note?: string;
   }>;
 }
 
