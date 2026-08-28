@@ -4,13 +4,15 @@ import {
   Dialog,
   Flex,
   Icon,
+  Label,
   Loader,
   Select,
   Text,
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { ChevronLeft, ChevronRight, Gear } from '@gravity-ui/icons';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye, Gear, FloppyDisk } from '@gravity-ui/icons';
+import { useApi } from '@/shared/api/use-api';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
@@ -19,8 +21,11 @@ import {
   formatDayHeader,
   formatSlotTitle,
   isCycleDayToday,
+  dateForCycleDay,
   shiftIsoDate,
   startOfWeekMonday,
+  toIsoDate,
+  todayIsoDate,
 } from './dates';
 import { DishPickerDialog } from './dish-picker-dialog';
 import {
@@ -34,7 +39,7 @@ import {
   type DayTotals,
   type NormStatus,
 } from './norms';
-import { MEALS, type MealId, type MenuDishRef } from './types';
+import { MEALS, type CycleMenu, type MealId, type MenuDishRef } from './types';
 import './menu-route.css';
 
 const EMPTY_DISHES: MenuDishRef[] = [];
@@ -60,6 +65,7 @@ export function MenuRoute() {
   const toaster = useToaster();
   const creating = useRef(false);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [localMenus, setLocalMenus] = useState<CycleMenu[]>([]);
 
   useEffect(() => {
     if (!menus.data || create.isPending) return;
@@ -118,10 +124,34 @@ export function MenuRoute() {
     );
   }
 
-  return <MenuByDates menuId={menuId} />;
+  const menuOptions = [
+    ...localMenus,
+    ...menus.data.menus.filter((item) => !localMenus.some((local) => local.id === item.id)),
+  ];
+
+  return (
+    <MenuByDates
+      menuId={menuId}
+      menus={menuOptions}
+      onMenuCreated={(newMenu) => {
+        setLocalMenus((current) => [newMenu, ...current.filter((item) => item.id !== newMenu.id)]);
+        setMenuId(newMenu.id);
+      }}
+    />
+  );
 }
 
-function MenuByDates({ menuId }: { menuId: string }) {
+function MenuByDates({
+  menuId,
+  menus,
+  onMenuCreated,
+}: {
+  menuId: string;
+  menus: CycleMenu[];
+  onMenuCreated: (menu: CycleMenu) => void;
+}) {
+  const api = useApi();
+  const create = useCreateMenu();
   const { data, isPending, isError, error, refetch } = useMenu(menuId);
   const updateMenu = useUpdateMenu(menuId);
   const updateSlot = useUpdateMenuSlot(menuId);
@@ -130,7 +160,23 @@ function MenuByDates({ menuId }: { menuId: string }) {
   const [organizationId, setOrganizationId] = useState(ORG_OPTIONS[0].value);
   const [parametersOpen, setParametersOpen] = useState(false);
   const [customPriceLimit, setCustomPriceLimit] = useState<number | null>(null);
+  const [customNorm, setCustomNorm] = useState<Partial<DayNorm> | null>(null);
   const [parametersDraftLimit, setParametersDraftLimit] = useState<string>('');
+  const [parametersDraftKcal, setParametersDraftKcal] = useState<string>('');
+  const [parametersDraftProtein, setParametersDraftProtein] = useState<string>('');
+  const [parametersDraftFat, setParametersDraftFat] = useState<string>('');
+  const [parametersDraftCarbs, setParametersDraftCarbs] = useState<string>('');
+  const [fillMenuOpen, setFillMenuOpen] = useState(false);
+  const [fillMenuSourceId, setFillMenuSourceId] = useState<string | null>(null);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [createMenuName, setCreateMenuName] = useState('');
+  const [fillMenuSubmitting, setFillMenuSubmitting] = useState(false);
+  /** День, для которого открыт попап нарушений. */
+  const [violationDay, setViolationDay] = useState<number | null>(null);
+  /** Дни, для которых нарушение разрешено (кнопка-глаз в обычном стиле). */
+  const [allowedViolationDays, setAllowedViolationDays] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
   /** Локальная неделя просмотра — стрелки обновляют только календарь. */
   const [viewStartDate, setViewStartDate] = useState<string | null>(null);
   const [weekLoading, setWeekLoading] = useState(false);
@@ -140,6 +186,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
 
   useEffect(() => {
     setViewStartDate(null);
+    setAllowedViolationDays(new Set());
   }, [menuId]);
 
   useEffect(() => {
@@ -186,6 +233,25 @@ function MenuByDates({ menuId }: { menuId: string }) {
     return map;
   }, [menu, slotMap]);
 
+  const hasDayViolation = (day: number): boolean => {
+    const totals = dayTotals.get(day) ?? sumDishes([]);
+    const base = normForDiet(menu?.dietName ?? 'Основная');
+    const activeNorm: DayNorm = {
+      kcal: customNorm?.kcal ?? base.kcal,
+      protein: customNorm?.protein ?? base.protein,
+      fat: customNorm?.fat ?? base.fat,
+      carbs: customNorm?.carbs ?? base.carbs,
+      price: customPriceLimit ?? base.price,
+    };
+    return (
+      compareToNorm(totals.kcal, activeNorm.kcal) !== 'ok' ||
+      compareToNorm(totals.protein, activeNorm.protein) !== 'ok' ||
+      compareToNorm(totals.fat, activeNorm.fat) !== 'ok' ||
+      compareToNorm(totals.carbs, activeNorm.carbs) !== 'ok' ||
+      comparePriceToLimit(totals.price, activeNorm.price) !== 'ok'
+    );
+  };
+
   const pickerDishes = useMemo(() => {
     if (!picker) return EMPTY_DISHES;
     return slotMap.get(slotKey(picker.day, picker.mealId)) ?? EMPTY_DISHES;
@@ -204,6 +270,30 @@ function MenuByDates({ menuId }: { menuId: string }) {
       )
     : '';
 
+  const fillMenuOptions = useMemo(
+    () => (menu ? [menu, ...menus.filter((item) => item.id !== menu.id)] : menus),
+    [menu, menus]
+  );
+
+  useEffect(() => {
+    if (!fillMenuOpen) return;
+    if (fillMenuOptions.length === 0) {
+      setFillMenuSourceId(null);
+      return;
+    }
+
+    const weekIsEmpty = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1).every(
+      (day) => MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
+    );
+
+    if (weekIsEmpty) {
+      setFillMenuSourceId(null);
+      return;
+    }
+
+    setFillMenuSourceId((current) => current ?? menuId ?? fillMenuOptions[0].id);
+  }, [fillMenuOpen, fillMenuOptions, menuId, slotMap]);
+
   if (isPending && !menu) {
     return (
       <div className="menu-page">
@@ -221,8 +311,110 @@ function MenuByDates({ menuId }: { menuId: string }) {
   }
 
   const days = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1);
-  const norm = normForDiet(menu.dietName);
-  const priceLimit = customPriceLimit ?? norm.price;
+  const baseNorm = normForDiet(menu.dietName);
+  const norm: DayNorm = {
+    kcal: customNorm?.kcal ?? baseNorm.kcal,
+    protein: customNorm?.protein ?? baseNorm.protein,
+    fat: customNorm?.fat ?? baseNorm.fat,
+    carbs: customNorm?.carbs ?? baseNorm.carbs,
+    price: customPriceLimit ?? baseNorm.price,
+  };
+  const priceLimit = norm.price;
+  const isEmptyWeek = days.every((day) =>
+    MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
+  );
+  const fillFromSourceMenu = async (sourceMenuId: string) => {
+    const sourceMenu = fillMenuOptions.find((candidate) => candidate.id === sourceMenuId);
+    if (!sourceMenu) return;
+
+    const sourceSlots = new Map(
+      sourceMenu.slots.map((slot) => [slotKey(slot.day, slot.mealId), slot.dishes] as const)
+    );
+    const currentSlots = new Map(
+      menu.slots.map((slot) => [slotKey(slot.day, slot.mealId), slot.dishes] as const)
+    );
+    const today = todayIsoDate();
+
+    setFillMenuSubmitting(true);
+    try {
+      const payloads = days.flatMap((day) =>
+        MEALS.map((meal) => ({
+          day,
+          mealId: meal.id,
+          dishes:
+            sourceMenu.id === menuId || toIsoDate(dateForCycleDay(startDate, day)) > today
+              ? (sourceSlots.get(slotKey(day, meal.id)) ?? [])
+              : (currentSlots.get(slotKey(day, meal.id)) ?? []),
+        }))
+      );
+
+      await Promise.all(payloads.map((payload) => updateSlot.mutateAsync(payload)));
+      setFillMenuOpen(false);
+      setFillMenuSourceId(null);
+      toaster.add({
+        name: 'menu-filled-from-source',
+        title: 'Меню заполнено',
+        content: `Скопировано из меню «${sourceMenu.name}».`,
+        theme: 'success',
+      });
+    } finally {
+      setFillMenuSubmitting(false);
+    }
+  };
+
+  const createAndFillNewMenu = async () => {
+    const name = createMenuName.trim() || `${menu.name} (копия)`;
+    setFillMenuSubmitting(true);
+    try {
+      const created = await create.mutateAsync({
+        name,
+        dietName: menu.dietName,
+        startDate: startOfWeekMonday(startDate),
+        cycleDays: CYCLE_DAYS,
+      });
+
+      const payloads = days.flatMap((day) =>
+        MEALS.map((meal) => ({
+          day,
+          mealId: meal.id,
+          dishes:
+            menu.slots.find((slot) => slotKey(slot.day, slot.mealId) === slotKey(day, meal.id))
+              ?.dishes ?? [],
+        }))
+      );
+
+      await Promise.all(
+        payloads.map((payload) =>
+          api.request<{ menu: { id: string } }>(`/v1/menus/${created.menu.id}/slots`, {
+            method: 'PUT',
+            body: payload,
+          })
+        )
+      );
+
+      const newMenu = { ...created.menu, slots: payloads };
+      onMenuCreated(newMenu);
+      setFillMenuOpen(false);
+      setCreateMenuOpen(false);
+      setCreateMenuName('');
+
+      toaster.add({
+        name: 'menu-created-and-filled',
+        title: 'Новое меню создано',
+        content: `Меню «${name}» создано и выбрано на текущую неделю.`,
+        theme: 'success',
+      });
+    } catch (error) {
+      toaster.add({
+        name: 'menu-create-error',
+        title: 'Не удалось создать меню',
+        content: error instanceof Error ? error.message : 'Попробуйте ещё раз.',
+        theme: 'danger',
+      });
+    } finally {
+      setFillMenuSubmitting(false);
+    }
+  };
 
   const patchMenu = (patch: { startDate?: string; dietName?: string }) => {
     updateMenu.mutate(patch, {
@@ -314,7 +506,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
           <Select
             size="l"
             label="Организация:"
-            width={300}
+            width={250}
             value={[organizationId]}
             onUpdate={(value) => setOrganizationId(value[0] ?? ORG_OPTIONS[0].value)}
             options={ORG_OPTIONS}
@@ -327,18 +519,42 @@ function MenuByDates({ menuId }: { menuId: string }) {
             onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
             options={DIET_OPTIONS}
           />
+          {(isEmptyWeek || !isEmptyWeek) && (
+            <Button
+              type="button"
+              view={isEmptyWeek ? 'action' : 'normal-contrast'}
+              size="l"
+              onClick={() => setFillMenuOpen(true)}
+              disabled={weekLoading}
+            >
+              Заполнение меню
+            </Button>
+          )}
           <Button
-            view="outlined"
+            view="normal-contrast"
             size="l"
             onClick={() => {
               setParametersDraftLimit(
                 customPriceLimit !== null ? String(customPriceLimit) : String(norm.price)
               );
+              setParametersDraftKcal(
+                customNorm?.kcal !== undefined ? String(customNorm.kcal) : String(norm.kcal)
+              );
+              setParametersDraftProtein(
+                customNorm?.protein !== undefined
+                  ? String(customNorm.protein)
+                  : String(norm.protein)
+              );
+              setParametersDraftFat(
+                customNorm?.fat !== undefined ? String(customNorm.fat) : String(norm.fat)
+              );
+              setParametersDraftCarbs(
+                customNorm?.carbs !== undefined ? String(customNorm.carbs) : String(norm.carbs)
+              );
               setParametersOpen(true);
             }}
           >
             <Icon data={Gear} size={16} />
-            Параметры
           </Button>
         </Flex>
       </Flex>
@@ -354,9 +570,7 @@ function MenuByDates({ menuId }: { menuId: string }) {
               } as CSSProperties
             }
           >
-            <div className="menu-grid__cell menu-grid__meal menu-grid__day menu-grid__corner">
-              Приём
-            </div>
+            <div className="menu-grid__cell menu-grid__meal menu-grid__day menu-grid__corner" />
             {days.map((day, dayIndex) => {
               const header = formatDayHeader(startDate, day);
               const isToday = isCycleDayToday(startDate, day);
@@ -369,73 +583,90 @@ function MenuByDates({ menuId }: { menuId: string }) {
                   <div className="menu-grid__day-weekday">{header.weekday}</div>
                   <div className="menu-grid__day-date">
                     {header.date}
-                    {isToday && <span className="menu-grid__today-dot" aria-label="Сегодня" />}
+                    {isToday && (
+                      <Label className="menu-grid__today-label" theme="success" size="xs">
+                        Сегодня
+                      </Label>
+                    )}
                   </div>
                 </div>
               );
             })}
 
-            {MEALS.map((meal) => (
-              <Fragment key={meal.id}>
-                <div className="menu-grid__cell menu-grid__meal">{meal.label}</div>
-                {days.map((day, dayIndex) => {
-                  const dishes = slotMap.get(slotKey(day, meal.id)) ?? [];
-                  const totals = sumDishes(dishes);
-                  const end = dayIndex === days.length - 1 ? ' menu-grid__cell_end' : '';
+            {MEALS.map((meal, mealIndex) => {
+              const beforeTotal =
+                mealIndex === MEALS.length - 1 ? ' menu-grid__cell_before-total' : '';
 
-                  return (
-                    <div
-                      key={`${meal.id}-${day}`}
-                      className={`menu-grid__cell menu-grid__slot${end}`}
-                    >
-                      <button
-                        type="button"
-                        className="menu-grid__cell-btn"
-                        disabled={!periodSynced || weekLoading}
-                        onClick={() => {
-                          if (!periodSynced || weekLoading) return;
-                          setPicker({ day, mealId: meal.id });
-                        }}
+              return (
+                <Fragment key={meal.id}>
+                  <div className={`menu-grid__cell menu-grid__meal${beforeTotal}`}>
+                    {meal.label}
+                  </div>
+                  {days.map((day, dayIndex) => {
+                    const dishes = slotMap.get(slotKey(day, meal.id)) ?? [];
+                    const totals = sumDishes(dishes);
+                    const end = dayIndex === days.length - 1 ? ' menu-grid__cell_end' : '';
+
+                    return (
+                      <div
+                        key={`${meal.id}-${day}`}
+                        className={`menu-grid__cell menu-grid__slot${end}${beforeTotal}`}
                       >
-                        {dishes.length === 0 ? (
-                          <span className="menu-grid__empty">+ блюдо</span>
-                        ) : (
-                          <>
-                            {dishes.map((dish) => (
+                        <button
+                          type="button"
+                          className="menu-grid__cell-btn"
+                          disabled={!periodSynced || weekLoading}
+                          onClick={() => {
+                            if (!periodSynced || weekLoading) return;
+                            setPicker({ day, mealId: meal.id });
+                          }}
+                        >
+                          {dishes.length === 0 ? (
+                            <span className="menu-grid__empty">+ блюдо</span>
+                          ) : (
+                            <>
                               <Text
-                                key={dish.recipeId}
                                 variant="body-1"
                                 className="menu-grid__dish"
-                                title={dish.name}
+                                title={dishes.map((dish) => dish.name).join(' | ')}
                               >
-                                {dish.name}
+                                {dishes.map((dish) => dish.name).join(' | ')}
                               </Text>
-                            ))}
-                            <div className="menu-grid__slot-meta">
-                              <span>
-                                {formatMetric(totals.kcal)} ккал · {formatMetric(totals.price)} ₽
-                              </span>
-                              <span>
-                                Б {formatMetric(totals.protein)} · Ж {formatMetric(totals.fat)} · У{' '}
-                                {formatMetric(totals.carbs)}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })}
-              </Fragment>
-            ))}
+                              <div className="menu-grid__slot-meta">
+                                <span>
+                                  {formatMetric(totals.kcal)} ккал | {formatMetric(totals.price)} ₽
+                                </span>
+                                <span>
+                                  Б {formatMetric(totals.protein)} | Ж {formatMetric(totals.fat)} |
+                                  У {formatMetric(totals.carbs)}
+                                </span>
+                              </div>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
 
             <div className="menu-grid__cell menu-grid__total-label">Итог на день</div>
             {days.map((day, dayIndex) => {
               const totals = dayTotals.get(day) ?? sumDishes([]);
               const end = dayIndex === days.length - 1 ? ' menu-grid__cell_end' : '';
               return (
-                <div key={`total-${day}`} className={`menu-grid__cell menu-grid__total-cell${end}`}>
-                  <DayTotalCell totals={totals} norm={norm} />
+                <div
+                  key={`total-${day}`}
+                  className={`menu-grid__cell menu-grid__total-cell${end}${hasDayViolation(day) && !allowedViolationDays.has(day) ? ' menu-grid__total-cell_violation' : ''}`}
+                >
+                  <DayTotalCell
+                    day={day}
+                    totals={totals}
+                    norm={norm}
+                    onInspect={setViolationDay}
+                    allowed={allowedViolationDays.has(day)}
+                  />
                 </div>
               );
             })}
@@ -449,24 +680,87 @@ function MenuByDates({ menuId }: { menuId: string }) {
       </div>
 
       <Dialog open={parametersOpen} onClose={() => setParametersOpen(false)} size="s">
-        <Dialog.Header caption="Параметры" />
+        <Dialog.Header caption="Параметры на день" />
         <Dialog.Divider />
         <Dialog.Body>
           <Flex direction="column" gap={3}>
-            <Text variant="body-1" color="secondary">
-              Укажите лимит цены на день. Если оставить пустым, будет использован лимит диеты.
-            </Text>
             <TextInput
               className="menu-price-input"
               size="l"
               type="number"
-              label="Лимит цены"
+              label="Лимит цены:"
               placeholder={`${norm.price}`}
               value={parametersDraftLimit}
               onUpdate={setParametersDraftLimit}
-              endContent={<Text color="secondary">₽</Text>}
+              endContent={
+                <span style={{ paddingInlineEnd: 8 }}>
+                  <Text color="secondary">₽</Text>
+                </span>
+              }
               style={{ width: '100%' }}
             />
+            <TextInput
+              className="menu-price-input"
+              size="l"
+              type="number"
+              label="Калорийность:"
+              placeholder={`${norm.kcal}`}
+              value={parametersDraftKcal}
+              onUpdate={setParametersDraftKcal}
+              endContent={
+                <span style={{ paddingInlineEnd: 8 }}>
+                  <Text color="secondary">ккал</Text>
+                </span>
+              }
+              style={{ width: '100%' }}
+            />
+            <Flex gap={2}>
+              <TextInput
+                className="menu-price-input"
+                size="l"
+                type="number"
+                label="Белки:"
+                placeholder={`${norm.protein}`}
+                value={parametersDraftProtein}
+                onUpdate={setParametersDraftProtein}
+                endContent={
+                  <span style={{ paddingInlineEnd: 8 }}>
+                    <Text color="secondary">г</Text>
+                  </span>
+                }
+                style={{ width: '100%' }}
+              />
+              <TextInput
+                className="menu-price-input"
+                size="l"
+                type="number"
+                label="Жиры:"
+                placeholder={`${norm.fat}`}
+                value={parametersDraftFat}
+                onUpdate={setParametersDraftFat}
+                endContent={
+                  <span style={{ paddingInlineEnd: 8 }}>
+                    <Text color="secondary">г</Text>
+                  </span>
+                }
+                style={{ width: '100%' }}
+              />
+              <TextInput
+                className="menu-price-input"
+                size="l"
+                type="number"
+                label="Углеводы:"
+                placeholder={`${norm.carbs}`}
+                value={parametersDraftCarbs}
+                onUpdate={setParametersDraftCarbs}
+                endContent={
+                  <span style={{ paddingInlineEnd: 8 }}>
+                    <Text color="secondary">г</Text>
+                  </span>
+                }
+                style={{ width: '100%' }}
+              />
+            </Flex>
           </Flex>
         </Dialog.Body>
         <Dialog.Divider />
@@ -483,11 +777,233 @@ function MenuByDates({ menuId }: { menuId: string }) {
                 setCustomPriceLimit(
                   parametersDraftLimit.trim() === '' ? null : parseRuNumber(parametersDraftLimit)
                 );
+                setCustomNorm({
+                  kcal:
+                    parametersDraftKcal.trim() === ''
+                      ? undefined
+                      : parseRuNumber(parametersDraftKcal),
+                  protein:
+                    parametersDraftProtein.trim() === ''
+                      ? undefined
+                      : parseRuNumber(parametersDraftProtein),
+                  fat:
+                    parametersDraftFat.trim() === ''
+                      ? undefined
+                      : parseRuNumber(parametersDraftFat),
+                  carbs:
+                    parametersDraftCarbs.trim() === ''
+                      ? undefined
+                      : parseRuNumber(parametersDraftCarbs),
+                });
                 setParametersOpen(false);
               }}
             >
+              <Icon data={FloppyDisk} size={16} />
               Сохранить
             </Button>
+          </Flex>
+        </Dialog.Footer>
+      </Dialog>
+
+      <Dialog
+        open={fillMenuOpen}
+        onClose={() => {
+          setFillMenuOpen(false);
+          setCreateMenuOpen(false);
+        }}
+        size="s"
+      >
+        {createMenuOpen ? (
+          <Flex alignItems="center" gap={1} style={{ padding: '16px 20px 12px' }}>
+            <Button view="flat" size="s" title="Назад" onClick={() => setCreateMenuOpen(false)}>
+              <Icon data={ArrowLeft} size={16} />
+            </Button>
+            <Text variant="subheader-2">Создание нового меню</Text>
+          </Flex>
+        ) : (
+          <Dialog.Header caption="Заполнить меню" />
+        )}
+        <Dialog.Divider />
+        <Dialog.Body>
+          {createMenuOpen ? (
+            <TextInput
+              size="l"
+              label="Название меню:"
+              placeholder={`${menu.name} (копия)`}
+              value={createMenuName}
+              onUpdate={setCreateMenuName}
+              autoFocus
+            />
+          ) : (
+            <Flex direction="column" gap={3}>
+              {fillMenuOptions.length > 0 && (
+                <Select
+                  size="l"
+                  label="Выбор меню:"
+                  placeholder="Выберите меню"
+                  value={fillMenuSourceId ? [fillMenuSourceId] : []}
+                  onUpdate={(value) => setFillMenuSourceId(value[0] ?? null)}
+                  options={fillMenuOptions.map((candidate) => ({
+                    value: candidate.id,
+                    content: candidate.name,
+                  }))}
+                />
+              )}
+              {!isEmptyWeek && (
+                <Button
+                  type="button"
+                  view="normal"
+                  size="l"
+                  loading={fillMenuSubmitting}
+                  onClick={() => setCreateMenuOpen(true)}
+                  disabled={fillMenuSubmitting}
+                >
+                  Создать новое из текущего
+                </Button>
+              )}
+              {fillMenuSourceId && fillMenuSourceId !== menuId && (
+                <Text variant="body-2" color="secondary">
+                  При выборе другого меню изменения будут применены только со следующего дня.
+                </Text>
+              )}
+            </Flex>
+          )}
+        </Dialog.Body>
+        <Dialog.Divider />
+        <Dialog.Footer>
+          <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
+            {createMenuOpen ? (
+              <>
+                <Button
+                  type="button"
+                  view="outlined"
+                  size="l"
+                  onClick={() => setCreateMenuOpen(false)}
+                >
+                  Назад
+                </Button>
+                <Button
+                  type="button"
+                  view="action"
+                  size="l"
+                  loading={fillMenuSubmitting}
+                  onClick={() => void createAndFillNewMenu()}
+                  disabled={fillMenuSubmitting}
+                >
+                  Создать новое меню
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  view="outlined"
+                  size="l"
+                  onClick={() => setFillMenuOpen(false)}
+                >
+                  Отмена
+                </Button>
+                {fillMenuOptions.length > 0 && fillMenuSourceId && (
+                  <Button
+                    type="button"
+                    view="action"
+                    size="l"
+                    loading={fillMenuSubmitting}
+                    onClick={() => void fillFromSourceMenu(fillMenuSourceId)}
+                    disabled={fillMenuSubmitting}
+                  >
+                    Выбрать
+                  </Button>
+                )}
+              </>
+            )}
+          </Flex>
+        </Dialog.Footer>
+      </Dialog>
+
+      <Dialog open={violationDay !== null} onClose={() => setViolationDay(null)} size="s">
+        <Dialog.Header caption="Нарушения за день" />
+        <Dialog.Divider />
+        <Dialog.Body>
+          {violationDay !== null && (
+            <Flex direction="column" gap={3}>
+              {(() => {
+                const totals = dayTotals.get(violationDay) ?? sumDishes([]);
+                const violations = [
+                  {
+                    label: 'Калорийность',
+                    actual: totals.kcal,
+                    norm: norm.kcal,
+                    unit: 'ккал',
+                    status: compareToNorm(totals.kcal, norm.kcal),
+                  },
+                  {
+                    label: 'Белки',
+                    actual: totals.protein,
+                    norm: norm.protein,
+                    unit: 'г',
+                    status: compareToNorm(totals.protein, norm.protein),
+                  },
+                  {
+                    label: 'Жиры',
+                    actual: totals.fat,
+                    norm: norm.fat,
+                    unit: 'г',
+                    status: compareToNorm(totals.fat, norm.fat),
+                  },
+                  {
+                    label: 'Углеводы',
+                    actual: totals.carbs,
+                    norm: norm.carbs,
+                    unit: 'г',
+                    status: compareToNorm(totals.carbs, norm.carbs),
+                  },
+                  {
+                    label: 'Цена',
+                    actual: totals.price,
+                    norm: norm.price,
+                    unit: '₽',
+                    status: comparePriceToLimit(totals.price, norm.price),
+                  },
+                ].filter((item) => item.status !== 'ok');
+                return violations.map((item) => (
+                  <Text key={item.label} variant="body-2">
+                    {item.label}: {formatMetric(item.actual)} / {formatMetric(item.norm)}{' '}
+                    {item.unit} - {item.status === 'low' ? 'ниже' : 'выше'} нормы
+                  </Text>
+                ));
+              })()}
+              <Text variant="body-2" color="secondary">
+                Вы можете разрешить нарушение или изменить состав блюд в приёмах.
+              </Text>
+            </Flex>
+          )}
+        </Dialog.Body>
+        <Dialog.Divider />
+        <Dialog.Footer>
+          <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
+            <Button type="button" view="outlined" size="l" onClick={() => setViolationDay(null)}>
+              Отмена
+            </Button>
+            {violationDay !== null && !allowedViolationDays.has(violationDay) && (
+              <Button
+                type="button"
+                view="outlined"
+                size="l"
+                onClick={() => {
+                  setAllowedViolationDays((prev) => new Set(prev).add(violationDay));
+                  toaster.add({
+                    name: 'menu-violation-allowed',
+                    title: 'Нарушение разрешено',
+                    content: `День ${violationDay} сохранён с нарушением нормы.`,
+                    theme: 'warning',
+                  });
+                  setViolationDay(null);
+                }}
+              >
+                Разрешить нарушение
+              </Button>
+            )}
           </Flex>
         </Dialog.Footer>
       </Dialog>
@@ -542,24 +1058,65 @@ function MenuByDates({ menuId }: { menuId: string }) {
   );
 }
 
-function DayTotalCell({ totals, norm }: { totals: DayTotals; norm: DayNorm }) {
+function DayTotalCell({
+  day,
+  totals,
+  norm,
+  onInspect,
+  allowed,
+}: {
+  day: number;
+  totals: DayTotals;
+  norm: DayNorm;
+  onInspect: (day: number) => void;
+  /** Нарушение дня было разрешено — кнопка-глаз в обычном стиле. */
+  allowed?: boolean;
+}) {
+  const kcalStatus = compareToNorm(totals.kcal, norm.kcal);
+  const anyViolation =
+    kcalStatus !== 'ok' ||
+    compareToNorm(totals.protein, norm.protein) !== 'ok' ||
+    compareToNorm(totals.fat, norm.fat) !== 'ok' ||
+    compareToNorm(totals.carbs, norm.carbs) !== 'ok' ||
+    comparePriceToLimit(totals.price, norm.price) !== 'ok';
+
   return (
     <div className="menu-grid__total-stack">
-      <MetricLine label="ккал" actual={totals.kcal} norm={norm.kcal} digits={0} unit="" />
       <div className="menu-grid__metric">
-        <span className="menu-grid__metric-label">КБЖУ</span>
+        <MetricLine
+          actual={totals.kcal}
+          norm={norm.kcal}
+          digits={0}
+          unit=" ккал"
+          compare={compareToNorm}
+        />
+      </div>
+      <div className="menu-grid__metric">
         <NormValue actual={totals.protein} norm={norm.protein} digits={0} prefix="Б " />
         <NormValue actual={totals.fat} norm={norm.fat} digits={0} prefix="Ж " />
         <NormValue actual={totals.carbs} norm={norm.carbs} digits={0} prefix="У " />
       </div>
-      <MetricLine
-        label="цена"
-        actual={totals.price}
-        norm={norm.price}
-        digits={0}
-        unit=" ₽"
-        compare={comparePriceToLimit}
-      />
+      <div className="menu-grid__metric">
+        <MetricLine
+          actual={totals.price}
+          norm={norm.price}
+          digits={0}
+          unit=""
+          normUnit=" ₽"
+          compare={comparePriceToLimit}
+        />
+      </div>
+      {anyViolation && (
+        <Button
+          view={allowed ? 'flat' : 'action'}
+          size="s"
+          className="menu-grid__violation-btn"
+          title="Посмотреть нарушения"
+          onClick={() => onInspect(day)}
+        >
+          <Icon data={Eye} size={16} />
+        </Button>
+      )}
     </div>
   );
 }
@@ -570,23 +1127,25 @@ function MetricLine({
   norm,
   digits,
   unit,
+  normUnit,
   compare = compareToNorm,
 }: {
-  label: string;
+  label?: string;
   actual: number;
   norm: number;
   digits: number;
   unit: string;
+  normUnit?: string;
   compare?: (actual: number, norm: number) => NormStatus;
 }) {
   const status = compare(actual, norm);
   return (
     <div className="menu-grid__metric">
-      <span className="menu-grid__metric-label">{label}</span>
+      {label && <span className="menu-grid__metric-label">{label}</span>}
       <span className={metricClass(status)}>
         {formatMetric(actual, digits)}
         {unit} / {formatMetric(norm, digits)}
-        {unit}
+        {normUnit ?? unit}
       </span>
     </div>
   );

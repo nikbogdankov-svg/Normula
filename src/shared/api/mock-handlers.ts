@@ -10,8 +10,13 @@ import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
-import { formatKettle, type DistributionRow, type KitchenUnit } from '@/features/objects/types';
-import type { DishDistributionRow, PortionEntry } from '@/features/portions/types';
+import {
+  formatKettle,
+  type DistributionRow,
+  type Facility,
+  type KitchenUnit,
+} from '@/features/objects/types';
+import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -470,14 +475,6 @@ function dishRef(recipe: Recipe): MenuDishRef {
   };
 }
 
-function todayIso(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function mondayOfWeek(iso: string = todayIso()): string {
   const [year, month, day] = iso.split('-').map(Number);
   const date = new Date(year, (month || 1) - 1, day || 1);
@@ -539,6 +536,15 @@ const warehouseReceipts = [
         unit: 'кг',
         unitPrice: 45,
         totalPrice: 2250,
+        packaging: 'Мешок 25 кг',
+        productionDate: '2025-06-10',
+        manufacturer: 'ООО «Зерно»',
+        supplier: 'ООО «ОптПродукт»',
+        documentType: 'Декларация о соответствии',
+        documentNumber: 'ЕАЭС N RU Д-RU.АВ90.В.01234',
+        organoleptic: 'Соответствует',
+        storageConditions: 'Сухое проветриваемое помещение',
+        expiryDate: '2025-12-10',
       },
       {
         id: 'rec-1-item-2',
@@ -548,6 +554,15 @@ const warehouseReceipts = [
         unit: 'л',
         unitPrice: 120,
         totalPrice: 2400,
+        packaging: 'ПЭТ бутылка 1 л',
+        productionDate: '2025-05-20',
+        manufacturer: 'ООО «МаслоДом»',
+        supplier: 'ООО «ОптПродукт»',
+        documentType: 'Декларация о соответствии',
+        documentNumber: 'ЕАЭС N RU Д-RU.АВ90.В.05678',
+        organoleptic: 'Соответствует',
+        storageConditions: 'Тёмное прохладное место',
+        expiryDate: '2026-05-20',
       },
     ],
     createdAt: new Date(Date.now() - 2 * day).toISOString(),
@@ -567,6 +582,15 @@ const warehouseReceipts = [
         unit: 'л',
         unitPrice: 65,
         totalPrice: 6500,
+        packaging: 'Пакет 1 л',
+        productionDate: '2025-06-14',
+        manufacturer: 'АО «Молзавод»',
+        supplier: 'ООО «Молочный мир»',
+        documentType: 'Декларация о соответствии',
+        documentNumber: 'ЕАЭС N RU Д-RU.АВ90.В.08901',
+        organoleptic: 'Соответствует',
+        storageConditions: 'Холодильная камера 0…+4 °C',
+        expiryDate: '2025-06-18',
       },
       {
         id: 'rec-2-item-2',
@@ -576,6 +600,15 @@ const warehouseReceipts = [
         unit: 'шт',
         unitPrice: 12,
         totalPrice: 3600,
+        packaging: 'Коробка 30 шт',
+        productionDate: '2025-06-13',
+        manufacturer: 'АО «Птицефабрика»',
+        supplier: 'ООО «Молочный мир»',
+        documentType: 'Ветеринарное свидетельство',
+        documentNumber: 'ВСД № 12345678',
+        organoleptic: 'Соответствует',
+        storageConditions: 'Холодильная камера до +6 °C',
+        expiryDate: '2025-06-27',
       },
     ],
     createdAt: new Date(Date.now() - 1 * day).toISOString(),
@@ -1174,7 +1207,18 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
   // --- Объекты (пищеблок → ЛПУ → отделения) ---
   if (route === '/v1/objects/kitchen' && method === 'GET') {
-    return { kitchen } as T;
+    return { kitchens } as T;
+  }
+
+  if (route === '/v1/objects/kitchen' && method === 'POST') {
+    const body = options.body as { name: string };
+    const newKitchen: KitchenUnit = {
+      id: `kitchen-${Date.now()}`,
+      name: body.name.trim(),
+      facilities: [],
+    };
+    kitchens.push(newKitchen);
+    return { kitchen: newKitchen } as T;
   }
 
   if (route === '/v1/objects/distribution' && method === 'GET') {
@@ -1191,7 +1235,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       tableId: string;
       headcount: number;
     };
-    const facility = kitchen.facilities.find((item) => item.id === body.facilityId);
+    const facility = findFacility(body.facilityId);
     if (!facility) throw new Error('mock: ЛПУ не найдено');
     const department = facility.departments.find((item) => item.id === body.departmentId);
     if (!department) throw new Error('mock: отделение не найдено');
@@ -1199,7 +1243,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     if (!table) throw new Error('mock: стол не найден');
     table.headcount = Math.max(0, body.headcount);
     rebuildDistribution();
-    return { kitchen } as T;
+    return { kitchens } as T;
   }
 
   const facilityRoute = match('/v1/objects/facilities/:id', route);
@@ -1214,7 +1258,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         tables: Array<{ id: string; name: string }>;
       }>;
     };
-    const facility = kitchen.facilities.find((item) => item.id === facilityRoute.id);
+    const facility = findFacility(facilityRoute.id);
     if (!facility) throw new Error('mock: ЛПУ не найдено');
 
     const oldDepartments = facility.departments;
@@ -1239,7 +1283,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
     prunePortionEntries();
     rebuildDistribution();
-    return { kitchen } as T;
+    return { kitchens } as T;
   }
 
   // --- Порционник (численность на дату + раздача по блюдам) ---
@@ -1250,7 +1294,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
   if (route === '/v1/portions/dishes' && method === 'GET') {
     const date = params.get('date') ?? '';
-    const rows = buildDishDistribution(date);
+    const rows = buildDishDistribution(date, params.get('kitchenId'));
     return {
       date,
       rows,
@@ -1273,8 +1317,16 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         item.departmentId === body.departmentId &&
         item.tableId === body.tableId
     );
-    if (!found) throw new Error('mock: строка порционника не найдена');
-    found.headcount = Math.max(0, body.headcount);
+    if (found) {
+      found.headcount = Math.max(0, body.headcount);
+    } else {
+      entries.push({
+        facilityId: body.facilityId,
+        departmentId: body.departmentId,
+        tableId: body.tableId,
+        headcount: Math.max(0, body.headcount),
+      });
+    }
     return { date: body.date, entries } as T;
   }
 
@@ -1288,7 +1340,23 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       date: string;
       invoiceNumber: string;
       warehouseId: string;
-      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+      items: Array<{
+        productId?: string;
+        productName?: string;
+        unit?: string;
+        quantity: number;
+        unitPrice: number;
+        packaging?: string;
+        productionDate?: string;
+        manufacturer?: string;
+        supplier?: string;
+        documentNumber?: string;
+        documentType?: string;
+        organoleptic?: string;
+        storageConditions?: string;
+        expiryDate?: string;
+        note?: string;
+      }>;
     };
     const productMap: Record<string, string> = {
       'prod-1': 'Мука пшеничная',
@@ -1309,12 +1377,22 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       warehouseId: body.warehouseId,
       items: body.items.map((item, idx) => ({
         id: `rec-item-${Date.now()}-${idx}`,
-        productId: item.productId,
-        productName: productMap[item.productId] || 'Неизвестный товар',
+        productId: item.productId ?? `prod-${Date.now()}-${idx}`,
+        productName: item.productName || productMap[item.productId ?? ''] || 'Неизвестный товар',
         quantity: item.quantity,
-        unit: unitMap[item.productId] || 'шт',
+        unit: item.unit || unitMap[item.productId ?? ''] || 'шт',
         unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
+        packaging: item.packaging ?? '',
+        productionDate: item.productionDate ?? '',
+        manufacturer: item.manufacturer ?? '',
+        supplier: item.supplier ?? '',
+        documentType: item.documentType ?? '',
+        documentNumber: item.documentNumber ?? '',
+        organoleptic: item.organoleptic ?? '',
+        storageConditions: item.storageConditions ?? '',
+        expiryDate: item.expiryDate ?? '',
+        note: item.note ?? '',
       })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1422,120 +1500,142 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
 }
 
-const kitchen: KitchenUnit = {
-  id: 'kitchen-1',
-  name: 'Центральный пищеблок',
-  facilities: [
-    {
-      id: 'lpu-1',
-      name: 'Больница №1',
-      address: 'корп. А',
-      kettleNumber: 1,
-      departments: [
-        {
-          id: 'dep-1-1',
-          name: 'Терапия',
-          tables: [
-            { id: 'tbl-1-1-1', name: 'Основная', headcount: 42 },
-            { id: 'tbl-1-1-2', name: 'Щадящая', headcount: 18 },
-          ],
-        },
-        {
-          id: 'dep-1-2',
-          name: 'Хирургия',
-          tables: [
-            { id: 'tbl-1-2-1', name: 'Основная', headcount: 30 },
-            { id: 'tbl-1-2-2', name: 'Диабетическая', headcount: 12 },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'lpu-2',
-      name: 'Больница №5',
-      address: 'корп. Б',
-      kettleNumber: 2,
-      departments: [
-        {
-          id: 'dep-2-1',
-          name: 'Педиатрия',
-          tables: [
-            { id: 'tbl-2-1-1', name: 'Основная', headcount: 36 },
-            { id: 'tbl-2-1-2', name: 'Щадящая', headcount: 14 },
-          ],
-        },
-        {
-          id: 'dep-2-2',
-          name: 'Неврология',
-          tables: [{ id: 'tbl-2-2-1', name: 'Основная', headcount: 28 }],
-        },
-      ],
-    },
-    {
-      id: 'lpu-3',
-      name: 'Поликлиника №3',
-      address: 'дневной стационар',
-      kettleNumber: 1,
-      departments: [
-        {
-          id: 'dep-3-1',
-          name: 'Дневной стационар',
-          tables: [{ id: 'tbl-3-1-1', name: 'Основная', headcount: 22 }],
-        },
-      ],
-    },
-    {
-      id: 'lpu-4',
-      name: 'Больница №2',
-      address: 'корп. В',
-      kettleNumber: 3,
-      departments: [
-        {
-          id: 'dep-4-1',
-          name: 'Кардиология',
-          tables: [
-            { id: 'tbl-4-1-1', name: 'Основная', headcount: 38 },
-            { id: 'tbl-4-1-2', name: 'Щадящая', headcount: 16 },
-          ],
-        },
-        {
-          id: 'dep-4-2',
-          name: 'Реанимация',
-          tables: [{ id: 'tbl-4-2-1', name: 'Основная', headcount: 10 }],
-        },
-        {
-          id: 'dep-4-3',
-          name: 'Ортопедия',
-          tables: [
-            { id: 'tbl-4-3-1', name: 'Основная', headcount: 24 },
-            { id: 'tbl-4-3-2', name: 'Диабетическая', headcount: 8 },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'lpu-5',
-      name: 'Роддом №1',
-      address: 'корп. Г',
-      kettleNumber: 2,
-      departments: [
-        {
-          id: 'dep-5-1',
-          name: 'Послеродовое',
-          tables: [
-            { id: 'tbl-5-1-1', name: 'Основная', headcount: 40 },
-            { id: 'tbl-5-1-2', name: 'Щадящая', headcount: 15 },
-          ],
-        },
-        {
-          id: 'dep-5-2',
-          name: 'Патология',
-          tables: [{ id: 'tbl-5-2-1', name: 'Основная', headcount: 20 }],
-        },
-      ],
-    },
-  ],
-};
+const kitchens: KitchenUnit[] = [
+  {
+    id: 'kitchen-1',
+    name: 'Центральный пищеблок',
+    facilities: [
+      {
+        id: 'lpu-1',
+        name: 'Больница №1',
+        address: 'корп. А',
+        kettleNumber: 1,
+        departments: [
+          {
+            id: 'dep-1-1',
+            name: 'Терапия',
+            tables: [
+              { id: 'tbl-1-1-1', name: 'Основная', headcount: 42 },
+              { id: 'tbl-1-1-2', name: 'Щадящая', headcount: 18 },
+            ],
+          },
+          {
+            id: 'dep-1-2',
+            name: 'Хирургия',
+            tables: [
+              { id: 'tbl-1-2-1', name: 'Основная', headcount: 30 },
+              { id: 'tbl-1-2-2', name: 'Диабетическая', headcount: 12 },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'lpu-3',
+        name: 'Поликлиника №3',
+        address: 'дневной стационар',
+        kettleNumber: 1,
+        departments: [
+          {
+            id: 'dep-3-1',
+            name: 'Дневной стационар',
+            tables: [{ id: 'tbl-3-1-1', name: 'Основная', headcount: 22 }],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'kitchen-2',
+    name: 'Пищеблок №2',
+    facilities: [
+      {
+        id: 'lpu-2',
+        name: 'Больница №5',
+        address: 'корп. Б',
+        kettleNumber: 2,
+        departments: [
+          {
+            id: 'dep-2-1',
+            name: 'Педиатрия',
+            tables: [
+              { id: 'tbl-2-1-1', name: 'Основная', headcount: 36 },
+              { id: 'tbl-2-1-2', name: 'Щадящая', headcount: 14 },
+            ],
+          },
+          {
+            id: 'dep-2-2',
+            name: 'Неврология',
+            tables: [{ id: 'tbl-2-2-1', name: 'Основная', headcount: 28 }],
+          },
+        ],
+      },
+      {
+        id: 'lpu-5',
+        name: 'Роддом №1',
+        address: 'корп. Г',
+        kettleNumber: 2,
+        departments: [
+          {
+            id: 'dep-5-1',
+            name: 'Послеродовое',
+            tables: [
+              { id: 'tbl-5-1-1', name: 'Основная', headcount: 40 },
+              { id: 'tbl-5-1-2', name: 'Щадящая', headcount: 15 },
+            ],
+          },
+          {
+            id: 'dep-5-2',
+            name: 'Патология',
+            tables: [{ id: 'tbl-5-2-1', name: 'Основная', headcount: 20 }],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'kitchen-3',
+    name: 'Пищеблок №3',
+    facilities: [
+      {
+        id: 'lpu-4',
+        name: 'Больница №2',
+        address: 'корп. В',
+        kettleNumber: 3,
+        departments: [
+          {
+            id: 'dep-4-1',
+            name: 'Кардиология',
+            tables: [
+              { id: 'tbl-4-1-1', name: 'Основная', headcount: 38 },
+              { id: 'tbl-4-1-2', name: 'Щадящая', headcount: 16 },
+            ],
+          },
+          {
+            id: 'dep-4-2',
+            name: 'Реанимация',
+            tables: [{ id: 'tbl-4-2-1', name: 'Основная', headcount: 10 }],
+          },
+          {
+            id: 'dep-4-3',
+            name: 'Ортопедия',
+            tables: [
+              { id: 'tbl-4-3-1', name: 'Основная', headcount: 24 },
+              { id: 'tbl-4-3-2', name: 'Диабетическая', headcount: 8 },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+function findFacility(facilityId: string): Facility | null {
+  for (const unit of kitchens) {
+    const facility = unit.facilities.find((item) => item.id === facilityId);
+    if (facility) return facility;
+  }
+  return null;
+}
 
 let distributionRows: DistributionRow[] = [];
 
@@ -1544,18 +1644,20 @@ function rebuildDistribution() {
   const rows: DistributionRow[] = [];
   // Сначала блюдо — одинаковые идут подряд для группировки в таблице.
   for (const dishName of dishes) {
-    for (const facility of kitchen.facilities) {
-      for (const department of facility.departments) {
-        for (const table of department.tables) {
-          if (table.headcount <= 0) continue;
-          rows.push({
-            dishName,
-            facilityName: facility.name,
-            departmentName: department.name,
-            tableName: table.name,
-            kettleLabel: formatKettle(facility.kettleNumber),
-            portions: table.headcount,
-          });
+    for (const unit of kitchens) {
+      for (const facility of unit.facilities) {
+        for (const department of facility.departments) {
+          for (const table of department.tables) {
+            if (table.headcount <= 0) continue;
+            rows.push({
+              dishName,
+              facilityName: facility.name,
+              departmentName: department.name,
+              tableName: table.name,
+              kettleLabel: formatKettle(facility.kettleNumber),
+              portions: table.headcount,
+            });
+          }
         }
       }
     }
@@ -1569,7 +1671,7 @@ rebuildDistribution();
 const portionsByDate: Record<string, PortionEntry[]> = {};
 
 function tableExists(facilityId: string, departmentId: string, tableId: string): boolean {
-  const facility = kitchen.facilities.find((item) => item.id === facilityId);
+  const facility = findFacility(facilityId);
   if (!facility) return false;
   const department = facility.departments.find((item) => item.id === departmentId);
   if (!department) return false;
@@ -1587,16 +1689,23 @@ function prunePortionEntries() {
 function ensurePortionsDay(date: string): PortionEntry[] {
   if (!date) throw new Error('mock: не указана дата порционника');
   if (!portionsByDate[date]) {
+    if (date > todayIso()) {
+      // Будущая дата — численность ещё не заполняли.
+      portionsByDate[date] = [];
+      return portionsByDate[date];
+    }
     const entries: PortionEntry[] = [];
-    for (const facility of kitchen.facilities) {
-      for (const department of facility.departments) {
-        for (const table of department.tables) {
-          entries.push({
-            facilityId: facility.id,
-            departmentId: department.id,
-            tableId: table.id,
-            headcount: table.headcount,
-          });
+    for (const unit of kitchens) {
+      for (const facility of unit.facilities) {
+        for (const department of facility.departments) {
+          for (const table of department.tables) {
+            entries.push({
+              facilityId: facility.id,
+              departmentId: department.id,
+              tableId: table.id,
+              headcount: table.headcount,
+            });
+          }
         }
       }
     }
@@ -1605,30 +1714,37 @@ function ensurePortionsDay(date: string): PortionEntry[] {
   return portionsByDate[date];
 }
 
-function buildDishDistribution(date: string): DishDistributionRow[] {
-  const dishes = ['Каша рисовая молочная', 'Суп картофельный с мясом', 'Котлета куриная паровая'];
+function buildDishDistribution(date: string, kitchenId: string | null): DishDistributionRow[] {
+  const dishes: Array<{ name: string; mealType: string }> = [
+    { name: 'Каша рисовая молочная', mealType: 'Завтрак' },
+    { name: 'Суп картофельный с мясом', mealType: 'Обед' },
+    { name: 'Котлета куриная паровая', mealType: 'Ужин' },
+  ];
   const entries = ensurePortionsDay(date);
+  const units = kitchenId ? kitchens.filter((unit) => unit.id === kitchenId) : kitchens;
   const rows: DishDistributionRow[] = [];
-  for (const dishName of dishes) {
-    for (const facility of kitchen.facilities) {
-      for (const department of facility.departments) {
-        for (const table of department.tables) {
-          const entry = entries.find(
-            (item) =>
-              item.facilityId === facility.id &&
-              item.departmentId === department.id &&
-              item.tableId === table.id
-          );
-          const portions = entry?.headcount ?? 0;
-          if (portions <= 0) continue;
-          rows.push({
-            dishName,
-            facilityName: facility.name,
-            departmentName: department.name,
-            tableName: table.name,
-            kettleLabel: formatKettle(facility.kettleNumber),
-            portions,
-          });
+  for (const dish of dishes) {
+    for (const unit of units) {
+      for (const facility of unit.facilities) {
+        for (const department of facility.departments) {
+          for (const table of department.tables) {
+            const entry = entries.find(
+              (item) =>
+                item.facilityId === facility.id &&
+                item.departmentId === department.id &&
+                item.tableId === table.id
+            );
+            const portions = entry?.headcount ?? 0;
+            if (portions <= 0) continue;
+            rows.push({
+              dishName: dish.name,
+              mealType: dish.mealType,
+              facilityName: facility.name,
+              departmentName: department.name,
+              tableName: table.name,
+              portions,
+            });
+          }
         }
       }
     }

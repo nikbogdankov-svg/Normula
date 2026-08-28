@@ -153,7 +153,7 @@ export function TtkRoute() {
             style={{ width: '100%' }}
           />
           {data && (
-            <Text variant="body-2" color="secondary">
+            <Text variant="body-1" color="secondary">
               {hasFilters ? `Найдено: ${total} ТТК` : `Всего ТТК: ${total}`}
             </Text>
           )}
@@ -233,7 +233,7 @@ function RecipesTable({
         />
       ),
       template: (row) => (
-        <Text variant="subheader-2">
+        <Text variant="body-2">
           <HighlightText text={row.name} query={search} />
         </Text>
       ),
@@ -241,7 +241,11 @@ function RecipesTable({
     {
       id: 'collection',
       name: 'Сборник',
-      template: (row) => <Text variant="body-2">{row.collectionName || '—'}</Text>,
+      template: (row) => (
+        <Text variant="body-2" color="secondary">
+          {row.collectionName || '—'}
+        </Text>
+      ),
     },
     {
       id: 'price',

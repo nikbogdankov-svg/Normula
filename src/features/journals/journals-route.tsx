@@ -1,16 +1,6 @@
-import { useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  Flex,
-  Icon,
-  Label,
-  Table,
-  Text,
-  TextInput,
-  useToaster,
-} from '@gravity-ui/uikit';
-import { BookOpen, Magnifier, Printer } from '@gravity-ui/icons';
+import { useState } from 'react';
+import { Button, Card, Flex, Icon, Label, Text, useToaster } from '@gravity-ui/uikit';
+import { Printer } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { JournalDrawer } from './journal-drawer';
@@ -24,20 +14,7 @@ import './journals-route.css';
 export function JournalsRoute() {
   const { current } = useOrganizations();
   const toaster = useToaster();
-  const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<AutoJournal | null>(null);
-
-  const rows = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return AUTO_JOURNALS.filter((journal) => {
-      if (!query) return true;
-      return (
-        journal.tag.toLowerCase().includes(query) ||
-        journal.title.toLowerCase().includes(query) ||
-        journal.description.toLowerCase().includes(query)
-      );
-    });
-  }, [search]);
 
   const onGenerate = (journal: AutoJournal) => {
     toaster.add({
@@ -58,88 +35,50 @@ export function JournalsRoute() {
 
   return (
     <div className="journals-page">
-      <Card view="filled" style={{ padding: 0 }}>
-        <Flex
-          alignItems="center"
-          justifyContent="space-between"
-          gap={3}
-          wrap
-          style={{ padding: '12px 16px' }}
-        >
-          <Flex alignItems="center" gap={2}>
-            <Icon data={BookOpen} size={16} />
-            <Text variant="subheader-2">Каталог журналов</Text>
-          </Flex>
-          <Flex alignItems="center" gap={2} wrap>
-            <Button view="normal" size="m" onClick={() => window.print()} title="Печать">
-              <Icon data={Printer} size={16} />
-            </Button>
-            <TextInput
-              size="m"
-              placeholder="Поиск по тегу или названию"
-              value={search}
-              onUpdate={setSearch}
-              hasClear
-              startContent={
-                <span
-                  style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
+      <div className="journals-grid">
+        {AUTO_JOURNALS.map((journal) => (
+          <Card
+            key={journal.id}
+            view="filled"
+            className="journals-card"
+            onClick={() => setOpened(journal)}
+          >
+            <Flex gap={2}>
+              <Flex direction="column" gap={2} style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="subheader-2">{journal.title}</Text>
+                <Flex gap={1} wrap>
+                  {journal.sources.map((source) => (
+                    <Label key={source} theme="unknown" size="xs">
+                      {JOURNAL_SOURCE_LABELS[source]}
+                    </Label>
+                  ))}
+                </Flex>
+                <Text
+                  variant="body-2"
+                  color={journal.manualFields.length > 0 ? 'primary' : 'secondary'}
                 >
-                  <Icon data={Magnifier} size={16} />
-                </span>
-              }
-              style={{ width: 280 }}
-            />
-          </Flex>
-        </Flex>
+                  {journal.manualFields.length > 0
+                    ? `Дозаполнить: ${journal.manualFields.join(', ')}`
+                    : 'Заполняется автоматически'}
+                </Text>
+              </Flex>
+              <Button
+                view="normal"
+                size="l"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerate(journal);
+                }}
+                title="Печать"
+              >
+                <Icon data={Printer} size={16} />
+              </Button>
+            </Flex>
+          </Card>
+        ))}
+      </div>
 
-        <div style={{ borderTop: '1px solid var(--g-color-line-generic)', paddingBottom: 8 }}>
-          <div className="admin-table-wrap">
-            <Table
-              width="max"
-              className="admin-table"
-              data={rows}
-              onRowClick={(row) => setOpened(row)}
-              getRowDescriptor={(row) => ({ id: row.id, interactive: true })}
-              columns={[
-                {
-                  id: 'title',
-                  name: 'Журнал',
-                  template: (row) => <Text variant="body-1">{row.title}</Text>,
-                },
-                {
-                  id: 'sources',
-                  name: 'Источники',
-                  width: 300,
-                  template: (row) => (
-                    <Flex gap={1} wrap>
-                      {row.sources.map((source) => (
-                        <Label key={source} theme="unknown" size="xs">
-                          {JOURNAL_SOURCE_LABELS[source]}
-                        </Label>
-                      ))}
-                    </Flex>
-                  ),
-                },
-                {
-                  id: 'manual',
-                  name: 'Вручную',
-                  width: 240,
-                  template: (row) =>
-                    row.manualFields.length > 0 ? (
-                      <Text variant="body-1">{row.manualFields.join(', ')}</Text>
-                    ) : (
-                      <Text variant="body-1" color="secondary">
-                        —
-                      </Text>
-                    ),
-                },
-              ]}
-            />
-          </div>
-        </div>
-      </Card>
-
-      <JournalDrawer journal={opened} onClose={() => setOpened(null)} onGenerate={onGenerate} />
+      <JournalDrawer journal={opened} onClose={() => setOpened(null)} />
     </div>
   );
 }

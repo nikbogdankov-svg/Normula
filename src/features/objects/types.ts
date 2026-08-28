@@ -31,7 +31,7 @@ export interface Facility {
   kettleNumber: number;
 }
 
-/** Пищеблок текущей организации. */
+/** Пищеблок организации: один готовит на несколько ЛПУ. */
 export interface KitchenUnit {
   id: string;
   name: string;
@@ -39,7 +39,7 @@ export interface KitchenUnit {
 }
 
 export interface KitchenResponse {
-  kitchen: KitchenUnit;
+  kitchens: KitchenUnit[];
 }
 
 export interface UpdateTableHeadcountRequest {
