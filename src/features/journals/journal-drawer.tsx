@@ -1,6 +1,6 @@
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { Printer, Xmark } from '@gravity-ui/icons';
-import { JOURNAL_PRIORITY_LABELS, JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
+import { JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
 
 function FieldList({
   title,
@@ -31,11 +31,9 @@ function FieldList({
 export function JournalDrawer({
   journal,
   onClose,
-  onGenerate,
 }: {
   journal: AutoJournal | null;
   onClose: () => void;
-  onGenerate: (journal: AutoJournal) => void;
 }) {
   const requestClose = () => onClose();
 
@@ -58,9 +56,6 @@ export function JournalDrawer({
             gap={3}
           >
             <Flex direction="column" gap={1}>
-              <Text variant="caption-2" color="secondary">
-                {journal.tag}
-              </Text>
               <Text variant="header-1">{journal.title}</Text>
               <Text variant="body-2" color="secondary">
                 {journal.description}
@@ -73,9 +68,6 @@ export function JournalDrawer({
 
           <Flex className="journal-drawer__body" direction="column" gap={4}>
             <Flex gap={2} wrap>
-              <Label theme={journal.priority === 'required' ? 'danger' : 'utility'} size="m">
-                {JOURNAL_PRIORITY_LABELS[journal.priority]}
-              </Label>
               {journal.sources.map((source) => (
                 <Label key={source} theme="info" size="m">
                   {JOURNAL_SOURCE_LABELS[source]}
@@ -93,10 +85,7 @@ export function JournalDrawer({
           </Flex>
 
           <Flex className="journal-drawer__footer" gap={2}>
-            <Button view="action" size="l" onClick={() => onGenerate(journal)}>
-              Сформировать
-            </Button>
-            <Button view="normal" size="l" onClick={() => window.print()}>
+            <Button view="action" size="l" onClick={() => window.print()}>
               <Icon data={Printer} size={16} />
               Печать
             </Button>

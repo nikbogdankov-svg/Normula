@@ -91,6 +91,7 @@
 }
 
 .ttk-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  width: 8%;
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
   padding-inline-end: 12px;
@@ -200,6 +201,7 @@
 }
 
 .ttk-page__scroll .admin-table .g-table__cell:last-child {
+  width: 8%;
   padding-inline-end: 0;
 }
 

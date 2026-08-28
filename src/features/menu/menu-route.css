@@ -73,9 +73,9 @@
   min-height: 480px;
   background: var(--onemore-card-bg);
   /* --menu-days / --menu-meal-rows задаются инлайном из React */
-  grid-template-columns: 140px repeat(var(--menu-days), minmax(180px, 1fr));
+  grid-template-columns: 140px repeat(var(--menu-days), 280px);
   /* Приёмы делят высоту поровну; «Итог на день» заметно ниже. */
-  grid-template-rows: 52px repeat(var(--menu-meal-rows), 1fr) minmax(64px, 0.55fr);
+  grid-template-rows: 40px repeat(var(--menu-meal-rows), 1fr) minmax(64px, 0.55fr);
 }
 
 .menu-grid__cell {
@@ -87,6 +87,14 @@
   background: var(--onemore-card-bg);
   border-right: 1px solid var(--g-color-line-generic);
   border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.menu-grid__day {
+  border-bottom-color: var(--g-color-line-generic-active);
+}
+
+.menu-grid__meal {
+  border-right-color: var(--g-color-line-generic-active);
 }
 
 .menu-grid__cell_end {
@@ -107,9 +115,11 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 4px 8px;
   text-align: center;
   background: var(--onemore-card-bg);
 }
@@ -127,23 +137,15 @@
   align-items: center;
   justify-content: center;
   min-width: 3.5em;
-  padding-inline-end: 10px;
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--g-color-text-primary);
 }
 
-.menu-grid__today-dot {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--g-color-base-brand);
-  transform: translateY(-50%);
+.menu-grid__today-label {
   flex-shrink: 0;
+  margin-inline-start: 6px;
 }
 
 .menu-grid__corner {
@@ -163,6 +165,11 @@
 .menu-price-input input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+/* Отступ справа у правых подписей (₽, ккал, г), чтобы не прижимались к краю. */
+.menu-price-input .g-text-input__end-content {
+  padding-inline-end: 8px;
 }
 
 .menu-grid__cell-btn {
@@ -188,12 +195,9 @@
 }
 
 .menu-grid__dish {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex-shrink: 0;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .menu-grid__empty {
@@ -223,6 +227,10 @@
   background: var(--onemore-card-bg);
 }
 
+.menu-grid__cell_before-total {
+  border-bottom-color: var(--g-color-line-generic-active);
+}
+
 .menu-grid__total-cell {
   position: sticky;
   bottom: 0;
@@ -232,13 +240,36 @@
   background: var(--onemore-card-bg);
 }
 
+.menu-grid__total-label,
+.menu-grid__total-cell {
+  border-right-color: var(--g-color-line-generic-active);
+}
+
+/* Ячейка «Итог на день» с нарушением нормы — светлый фон опасности. */
+.menu-grid__total-cell_violation {
+  background: var(--g-color-base-danger-light);
+}
+
 .menu-grid__total-stack {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 4px;
   min-height: 0;
   overflow: auto;
+}
+
+/* Кнопка просмотра нарушений в «Итоге на день»: по центру ячейки по
+   вертикали, прижата к правому краю. Анимации сдвига вниз при нажатии нет. */
+.menu-grid__violation-btn,
+.menu-grid__violation-btn:active,
+.menu-grid__violation-btn:focus-visible {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  transition: none;
 }
 
 .menu-grid__metric {
@@ -259,8 +290,10 @@
   color: var(--g-color-text-primary);
 }
 
+/* В итоге на день нормаль не подсвечивается зелёным — только
+   отклонения (низко/высоко) выделяются красным. */
 .menu-grid__metric-value_ok {
-  color: var(--g-color-text-positive);
+  color: var(--g-color-text-primary);
 }
 
 .menu-grid__metric-value_low,

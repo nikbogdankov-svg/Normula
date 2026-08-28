@@ -3,6 +3,7 @@ import { useApi } from '@/shared/api/use-api';
 import type {
   DistributionPreviewResponse,
   KitchenResponse,
+  KitchenUnit,
   UpdateFacilityRequest,
   UpdateTableHeadcountRequest,
 } from './types';
@@ -60,6 +61,20 @@ export function useUpdateFacility() {
       api.request<KitchenResponse>(`/v1/objects/facilities/${id}`, {
         method: 'PATCH',
         body: patch,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateKitchen() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: (name: string) =>
+      api.request<{ kitchen: KitchenUnit }>('/v1/objects/kitchen', {
+        method: 'POST',
+        body: { name },
       }),
     onSuccess: invalidate,
   });

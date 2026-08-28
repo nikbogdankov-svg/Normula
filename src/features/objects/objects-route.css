@@ -12,21 +12,14 @@
   padding-block-start: 8px;
 }
 
-/* Линия между ЛПУ внутри блюда — не пересекает столбец «Блюдо». */
-.objects-group-table .objects-group-row_facility-divider .g-table__cell:first-child {
+/* Линия между отделениями в одном ЛПУ — начинается от «Отделение», «Организация» пропущена. */
+.objects-group-table
+  .objects-group-row_department-divider
+  .g-table__cell:first-child {
   border-block-end-color: transparent;
 }
 
-/* Линия между отделениями — не пересекает «Блюдо» и «ЛПУ». */
-.objects-group-table .objects-group-row_department-divider .g-table__cell:nth-child(-n + 2) {
-  border-block-end-color: transparent;
-}
-
-/* Выравнивание «Всего» с цифрами внутри TextInput size=s (padding ~8px). */
-.objects-total-headcount {
-  display: inline-block;
-  padding-inline-start: 8px;
-}
+/* Полная линия между разными ЛПУ — все колонки (по умолчанию). */
 
 /* Отключаем ховер-эффект строк таблицы объектов. */
 .g-root .objects-group-table .g-table__body .g-table__row:hover,
@@ -34,12 +27,8 @@
   background-color: transparent;
 }
 
-/* Хедер колонки «Котел» — выравнивание вправо. */
-.g-root .objects-group-table .g-table__head .g-table__cell:last-child {
-  text-align: end;
-}
-
 /* Шрифт body-2 в таблице объектов. */
 .g-root .objects-group-table .g-table__cell {
   font-size: var(--g-text-body-2-font-size);
+  vertical-align: top;
 }

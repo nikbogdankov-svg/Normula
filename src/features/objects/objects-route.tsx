@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Flex, Icon, Select, Table, Text, useToaster } from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, Select, Table, Text } from '@gravity-ui/uikit';
 import { House, Pencil, Plus } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
@@ -10,24 +10,37 @@ import {
 } from '@/shared/ui/states';
 import { useKitchen } from './api';
 import { EditFacilityDialog } from './objects-dialog';
-import { formatKettle, type Facility } from './types';
+import { type Facility, type KitchenUnit } from './types';
 import './objects-route.css';
 
-function groupRowClassNames(opts: { isLastInGroup: boolean; isContinuation: boolean }): string[] {
+function groupRowClassNames(row: {
+  isLastInDepartment: boolean;
+  isLastInFacility: boolean;
+  nextShowDepartment: boolean;
+  nextShowFacility: boolean;
+}): string[] {
   const classes: string[] = [];
-  if (!opts.isLastInGroup) classes.push('objects-group-row_no-divider');
-  if (opts.isContinuation) classes.push('objects-group-row_continuation');
+  // Внутри одного отделения — без линий.
+  if (!row.isLastInDepartment) classes.push('objects-group-row_no-divider');
+  // Последняя строка отделения, следующее — в том же ЛПУ → линия от «Отделение».
+  if (row.isLastInDepartment && row.nextShowDepartment && !row.nextShowFacility) {
+    classes.push('objects-group-row_department-divider');
+  }
+  // Последняя строка ЛПУ → полная линия (все колонки).
+  if (row.isLastInFacility) {
+    classes.push('objects-group-row_facility-divider');
+  }
   return classes;
 }
 
 /**
- * «Объекты»: справочник пищеблок → ЛПУ → отделения → столы / котлы (ОБЪЕКТ-01…03).
+ * «Объекты»: справочник пищеблок → ЛПУ → отделения → столы.
  * Численность на дату — в «Порционнике».
  */
 export function ObjectsRoute() {
   const { current } = useOrganizations();
   const kitchen = useKitchen();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedKitchenId, setSelectedKitchenId] = useState<string | null>(null);
 
   if (current === null) {
     return (
@@ -53,98 +66,136 @@ export function ObjectsRoute() {
     );
   }
 
-  const facilities = kitchen.data.kitchen.facilities;
-  const selected =
-    facilities.find((facility) => facility.id === selectedId) ?? facilities[0] ?? null;
+  const kitchens = kitchen.data.kitchens;
+  const activeKitchenId = selectedKitchenId ?? kitchens[0]?.id ?? null;
+  const facilities = activeKitchenId
+    ? kitchens.find((k) => k.id === activeKitchenId)?.facilities ?? []
+    : kitchens.flatMap((k) => k.facilities);
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
       <FacilitiesCard
+        kitchens={kitchens}
         facilities={facilities}
-        selected={selected}
-        selectedId={selected?.id ?? null}
-        onSelect={setSelectedId}
+        selectedKitchenId={activeKitchenId}
+        onSelectKitchen={setSelectedKitchenId}
       />
     </Flex>
   );
 }
 
 function FacilitiesCard({
+  kitchens,
   facilities,
-  selected,
-  selectedId,
-  onSelect,
+  selectedKitchenId,
+  onSelectKitchen,
 }: {
+  kitchens: KitchenUnit[];
   facilities: Facility[];
-  selected: Facility | null;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  selectedKitchenId: string | null;
+  onSelectKitchen: (id: string | null) => void;
 }) {
-  const toaster = useToaster();
-  const [editing, setEditing] = useState<Facility | null>(null);
-  const kettle = selected ? formatKettle(selected.kettleNumber) : '';
+  const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const selectedKitchen = kitchens.find((k) => k.id === selectedKitchenId) ?? kitchens[0] ?? null;
 
   const rows = useMemo(() => {
-    if (!selected) return [];
-    const flat = selected.departments.flatMap((department) =>
-      department.tables.map((table) => ({
-        id: table.id,
-        departmentId: department.id,
-        departmentName: department.name,
-        tableName: table.name,
-      }))
-    );
-    return flat.map((row, index) => ({
-      ...row,
-      showDepartment: index === 0 || flat[index - 1].departmentId !== row.departmentId,
-      isLastInDepartment:
-        index === flat.length - 1 || flat[index + 1].departmentId !== row.departmentId,
-    }));
-  }, [selected]);
+    const result: Array<{
+      id: string;
+      facilityId: string;
+      facilityName: string;
+      departmentId: string;
+      departmentName: string;
+      tableName: string;
+      showFacility: boolean;
+      showDepartment: boolean;
+      isLastInDepartment: boolean;
+      isLastInFacility: boolean;
+      nextShowDepartment: boolean;
+      nextShowFacility: boolean;
+    }> = [];
+    for (const facility of facilities) {
+      for (const department of facility.departments) {
+        for (const table of department.tables) {
+          const prevRow = result[result.length - 1];
+          const showFacility = !prevRow || prevRow.facilityId !== facility.id;
+          const showDepartment =
+            showFacility || !prevRow || prevRow.departmentId !== department.id;
+          result.push({
+            id: table.id,
+            facilityId: facility.id,
+            facilityName: facility.name,
+            departmentId: department.id,
+            departmentName: department.name,
+            tableName: table.name,
+            showFacility,
+            showDepartment,
+            isLastInDepartment: false,
+            isLastInFacility: false,
+            nextShowDepartment: false,
+            nextShowFacility: false,
+          });
+        }
+      }
+    }
+    // Mark last rows and propagate next-flags.
+    for (let i = result.length - 1; i >= 0; i--) {
+      const row = result[i];
+      const next = result[i + 1];
+      row.isLastInDepartment = !next || next.departmentId !== row.departmentId;
+      row.isLastInFacility = !next || next.facilityId !== row.facilityId;
+      row.nextShowDepartment = next?.showDepartment ?? false;
+      row.nextShowFacility = next?.showFacility ?? false;
+    }
+    return result;
+  }, [facilities]);
 
   return (
-    <Card view="filled" style={{ padding: 0 }}>
-      <Flex
-        alignItems="center"
-        justifyContent="space-between"
-        gap={4}
-        style={{ padding: '12px 16px' }}
-      >
-        <Flex alignItems="center" gap={2}>
-          <Icon data={House} size={16} />
-          <Text variant="subheader-2">ЛПУ</Text>
-        </Flex>
-        <Flex alignItems="center" gap={2}>
-          {facilities.length > 0 && (
-            <Select
-              size="m"
-              width={260}
-              label="Организация:"
-              value={selectedId ? [selectedId] : []}
-              onUpdate={(value) => onSelect(value[0] ?? '')}
-              placeholder="Выберите ЛПУ"
-              options={facilities.map((facility) => ({
-                value: facility.id,
-                content: facility.name,
-              }))}
-            />
-          )}
-          <Button
-            view="normal"
-            onClick={() =>
-              toaster.add({
-                name: 'objects-add-facility',
-                title: 'Добавление организации',
-                content: 'Скоро будет доступно',
-                theme: 'info',
-              })
-            }
-          >
-            <Icon data={Plus} size={16} />
-            Добавить организацию
-          </Button>
-        </Flex>
+    <>
+      <Flex alignItems="center" justifyContent="space-between" gap={2}>
+        {kitchens.length > 0 && (
+          <Select
+            size="l"
+            width={360}
+            label="Пищеблок:"
+            value={selectedKitchenId ? [selectedKitchenId] : []}
+            onUpdate={(value) => onSelectKitchen(value[0] ?? null)}
+            placeholder="Все пищеблоки"
+            options={kitchens.map((unit) => ({
+              value: unit.id,
+              content: unit.name,
+            }))}
+          />
+        )}
+        <Button
+          view="normal-contrast"
+          size="l"
+          onClick={() => setCreating(true)}
+        >
+          <Icon data={Plus} size={16} />
+          Добавить пищеблок
+        </Button>
       </Flex>
+
+      <Card view="filled" style={{ padding: 0 }}>
+        <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ padding: '12px 16px' }}>
+          <Flex alignItems="center" gap={2}>
+            <Icon data={House} size={16} />
+            <Text variant="subheader-2">Пищеблок</Text>
+          </Flex>
+          {kitchens.length > 0 && (
+            <Button
+              view="normal"
+              size="m"
+              disabled={selectedKitchen === null}
+              onClick={() => setEditing(true)}
+            >
+              <Icon data={Pencil} size={16} />
+              Редактировать
+            </Button>
+          )}
+        </Flex>
 
       <div
         style={{
@@ -155,8 +206,8 @@ function FacilitiesCard({
       >
         {facilities.length === 0 ? (
           <EmptyState text="ЛПУ пока не добавлены" />
-        ) : !selected || rows.length === 0 ? (
-          <EmptyState text="В этом ЛПУ нет отделений" />
+        ) : rows.length === 0 ? (
+          <EmptyState text="В этом пищеблоке нет отделений" />
         ) : (
           <div className="admin-table-wrap">
             <Table
@@ -165,29 +216,31 @@ function FacilitiesCard({
               data={rows}
               getRowClassNames={(row) =>
                 groupRowClassNames({
-                  isLastInGroup: row.isLastInDepartment,
-                  isContinuation: !row.showDepartment,
+                  isLastInDepartment: row.isLastInDepartment,
+                  isLastInFacility: row.isLastInFacility,
+                  nextShowDepartment: row.nextShowDepartment,
+                  nextShowFacility: row.nextShowFacility,
                 })
               }
               columns={[
                 {
+                  id: 'facilityName',
+                  name: 'ЛПУ',
+                  width: '35%',
+                  template: (row) => (row.showFacility ? row.facilityName : null),
+                  placeholder: () => null,
+                },
+                {
                   id: 'departmentName',
                   name: 'Отделение',
-                  width: '40%',
+                  width: '35%',
                   template: (row) => (row.showDepartment ? row.departmentName : null),
                   placeholder: () => null,
                 },
                 {
                   id: 'tableName',
                   name: 'Стол',
-                  width: '35%',
-                },
-                {
-                  id: 'kettle',
-                  name: 'Котел',
-                  width: '25%',
-                  align: 'end',
-                  template: () => kettle,
+                  width: '30%',
                 },
               ]}
             />
@@ -195,23 +248,13 @@ function FacilitiesCard({
         )}
       </div>
 
-      {selected && (
-        <>
-          <div style={{ borderTop: '1px solid var(--g-color-line-generic)' }} />
-          <Flex justifyContent="flex-end" style={{ padding: '12px 16px' }}>
-            <Button
-              view="normal"
-              onClick={() => setEditing(selected)}
-              title="Редактировать организацию"
-            >
-              <Icon data={Pencil} size={16} />
-              Редактировать организацию
-            </Button>
-          </Flex>
-        </>
-      )}
-
-      <EditFacilityDialog facility={editing} onClose={() => setEditing(null)} />
     </Card>
+
+      <EditFacilityDialog
+        kitchen={editing ? selectedKitchen : null}
+        mode={creating ? 'create' : 'edit'}
+        onClose={() => { setEditing(false); setCreating(false); }}
+      />
+    </>
   );
 }

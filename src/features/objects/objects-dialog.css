@@ -1,3 +1,9 @@
+.objects-facility-dialog__facility-block {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--g-color-line-generic);
+}
+
 .objects-facility-dialog__department {
   padding: 12px;
   border-radius: 8px;
