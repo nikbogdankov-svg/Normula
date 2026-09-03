@@ -15,10 +15,10 @@ import { MEALS } from '@/features/menu/types';
 import {
   formatKettle,
   isFacilityType,
+  type CateringObject,
   type DistributionRow,
-  type Facility,
   type FacilityType,
-  type KitchenUnit,
+  type SubObject,
 } from '@/features/objects/types';
 import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
 import type { WarehouseReceipt } from '@/features/warehouse-receipts/types';
@@ -98,7 +98,7 @@ const organizations: Organization[] = [
   {
     id: 'org-school-12',
     name: 'Школа №12',
-    description: 'Пищеблок школы',
+    description: 'Объект школы',
     memberCount: 3,
     disabled: false,
     createdAt: String(Date.now() - 30 * day),
@@ -459,6 +459,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-main',
     name: 'Основной',
     appliesTo: ['school', 'kindergarten', 'hospital'],
+    mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
     pricePerDay: 450,
     kcal: 1800,
     protein: 90,
@@ -469,6 +470,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-gentle',
     name: 'Щадящий',
     appliesTo: ['school', 'kindergarten', 'hospital'],
+    mealIds: ['breakfast', 'lunch', 'dinner'],
     pricePerDay: 430,
     kcal: 1750,
     protein: 85,
@@ -479,6 +481,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-gluten-free',
     name: 'Безглютеновый',
     appliesTo: ['school', 'kindergarten', 'hospital'],
+    mealIds: ['breakfast', 'lunch', 'snack', 'dinner'],
     pricePerDay: 460,
     kcal: 1800,
     protein: 90,
@@ -489,6 +492,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-lactose-free',
     name: 'Безлактозный',
     appliesTo: ['school', 'kindergarten', 'hospital'],
+    mealIds: [],
     pricePerDay: 455,
     kcal: 1800,
     protein: 90,
@@ -499,6 +503,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-diabetic',
     name: 'Диабетический',
     appliesTo: ['school', 'kindergarten', 'hospital'],
+    mealIds: ['breakfast', 'lunch', 'dinner'],
     pricePerDay: 440,
     kcal: 1600,
     protein: 85,
@@ -509,6 +514,7 @@ const mockedDiets: Diet[] = [
     id: 'diet-vegetarian',
     name: 'Вегетарианский',
     appliesTo: ['school', 'kindergarten'],
+    mealIds: [],
     pricePerDay: 420,
     kcal: 1700,
     protein: 70,
@@ -1192,6 +1198,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       appliesTo: FacilityType[];
+      mealIds: MealId[];
       pricePerDay: number;
       kcal: number;
       protein: number;
@@ -1202,6 +1209,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       id: `diet-${Date.now()}`,
       name: body.name,
       appliesTo: body.appliesTo ?? [],
+      mealIds: body.mealIds ?? [],
       pricePerDay: body.pricePerDay ?? 0,
       kcal: body.kcal ?? 0,
       protein: body.protein ?? 0,
@@ -1221,6 +1229,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       appliesTo: FacilityType[];
+      mealIds: MealId[];
       pricePerDay: number;
       kcal: number;
       protein: number;
@@ -1230,6 +1239,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     Object.assign(found, {
       name: body.name,
       appliesTo: body.appliesTo ?? found.appliesTo,
+      mealIds: body.mealIds ?? found.mealIds,
       pricePerDay: body.pricePerDay ?? found.pricePerDay,
       kcal: body.kcal ?? found.kcal,
       protein: body.protein ?? found.protein,
@@ -1552,20 +1562,21 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return { menu: found } as T;
   }
 
-  // --- Объекты (пищеблок → ЛПУ → отделения) ---
-  if (route === '/v1/objects/kitchen' && method === 'GET') {
-    return { kitchens } as T;
+  // --- Объекты (объект → подобъект → отделения) ---
+  if (route === '/v1/objects' && method === 'GET') {
+    return { objects } as T;
   }
 
-  if (route === '/v1/objects/kitchen' && method === 'POST') {
+  if (route === '/v1/objects' && method === 'POST') {
     const body = options.body as { name: string };
-    const newKitchen: KitchenUnit = {
-      id: `kitchen-${Date.now()}`,
+    const newObject: CateringObject = {
+      id: `object-${Date.now()}`,
       name: body.name.trim(),
-      facilities: [],
+      mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+      subObjects: [],
     };
-    kitchens.push(newKitchen);
-    return { kitchen: newKitchen } as T;
+    objects.push(newObject);
+    return { object: newObject } as T;
   }
 
   if (route === '/v1/objects/distribution' && method === 'GET') {
@@ -1575,50 +1586,83 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     } as T;
   }
 
+  if (route === '/v1/objects/menu' && method === 'PATCH') {
+    const body = options.body as {
+      objectId?: string;
+      subObjectId?: string;
+      menuId?: string;
+      mealIds?: MealId[];
+    };
+    if (body.objectId) {
+      const obj = objects.find((item) => item.id === body.objectId);
+      if (!obj) throw new Error('mock: объект не найден');
+      if (body.menuId !== undefined) obj.menuId = body.menuId;
+      if (body.mealIds) obj.mealIds = body.mealIds;
+    }
+    if (body.subObjectId) {
+      for (const obj of objects) {
+        const sub = obj.subObjects.find((item) => item.id === body.subObjectId);
+        if (sub) {
+          if (body.menuId !== undefined) sub.menuId = body.menuId;
+          if (body.mealIds) sub.mealIds = body.mealIds;
+          break;
+        }
+      }
+    }
+    return { objects } as T;
+  }
+
   if (route === '/v1/objects/tables/headcount' && method === 'PATCH') {
     const body = options.body as {
-      facilityId: string;
+      objectId: string;
+      subObjectId: string;
       departmentId: string;
       tableId: string;
       headcount: number;
     };
-    const facility = findFacility(body.facilityId);
-    if (!facility) throw new Error('mock: учреждение не найдено');
-    const department = facility.departments.find((item) => item.id === body.departmentId);
+    const subObject = findSubObject(body.subObjectId);
+    if (!subObject) throw new Error('mock: подобъект не найден');
+    const department = subObject.departments.find((item) => item.id === body.departmentId);
     if (!department) throw new Error('mock: группа/класс не найдены');
     const table = department.tables.find((item) => item.id === body.tableId);
     if (!table) throw new Error('mock: рацион не найден');
     table.headcount = Math.max(0, body.headcount);
     rebuildDistribution();
-    return { kitchens } as T;
+    return { objects } as T;
   }
 
-  const facilityRoute = match('/v1/objects/facilities/:id', route);
-  if (facilityRoute && method === 'PATCH') {
+  const subObjectRoute = match('/v1/objects/sub-objects/:id', route);
+  if (subObjectRoute && method === 'PATCH') {
     const body = options.body as {
       name: string;
       address: string;
       type: string;
       kettleNumber: number;
+      menuSource: string;
+      mealIds?: MealId[];
       departments: Array<{
         id: string;
         name: string;
+        mealIds: MealId[];
         tables: Array<{ id: string; name: string }>;
       }>;
     };
-    const facility = findFacility(facilityRoute.id);
-    if (!facility) throw new Error('mock: учреждение не найдено');
+    const subObject = findSubObject(subObjectRoute.id);
+    if (!subObject) throw new Error('mock: подобъект не найден');
 
-    const oldDepartments = facility.departments;
-    facility.name = body.name.trim();
-    facility.address = body.address.trim();
-    facility.type = isFacilityType(body.type) ? body.type : facility.type;
-    facility.kettleNumber = Math.max(1, body.kettleNumber);
-    facility.departments = body.departments.map((department) => {
+    const oldDepartments = subObject.departments;
+    subObject.name = body.name.trim();
+    subObject.address = body.address.trim();
+    subObject.type = isFacilityType(body.type) ? body.type : subObject.type;
+    subObject.kettleNumber = Math.max(1, body.kettleNumber);
+    subObject.menuSource = body.menuSource === 'own' ? 'own' : 'object';
+    subObject.mealIds = body.mealIds;
+    subObject.departments = body.departments.map((department) => {
       const oldDepartment = oldDepartments.find((item) => item.id === department.id);
       return {
         id: department.id,
         name: department.name.trim(),
+        mealIds: department.mealIds ?? [],
         tables: department.tables.map((table) => {
           const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
           return {
@@ -1632,7 +1676,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
     prunePortionEntries();
     rebuildDistribution();
-    return { kitchens } as T;
+    return { objects } as T;
   }
 
   // --- Порционник (численность на дату + раздача по блюдам) ---
@@ -1643,7 +1687,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
   if (route === '/v1/portions/dishes' && method === 'GET') {
     const date = params.get('date') ?? '';
-    const rows = buildDishDistribution(date, params.get('kitchenId'));
+    const rows = buildDishDistribution(date, params.get('objectId'));
     return {
       date,
       rows,
@@ -1654,7 +1698,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   if (route === '/v1/portions/headcount' && method === 'PATCH') {
     const body = options.body as {
       date: string;
-      facilityId: string;
+      subObjectId: string;
       departmentId: string;
       tableId: string;
       headcount: number;
@@ -1662,7 +1706,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const entries = ensurePortionsDay(body.date);
     const found = entries.find(
       (item) =>
-        item.facilityId === body.facilityId &&
+        item.subObjectId === body.subObjectId &&
         item.departmentId === body.departmentId &&
         item.tableId === body.tableId
     );
@@ -1670,7 +1714,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       found.headcount = Math.max(0, body.headcount);
     } else {
       entries.push({
-        facilityId: body.facilityId,
+        subObjectId: body.subObjectId,
         departmentId: body.departmentId,
         tableId: body.tableId,
         headcount: Math.max(0, body.headcount),
@@ -1911,17 +1955,19 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
 }
 
-const kitchens: KitchenUnit[] = [
+const objects: CateringObject[] = [
   {
-    id: 'kitchen-1',
-    name: 'Центральный пищеблок',
-    facilities: [
+    id: 'object-1',
+    name: 'Центральный объект',
+    mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+    subObjects: [
       {
-        id: 'lpu-1',
+        id: 'sub-1-1',
         name: 'Больница №1',
         address: 'корп. А',
         type: 'hospital',
         kettleNumber: 1,
+        menuSource: 'object',
         departments: [
           {
             id: 'dep-1-1',
@@ -1943,11 +1989,12 @@ const kitchens: KitchenUnit[] = [
         ],
       },
       {
-        id: 'lpu-3',
+        id: 'sub-1-3',
         name: 'Больница №4',
         address: 'корп. Д',
         type: 'hospital',
         kettleNumber: 1,
+        menuSource: 'object',
         departments: [
           {
             id: 'dep-3-1',
@@ -1967,15 +2014,17 @@ const kitchens: KitchenUnit[] = [
     ],
   },
   {
-    id: 'kitchen-2',
-    name: 'Пищеблок №2',
-    facilities: [
+    id: 'object-2',
+    name: 'Объект №2',
+    mealIds: ['breakfast', 'lunch'],
+    subObjects: [
       {
-        id: 'lpu-2',
+        id: 'sub-2-1',
         name: 'Школа №5',
         address: 'корп. Б',
         type: 'school',
         kettleNumber: 2,
+        menuSource: 'object',
         departments: [
           {
             id: 'dep-2-1',
@@ -1996,11 +2045,12 @@ const kitchens: KitchenUnit[] = [
         ],
       },
       {
-        id: 'lpu-5',
+        id: 'sub-2-5',
         name: 'Детский сад №3',
         address: 'ул. Садовая, 5',
         type: 'kindergarten',
         kettleNumber: 2,
+        menuSource: 'own',
         departments: [
           {
             id: 'dep-5-1',
@@ -2020,15 +2070,17 @@ const kitchens: KitchenUnit[] = [
     ],
   },
   {
-    id: 'kitchen-3',
-    name: 'Пищеблок №3',
-    facilities: [
+    id: 'object-3',
+    name: 'Объект №3',
+    mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+    subObjects: [
       {
-        id: 'lpu-4',
+        id: 'sub-3-4',
         name: 'Школа №2',
         address: 'корп. В',
         type: 'school',
         kettleNumber: 3,
+        menuSource: 'object',
         departments: [
           {
             id: 'dep-4-1',
@@ -2049,11 +2101,12 @@ const kitchens: KitchenUnit[] = [
         ],
       },
       {
-        id: 'lpu-6',
+        id: 'sub-3-6',
         name: 'Больница №3',
         address: 'корп. Д',
         type: 'hospital',
         kettleNumber: 3,
+        menuSource: 'object',
         departments: [
           {
             id: 'dep-6-1',
@@ -2078,10 +2131,10 @@ const kitchens: KitchenUnit[] = [
   },
 ];
 
-function findFacility(facilityId: string): Facility | null {
-  for (const unit of kitchens) {
-    const facility = unit.facilities.find((item) => item.id === facilityId);
-    if (facility) return facility;
+function findSubObject(subObjectId: string): SubObject | null {
+  for (const obj of objects) {
+    const subObject = obj.subObjects.find((item) => item.id === subObjectId);
+    if (subObject) return subObject;
   }
   return null;
 }
@@ -2093,17 +2146,18 @@ function rebuildDistribution() {
   const rows: DistributionRow[] = [];
   // Сначала блюдо — одинаковые идут подряд для группировки в таблице.
   for (const dishName of dishes) {
-    for (const unit of kitchens) {
-      for (const facility of unit.facilities) {
-        for (const department of facility.departments) {
+    for (const obj of objects) {
+      for (const subObject of obj.subObjects) {
+        for (const department of subObject.departments) {
           for (const table of department.tables) {
             if (table.headcount <= 0) continue;
             rows.push({
               dishName,
-              facilityName: facility.name,
+              objectName: obj.name,
+              subObjectName: subObject.name,
               departmentName: department.name,
               tableName: table.name,
-              kettleLabel: formatKettle(facility.kettleNumber),
+              kettleLabel: formatKettle(subObject.kettleNumber),
               portions: table.headcount,
             });
           }
@@ -2119,10 +2173,10 @@ rebuildDistribution();
 /** Порционник по датам: ключ YYYY-MM-DD → строки численности. */
 const portionsByDate: Record<string, PortionEntry[]> = {};
 
-function tableExists(facilityId: string, departmentId: string, tableId: string): boolean {
-  const facility = findFacility(facilityId);
-  if (!facility) return false;
-  const department = facility.departments.find((item) => item.id === departmentId);
+function tableExists(subObjectId: string, departmentId: string, tableId: string): boolean {
+  const subObject = findSubObject(subObjectId);
+  if (!subObject) return false;
+  const department = subObject.departments.find((item) => item.id === departmentId);
   if (!department) return false;
   return department.tables.some((item) => item.id === tableId);
 }
@@ -2130,7 +2184,7 @@ function tableExists(facilityId: string, departmentId: string, tableId: string):
 function prunePortionEntries() {
   for (const date of Object.keys(portionsByDate)) {
     portionsByDate[date] = portionsByDate[date].filter((entry) =>
-      tableExists(entry.facilityId, entry.departmentId, entry.tableId)
+      tableExists(entry.subObjectId, entry.departmentId, entry.tableId)
     );
   }
 }
@@ -2144,12 +2198,12 @@ function ensurePortionsDay(date: string): PortionEntry[] {
       return portionsByDate[date];
     }
     const entries: PortionEntry[] = [];
-    for (const unit of kitchens) {
-      for (const facility of unit.facilities) {
-        for (const department of facility.departments) {
+    for (const obj of objects) {
+      for (const subObject of obj.subObjects) {
+        for (const department of subObject.departments) {
           for (const table of department.tables) {
             entries.push({
-              facilityId: facility.id,
+              subObjectId: subObject.id,
               departmentId: department.id,
               tableId: table.id,
               headcount: table.headcount,
@@ -2163,23 +2217,23 @@ function ensurePortionsDay(date: string): PortionEntry[] {
   return portionsByDate[date];
 }
 
-function buildDishDistribution(date: string, kitchenId: string | null): DishDistributionRow[] {
+function buildDishDistribution(date: string, objectId: string | null): DishDistributionRow[] {
   const dishes: Array<{ name: string; mealType: string }> = [
     { name: 'Каша рисовая молочная', mealType: 'Завтрак' },
     { name: 'Суп картофельный с мясом', mealType: 'Обед' },
     { name: 'Котлета куриная паровая', mealType: 'Ужин' },
   ];
   const entries = ensurePortionsDay(date);
-  const units = kitchenId ? kitchens.filter((unit) => unit.id === kitchenId) : kitchens;
+  const units = objectId ? objects.filter((obj) => obj.id === objectId) : objects;
   const rows: DishDistributionRow[] = [];
   for (const dish of dishes) {
     for (const unit of units) {
-      for (const facility of unit.facilities) {
-        for (const department of facility.departments) {
+      for (const subObject of unit.subObjects) {
+        for (const department of subObject.departments) {
           for (const table of department.tables) {
             const entry = entries.find(
               (item) =>
-                item.facilityId === facility.id &&
+                item.subObjectId === subObject.id &&
                 item.departmentId === department.id &&
                 item.tableId === table.id
             );
@@ -2188,7 +2242,7 @@ function buildDishDistribution(date: string, kitchenId: string | null): DishDist
             rows.push({
               dishName: dish.name,
               mealType: dish.mealType,
-              facilityName: facility.name,
+              subObjectName: subObject.name,
               departmentName: department.name,
               tableName: table.name,
               portions,

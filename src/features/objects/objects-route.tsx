@@ -8,39 +8,40 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useKitchen } from './api';
-import { EditFacilityDialog } from './objects-dialog';
-import { type Facility, type KitchenUnit } from './types';
+import { useCateringObjects } from './api';
+import { EditSubObjectDialog } from './objects-dialog';
+import { type CateringObject, type SubObject } from './types';
 import './objects-route.css';
 
 function groupRowClassNames(row: {
   isLastInDepartment: boolean;
-  isLastInFacility: boolean;
+  isLastInSubObject: boolean;
   nextShowDepartment: boolean;
-  nextShowFacility: boolean;
+  nextShowSubObject: boolean;
 }): string[] {
   const classes: string[] = [];
   // Внутри одного отделения — без линий.
   if (!row.isLastInDepartment) classes.push('objects-group-row_no-divider');
-  // Последняя строка отделения, следующее — в том же ЛПУ → линия от «Отделение».
-  if (row.isLastInDepartment && row.nextShowDepartment && !row.nextShowFacility) {
+  // Последняя строка отделения, следующее — в том же подобъекте → линия от «Отделение».
+  if (row.isLastInDepartment && row.nextShowDepartment && !row.nextShowSubObject) {
     classes.push('objects-group-row_department-divider');
   }
-  // Последняя строка ЛПУ → полная линия (все колонки).
-  if (row.isLastInFacility) {
+  // Последняя строка подобъекта → полная линия (все колонки).
+  if (row.isLastInSubObject) {
     classes.push('objects-group-row_facility-divider');
   }
   return classes;
 }
 
 /**
- * «Объекты»: справочник пищеблок → ЛПУ → отделения → столы.
+ * «Объекты»: справочник объект → подобъект → отделения → столы.
  * Численность на дату — в «Порционнике».
+ * У объекта своё меню; у подобъекта — меню объекта либо собственное.
  */
 export function ObjectsRoute() {
   const { current } = useOrganizations();
-  const kitchen = useKitchen();
-  const [selectedKitchenId, setSelectedKitchenId] = useState<string | null>(null);
+  const objects = useCateringObjects();
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
   if (current === null) {
     return (
@@ -50,7 +51,7 @@ export function ObjectsRoute() {
     );
   }
 
-  if (kitchen.isPending) {
+  if (objects.isPending) {
     return (
       <Flex direction="column" style={{ padding: 16 }}>
         <LoadingState />
@@ -58,82 +59,83 @@ export function ObjectsRoute() {
     );
   }
 
-  if (kitchen.isError || !kitchen.data) {
+  if (objects.isError || !objects.data) {
     return (
       <Flex direction="column" style={{ padding: 16 }}>
-        <ErrorState error={kitchen.error} onRetry={() => void kitchen.refetch()} />
+        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       </Flex>
     );
   }
 
-  const kitchens = kitchen.data.kitchens;
-  const activeKitchenId = selectedKitchenId ?? kitchens[0]?.id ?? null;
-  const facilities = activeKitchenId
-    ? (kitchens.find((k) => k.id === activeKitchenId)?.facilities ?? [])
-    : kitchens.flatMap((k) => k.facilities);
+  const objectList = objects.data.objects;
+  const activeObjectId = selectedObjectId ?? objectList[0]?.id ?? null;
+  const subObjects = activeObjectId
+    ? (objectList.find((o) => o.id === activeObjectId)?.subObjects ?? [])
+    : objectList.flatMap((o) => o.subObjects);
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
-      <FacilitiesCard
-        kitchens={kitchens}
-        facilities={facilities}
-        selectedKitchenId={activeKitchenId}
-        onSelectKitchen={setSelectedKitchenId}
+      <SubObjectsCard
+        objects={objectList}
+        subObjects={subObjects}
+        selectedObjectId={activeObjectId}
+        onSelectObject={setSelectedObjectId}
       />
     </Flex>
   );
 }
 
-function FacilitiesCard({
-  kitchens,
-  facilities,
-  selectedKitchenId,
-  onSelectKitchen,
+function SubObjectsCard({
+  objects,
+  subObjects,
+  selectedObjectId,
+  onSelectObject,
 }: {
-  kitchens: KitchenUnit[];
-  facilities: Facility[];
-  selectedKitchenId: string | null;
-  onSelectKitchen: (id: string | null) => void;
+  objects: CateringObject[];
+  subObjects: SubObject[];
+  selectedObjectId: string | null;
+  onSelectObject: (id: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const selectedKitchen = kitchens.find((k) => k.id === selectedKitchenId) ?? kitchens[0] ?? null;
+  const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? objects[0] ?? null;
 
   const rows = useMemo(() => {
     const result: Array<{
       id: string;
-      facilityId: string;
-      facilityName: string;
+      subObjectId: string;
+      subObjectName: string;
       departmentId: string;
       departmentName: string;
       tableName: string;
-      showFacility: boolean;
+      showSubObject: boolean;
       showDepartment: boolean;
       isLastInDepartment: boolean;
-      isLastInFacility: boolean;
+      isLastInSubObject: boolean;
       nextShowDepartment: boolean;
-      nextShowFacility: boolean;
+      nextShowSubObject: boolean;
     }> = [];
-    for (const facility of facilities) {
-      for (const department of facility.departments) {
+    for (const subObject of subObjects) {
+      for (const department of subObject.departments) {
         for (const table of department.tables) {
           const prevRow = result[result.length - 1];
-          const showFacility = !prevRow || prevRow.facilityId !== facility.id;
-          const showDepartment = showFacility || !prevRow || prevRow.departmentId !== department.id;
+          const showSubObject = !prevRow || prevRow.subObjectId !== subObject.id;
+          const showDepartment =
+            showSubObject || !prevRow || prevRow.departmentId !== department.id;
           result.push({
             id: table.id,
-            facilityId: facility.id,
-            facilityName: facility.name,
+            subObjectId: subObject.id,
+            subObjectName: subObject.name,
             departmentId: department.id,
             departmentName: department.name,
             tableName: table.name,
-            showFacility,
+            showSubObject,
             showDepartment,
             isLastInDepartment: false,
-            isLastInFacility: false,
+            isLastInSubObject: false,
             nextShowDepartment: false,
-            nextShowFacility: false,
+            nextShowSubObject: false,
           });
         }
       }
@@ -143,33 +145,33 @@ function FacilitiesCard({
       const row = result[i];
       const next = result[i + 1];
       row.isLastInDepartment = !next || next.departmentId !== row.departmentId;
-      row.isLastInFacility = !next || next.facilityId !== row.facilityId;
+      row.isLastInSubObject = !next || next.subObjectId !== row.subObjectId;
       row.nextShowDepartment = next?.showDepartment ?? false;
-      row.nextShowFacility = next?.showFacility ?? false;
+      row.nextShowSubObject = next?.showSubObject ?? false;
     }
     return result;
-  }, [facilities]);
+  }, [subObjects]);
 
   return (
     <>
       <Flex alignItems="center" justifyContent="space-between" gap={2}>
-        {kitchens.length > 0 && (
+        {objects.length > 0 && (
           <Select
             size="l"
             width={360}
-            label="Пищеблок:"
-            value={selectedKitchenId ? [selectedKitchenId] : []}
-            onUpdate={(value) => onSelectKitchen(value[0] ?? null)}
-            placeholder="Все пищеблоки"
-            options={kitchens.map((unit) => ({
-              value: unit.id,
-              content: unit.name,
+            label="Объект:"
+            value={selectedObjectId ? [selectedObjectId] : []}
+            onUpdate={(value) => onSelectObject(value[0] ?? null)}
+            placeholder="Все объекты"
+            options={objects.map((obj) => ({
+              value: obj.id,
+              content: obj.name,
             }))}
           />
         )}
         <Button view="normal-contrast" size="l" onClick={() => setCreating(true)}>
           <Icon data={Plus} size={16} />
-          Добавить пищеблок
+          Добавить объект
         </Button>
       </Flex>
 
@@ -182,13 +184,13 @@ function FacilitiesCard({
         >
           <Flex alignItems="center" gap={2}>
             <Icon data={House} size={16} />
-            <Text variant="subheader-2">Пищеблок</Text>
+            <Text variant="subheader-2">Объект</Text>
           </Flex>
-          {kitchens.length > 0 && (
+          {objects.length > 0 && (
             <Button
               view="normal"
               size="m"
-              disabled={selectedKitchen === null}
+              disabled={selectedObject === null}
               onClick={() => setEditing(true)}
             >
               <Icon data={Pencil} size={16} />
@@ -204,10 +206,10 @@ function FacilitiesCard({
             paddingBottom: 8,
           }}
         >
-          {facilities.length === 0 ? (
-            <EmptyState text="Учреждения пока не добавлены" />
+          {subObjects.length === 0 ? (
+            <EmptyState text="Подобъекты пока не добавлены" />
           ) : rows.length === 0 ? (
-            <EmptyState text="В этом пищеблоке нет групп/классов" />
+            <EmptyState text="В этом объекте нет групп/классов" />
           ) : (
             <div className="admin-table-wrap">
               <Table
@@ -217,17 +219,17 @@ function FacilitiesCard({
                 getRowClassNames={(row) =>
                   groupRowClassNames({
                     isLastInDepartment: row.isLastInDepartment,
-                    isLastInFacility: row.isLastInFacility,
+                    isLastInSubObject: row.isLastInSubObject,
                     nextShowDepartment: row.nextShowDepartment,
-                    nextShowFacility: row.nextShowFacility,
+                    nextShowSubObject: row.nextShowSubObject,
                   })
                 }
                 columns={[
                   {
-                    id: 'facilityName',
-                    name: 'Учреждение',
+                    id: 'subObjectName',
+                    name: 'Подобъект',
                     width: '35%',
-                    template: (row) => (row.showFacility ? row.facilityName : null),
+                    template: (row) => (row.showSubObject ? row.subObjectName : null),
                     placeholder: () => null,
                   },
                   {
@@ -249,8 +251,8 @@ function FacilitiesCard({
         </div>
       </Card>
 
-      <EditFacilityDialog
-        kitchen={editing ? selectedKitchen : null}
+      <EditSubObjectDialog
+        object={editing ? selectedObject : null}
         mode={creating ? 'create' : 'edit'}
         onClose={() => {
           setEditing(false);

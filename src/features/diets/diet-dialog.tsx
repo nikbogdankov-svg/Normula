@@ -4,6 +4,7 @@ import { Pencil, TrashBin } from '@gravity-ui/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeleteDiet, useUpdateDiet } from './api';
 import { useDietForm } from './diet-form';
+import { MEALS } from '@/features/menu/types';
 import type { Diet } from './types';
 import './diets-route.css';
 
@@ -182,6 +183,25 @@ export function DietDialog({
                   view.appliesTo.map((type) => (
                     <span key={type} className="diet-dialog__tag">
                       {FACILITY_TYPE_LABELS[type] ?? type}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="diet-dialog__meta">
+            <div className="diet-dialog__applies-row">
+              <Text variant="body-2" className="diet-dialog__meta-label">
+                Приёмы пищи:
+              </Text>
+              <div className="diet-dialog__tags">
+                {view.mealIds.length === 0 ? (
+                  <Text variant="body-2">Все</Text>
+                ) : (
+                  view.mealIds.map((meal) => (
+                    <span key={meal} className="diet-dialog__tag">
+                      {MEALS.find((item) => item.id === meal)?.label ?? meal}
                     </span>
                   ))
                 )}

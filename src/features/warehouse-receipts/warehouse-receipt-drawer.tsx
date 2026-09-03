@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useKitchen } from '@/features/objects/api';
+import { useCateringObjects } from '@/features/objects/api';
 import type { ReceiptItem, WarehouseReceipt } from './types';
 import './warehouse-receipt-drawer.css';
 
@@ -75,7 +75,7 @@ export function ReceiptDrawer({
   onEdit?: (receipt: WarehouseReceipt) => void;
 }) {
   const height = useDrawerHeight();
-  const kitchens = useKitchen();
+  const objects = useCateringObjects();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<WarehouseReceipt | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -170,11 +170,11 @@ export function ReceiptDrawer({
               <div className="warehouse-receipt-drawer__unit" style={{ marginBottom: 12 }}>
                 <Flex alignItems="center" gap={1}>
                   <Text variant="body-3" color="secondary">
-                    Пищеблок:
+                    Объект:
                   </Text>
                   <Text variant="body-3">
                     {view.unitId
-                      ? (kitchens.data?.kitchens.find((k) => k.id === view.unitId)?.name ?? '—')
+                      ? (objects.data?.objects.find((k) => k.id === view.unitId)?.name ?? '—')
                       : '—'}
                   </Text>
                 </Flex>

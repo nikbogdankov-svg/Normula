@@ -1,21 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
 import type {
+  CateringObject,
+  CateringObjectsResponse,
   DistributionPreviewResponse,
-  KitchenResponse,
-  KitchenUnit,
-  UpdateFacilityRequest,
+  UpdateObjectMenuRequest,
+  UpdateSubObjectRequest,
   UpdateTableHeadcountRequest,
 } from './types';
 
 const KEY = 'objects';
 
-export function useKitchen() {
+export function useCateringObjects() {
   const api = useApi();
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, 'kitchen'],
-    queryFn: () => api.request<KitchenResponse>('/v1/objects/kitchen'),
+    queryKey: [KEY, api.organizationId, 'objects'],
+    queryFn: () => api.request<CateringObjectsResponse>('/v1/objects'),
     enabled: api.organizationId !== null,
   });
 }
@@ -44,7 +45,7 @@ export function useUpdateTableHeadcount() {
 
   return useMutation({
     mutationFn: (body: UpdateTableHeadcountRequest) =>
-      api.request<KitchenResponse>('/v1/objects/tables/headcount', {
+      api.request<CateringObjectsResponse>('/v1/objects/tables/headcount', {
         method: 'PATCH',
         body,
       }),
@@ -52,13 +53,13 @@ export function useUpdateTableHeadcount() {
   });
 }
 
-export function useUpdateFacility() {
+export function useUpdateSubObject() {
   const api = useApi();
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: UpdateFacilityRequest }) =>
-      api.request<KitchenResponse>(`/v1/objects/facilities/${id}`, {
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateSubObjectRequest }) =>
+      api.request<CateringObjectsResponse>(`/v1/objects/sub-objects/${id}`, {
         method: 'PATCH',
         body: patch,
       }),
@@ -66,15 +67,29 @@ export function useUpdateFacility() {
   });
 }
 
-export function useCreateKitchen() {
+export function useCreateObject() {
   const api = useApi();
   const invalidate = useInvalidate();
 
   return useMutation({
     mutationFn: (name: string) =>
-      api.request<{ kitchen: KitchenUnit }>('/v1/objects/kitchen', {
+      api.request<{ object: CateringObject }>('/v1/objects', {
         method: 'POST',
         body: { name },
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateObjectMenu() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: (body: UpdateObjectMenuRequest) =>
+      api.request<CateringObjectsResponse>('/v1/objects/menu', {
+        method: 'PATCH',
+        body,
       }),
     onSuccess: invalidate,
   });

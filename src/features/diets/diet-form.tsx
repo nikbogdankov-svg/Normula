@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Checkbox, Flex, Text, TextInput } from '@gravity-ui/uikit';
 import type { FacilityType } from '@/features/objects/types';
+import { MEALS, type MealId } from '@/features/menu/types';
 import type { CreateDietRequest, Diet } from './types';
 
 const FACILITY_TYPE_OPTIONS: Array<{ value: FacilityType; label: string }> = [
@@ -17,6 +18,7 @@ function parseDecimal(value: string): number {
 type Draft = {
   name: string;
   appliesTo: FacilityType[];
+  mealIds: MealId[];
   pricePerDay: string;
   kcal: string;
   protein: string;
@@ -29,6 +31,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
   const [draft, setDraft] = useState<Draft>({
     name: '',
     appliesTo: [],
+    mealIds: [],
     pricePerDay: '',
     kcal: '',
     protein: '',
@@ -40,6 +43,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     setDraft({
       name: initial?.name ?? '',
       appliesTo: initial ? [...initial.appliesTo] : [],
+      mealIds: initial ? [...initial.mealIds] : [],
       pricePerDay: initial ? String(initial.pricePerDay) : '',
       kcal: initial ? String(initial.kcal) : '',
       protein: initial ? String(initial.protein) : '',
@@ -65,9 +69,18 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
         : [...current.appliesTo, type],
     }));
 
+  const toggleMeal = (meal: MealId) =>
+    setDraft((current) => ({
+      ...current,
+      mealIds: current.mealIds.includes(meal)
+        ? current.mealIds.filter((item) => item !== meal)
+        : [...current.mealIds, meal],
+    }));
+
   const getBody = (): CreateDietRequest => ({
     name: draft.name.trim(),
     appliesTo: draft.appliesTo,
+    mealIds: draft.mealIds,
     pricePerDay: parseDecimal(draft.pricePerDay),
     kcal: parseDecimal(draft.kcal),
     protein: parseDecimal(draft.protein),
@@ -97,6 +110,22 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             onUpdate={() => toggleType(option.value)}
           >
             {option.label}
+          </Checkbox>
+        ))}
+      </Flex>
+
+      <Flex direction="column" gap={1}>
+        <Text variant="body-2" color="secondary">
+          Для каких приёмов пищи доступна диета:
+        </Text>
+        {MEALS.map((meal) => (
+          <Checkbox
+            key={meal.id}
+            size="l"
+            checked={draft.mealIds.includes(meal.id)}
+            onUpdate={() => toggleMeal(meal.id)}
+          >
+            {meal.label}
           </Checkbox>
         ))}
       </Flex>

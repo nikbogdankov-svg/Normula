@@ -1,3 +1,4 @@
+import type { MealId } from '@/features/menu/types';
 import type { FacilityType } from '@/features/objects/types';
 
 /**
@@ -16,6 +17,8 @@ export interface Diet {
   name: string;
   /** Типы учреждений, для которых доступна диета. */
   appliesTo: FacilityType[];
+  /** Приёмы пищи, для которых доступна диета (пусто — все). */
+  mealIds: MealId[];
   /** Норма цены на день на человека, ₽. */
   pricePerDay: number;
   /** Норма калорийности на день, ккал. */
@@ -37,6 +40,7 @@ export interface ListDietsResponse {
 export interface CreateDietRequest {
   name: string;
   appliesTo: FacilityType[];
+  mealIds: MealId[];
   pricePerDay: number;
   kcal: number;
   protein: number;

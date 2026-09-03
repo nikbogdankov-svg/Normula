@@ -14,7 +14,7 @@ import {
 } from '@gravity-ui/icons';
 import { useCreateReceipt, useUpdateReceipt } from './api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useKitchen } from '@/features/objects/api';
+import { useCateringObjects } from '@/features/objects/api';
 import type { CreateReceiptRequest, ReceiptItem, WarehouseReceipt } from './types';
 import './create-receipt-drawer.css';
 
@@ -273,7 +273,7 @@ export function CreateReceiptDrawer({
   const create = useCreateReceipt();
   const update = useUpdateReceipt();
   const toaster = useToaster();
-  const kitchens = useKitchen();
+  const objects = useCateringObjects();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -424,10 +424,10 @@ export function CreateReceiptDrawer({
               <div style={{ flex: 1 }}>
                 <Select
                   size="l"
-                  label="Пищеблок:"
-                  placeholder="Выберите пищеблок"
+                  label="Объект:"
+                  placeholder="Выберите объект"
                   value={unitId ? [unitId] : []}
-                  options={(kitchens.data?.kitchens ?? []).map((k) => ({
+                  options={(objects.data?.objects ?? []).map((k) => ({
                     value: k.id,
                     content: k.name,
                   }))}
