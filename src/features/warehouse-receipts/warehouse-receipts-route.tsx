@@ -93,6 +93,7 @@ export function WarehouseReceiptsRoute() {
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<WarehouseReceipt | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<WarehouseReceipt | null>(null);
 
   const { data, isLoading, error } = useReceipts(MOCK_WAREHOUSE_ID);
 
@@ -170,11 +171,22 @@ export function WarehouseReceiptsRoute() {
         />
       )}
 
-      <ReceiptDrawer receipt={opened} onClose={() => setOpened(null)} />
+      <ReceiptDrawer
+        receipt={opened}
+        onClose={() => setOpened(null)}
+        onEdit={(receipt) => {
+          setEditing(receipt);
+          setOpened(null);
+        }}
+      />
       <CreateReceiptDrawer
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        open={createOpen || Boolean(editing)}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditing(null);
+        }}
         warehouseId={MOCK_WAREHOUSE_ID}
+        initial={editing}
       />
     </div>
   );

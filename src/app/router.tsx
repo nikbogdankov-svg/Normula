@@ -16,6 +16,8 @@ import { ProfileRoute } from '@/features/profile/profile-route';
 import { MenuRoute } from '@/features/menu/menu-route';
 import { ObjectsRoute } from '@/features/objects/objects-route';
 import { PortionsRoute } from '@/features/portions/portions-route';
+import { ProductsRoute } from '@/features/products/products-route';
+import { DietsRoute } from '@/features/diets/diets-route';
 import { JournalsRoute } from '@/features/journals/journals-route';
 import { WarehouseReceiptsRoute } from '@/features/warehouse-receipts/warehouse-receipts-route';
 import { WarehouseBalancesRoute } from '@/features/warehouse-balances/warehouse-balances-route';
@@ -37,6 +39,8 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/menu': <MenuRoute />,
   '/app/objects': <ObjectsRoute />,
   '/app/portions': <PortionsRoute />,
+  '/app/products': <ProductsRoute />,
+  '/app/diets': <DietsRoute />,
   '/app/journals': <JournalsRoute />,
   '/app/warehouse-receipts': <WarehouseReceiptsRoute />,
   '/app/warehouse-balances': <WarehouseBalancesRoute />,

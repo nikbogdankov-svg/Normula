@@ -119,7 +119,9 @@ export function DishPickerDialog({
             )}
             <Text variant="subheader-2" color={overLimit ? 'danger' : 'primary'}>
               Цена дня: {formatMetric(dayPrice)} / {formatMetric(priceLimit)} ₽
-              {overLimit ? ` · превышение на ${formatMetric(Math.abs(remaining))} ₽` : ` · осталось ${formatMetric(remaining)} ₽`}
+              {overLimit
+                ? ` · превышение на ${formatMetric(Math.abs(remaining))} ₽`
+                : ` · осталось ${formatMetric(remaining)} ₽`}
             </Text>
           </Flex>
 
@@ -162,8 +164,7 @@ export function DishPickerDialog({
                         {recipe.name}
                       </Text>
                       <Text variant="body-1" color={wouldExceed ? 'secondary' : 'secondary'}>
-                        {recipe.kcal} ккал · {recipe.price} ₽
-                        {wouldExceed && ' · превысит лимит'}
+                        {recipe.kcal} ккал · {recipe.price} ₽{wouldExceed && ' · превысит лимит'}
                       </Text>
                     </Flex>
                     <Button type="button" view="flat" size="s" onClick={() => add(recipe.id)}>
@@ -188,7 +189,13 @@ export function DishPickerDialog({
           <Button type="button" view="outlined" size="l" onClick={onClose}>
             Отмена
           </Button>
-          <Button type="button" view="action" size="l" loading={saving} onClick={() => onSave(draft)}>
+          <Button
+            type="button"
+            view="action"
+            size="l"
+            loading={saving}
+            onClick={() => onSave(draft)}
+          >
             <Icon data={FloppyDisk} size={16} />
             Сохранить
           </Button>

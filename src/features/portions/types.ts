@@ -4,7 +4,7 @@
  */
 
 export interface PortionEntry {
-  facilityId: string;
+  subObjectId: string;
   departmentId: string;
   tableId: string;
   headcount: number;
@@ -17,7 +17,7 @@ export interface PortionsDayResponse {
 
 export interface UpdatePortionHeadcountRequest {
   date: string;
-  facilityId: string;
+  subObjectId: string;
   departmentId: string;
   tableId: string;
   headcount: number;
@@ -30,7 +30,7 @@ export type PortionsView = 'organizations' | 'dishes';
 export interface DishDistributionRow {
   dishName: string;
   mealType: string;
-  facilityName: string;
+  subObjectName: string;
   departmentName: string;
   tableName: string;
   portions: number;

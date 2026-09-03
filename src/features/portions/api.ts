@@ -19,15 +19,15 @@ export function usePortionsDay(date: string) {
   });
 }
 
-export function useDishDistribution(date: string, kitchenId: string | null) {
+export function useDishDistribution(date: string, objectId: string | null) {
   const api = useApi();
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, 'dishes', date, kitchenId],
+    queryKey: [KEY, api.organizationId, 'dishes', date, objectId],
     queryFn: () => {
       let path = `/v1/portions/dishes?date=${encodeURIComponent(date)}`;
-      if (kitchenId) {
-        path += `&kitchenId=${encodeURIComponent(kitchenId)}`;
+      if (objectId) {
+        path += `&objectId=${encodeURIComponent(objectId)}`;
       }
       return api.request<DishDistributionResponse>(path);
     },
@@ -73,7 +73,7 @@ function upsertEntry(
 ): PortionsDayResponse {
   const rest = day.entries.filter(
     (entry) =>
-      entry.facilityId !== body.facilityId ||
+      entry.subObjectId !== body.subObjectId ||
       entry.departmentId !== body.departmentId ||
       entry.tableId !== body.tableId
   );
@@ -82,7 +82,7 @@ function upsertEntry(
     entries: [
       ...rest,
       {
-        facilityId: body.facilityId,
+        subObjectId: body.subObjectId,
         departmentId: body.departmentId,
         tableId: body.tableId,
         headcount: body.headcount,

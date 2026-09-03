@@ -1,6 +1,8 @@
 /* Нижний drawer деталей накладной. */
 .warehouse-receipt-drawer {
-  z-index: 100000;
+  /* Ниже редактора (995) и поп-апов Select (1000), чтобы при переходе
+     «Редактировать» редактор всегда был поверх фона деталей. */
+  z-index: 990;
   background-color: rgba(0, 0, 0, 0.75);
 }
 
@@ -67,6 +69,14 @@
   background: #f2f2f2;
 }
 
+/* Подпись «Пищеблок» — той же ширины, что и таблица товаров. */
+.warehouse-receipt-drawer__unit {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
 /* Список карточек приёмочного контроля в стиле ТТК. */
 .warehouse-receipt-drawer__items {
   display: flex;
@@ -80,7 +90,9 @@
 /* Шапка колонок над карточками (как шапка таблицы ТТК). */
 .warehouse-receipt-drawer__items-head {
   display: grid;
-  grid-template-columns: minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr) minmax(80px, 0.5fr) 40px;
+  grid-template-columns:
+    minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr)
+    minmax(80px, 0.5fr) 40px;
   gap: 8px;
   align-items: center;
   padding: 0 16px;
@@ -103,7 +115,9 @@
 /* Основная строка карточки: поля + шеврон. */
 .warehouse-receipt-drawer__card-main {
   display: grid;
-  grid-template-columns: minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr) minmax(80px, 0.5fr) 40px;
+  grid-template-columns:
+    minmax(160px, 28%) minmax(70px, 0.5fr) minmax(110px, 0.9fr) minmax(200px, 1.4fr)
+    minmax(80px, 0.5fr) 40px;
   align-items: center;
   gap: 8px;
   padding: 12px 12px 12px 16px;
@@ -152,3 +166,21 @@
   gap: 4px;
 }
 
+/* Футер drawer'а с действиями. */
+.warehouse-receipt-drawer__footer {
+  flex-shrink: 0;
+  padding-block: 16px;
+  border-top: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+.warehouse-receipt-drawer__footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}

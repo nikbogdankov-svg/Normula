@@ -29,13 +29,13 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useKitchen } from '@/features/objects/api';
-import type { Facility } from '@/features/objects/types';
+import { useCateringObjects } from '@/features/objects/api';
+import type { SubObject } from '@/features/objects/types';
 import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
 
-const ALL_FACILITIES = '__all';
+const ALL_SUBOBJECTS = '__all';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,7 +45,7 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function PortionsRoute() {
   const { current } = useOrganizations();
-  const kitchen = useKitchen();
+  const objects = useCateringObjects();
   // Дата живёт в адресе страницы: перезагрузка или редирект (например,
   // обновление токена Logto) не сбрасывают выбор на сегодня.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,7 +57,7 @@ export function PortionsRoute() {
   };
 
   const [view, setView] = useState<PortionsView>('organizations');
-  const [selectedId, setSelectedId] = useState<string>(ALL_FACILITIES);
+  const [selectedId, setSelectedId] = useState<string>(ALL_SUBOBJECTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [dishSearchQuery, setDishSearchQuery] = useState('');
   const portions = usePortionsDay(date);
@@ -66,12 +66,12 @@ export function PortionsRoute() {
   const update = useUpdatePortionHeadcount();
   const toaster = useToaster();
 
-  // Пищеблоки организации; селект готов к произвольному числу.
-  const kitchens = useMemo(() => kitchen.data?.kitchens ?? [], [kitchen.data]);
-  const [selectedKitchenId, setSelectedKitchenId] = useState<string | null>(null);
-  const activeKitchenId = selectedKitchenId ?? kitchens[0]?.id ?? null;
+  // Объекты организации; селект готов к произвольному числу.
+  const objectsList = useMemo(() => objects.data?.objects ?? [], [objects.data]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
 
-  const dishes = useDishDistribution(date, activeKitchenId);
+  const dishes = useDishDistribution(date, activeObjectId);
 
   if (current === null) {
     return (
@@ -81,7 +81,7 @@ export function PortionsRoute() {
     );
   }
 
-  if (kitchen.isPending) {
+  if (objects.isPending) {
     return (
       <Flex direction="column" style={{ padding: 16 }}>
         <LoadingState />
@@ -89,29 +89,29 @@ export function PortionsRoute() {
     );
   }
 
-  if (kitchen.isError || !kitchen.data) {
+  if (objects.isError || !objects.data) {
     return (
       <Flex direction="column" style={{ padding: 16 }}>
-        <ErrorState error={kitchen.error} onRetry={() => void kitchen.refetch()} />
+        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       </Flex>
     );
   }
 
-  const facilities = kitchen.data.kitchens.flatMap((unit) => unit.facilities);
+  const subObjects = objects.data.objects.flatMap((unit) => unit.subObjects);
   const filteredFacilities = searchQuery
-    ? facilities.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : facilities;
-  const showAll = selectedId === ALL_FACILITIES;
+    ? subObjects.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : subObjects;
+  const showAll = selectedId === ALL_SUBOBJECTS;
   const selected = showAll
     ? null
-    : (facilities.find((facility) => facility.id === selectedId) ?? facilities[0] ?? null);
+    : (subObjects.find((subObject) => subObject.id === selectedId) ?? subObjects[0] ?? null);
 
   const isFutureDate = date > todayIso();
   /** null — записи ещё нет (например, будущая дата): инпут показываем пустым. */
-  const headcountOf = (facilityId: string, departmentId: string, tableId: string) => {
+  const headcountOf = (subObjectId: string, departmentId: string, tableId: string) => {
     const entry = portions.data?.entries.find(
       (item) =>
-        item.facilityId === facilityId &&
+        item.subObjectId === subObjectId &&
         item.departmentId === departmentId &&
         item.tableId === tableId
     );
@@ -125,7 +125,7 @@ export function PortionsRoute() {
       update.mutate(
         {
           date,
-          facilityId: entry.facilityId,
+          subObjectId: entry.subObjectId,
           departmentId: entry.departmentId,
           tableId: entry.tableId,
           headcount: entry.headcount,
@@ -175,7 +175,7 @@ export function PortionsRoute() {
           value={view}
           onUpdate={(value) => setView(value as PortionsView)}
         >
-          <SegmentedRadioGroup.Option value="organizations" content="По ЛПУ" />
+          <SegmentedRadioGroup.Option value="organizations" content="По подобъектам" />
           <SegmentedRadioGroup.Option value="dishes" content="По блюдам" />
         </SegmentedRadioGroup>
       </Flex>
@@ -191,15 +191,15 @@ export function PortionsRoute() {
           <Flex alignItems="center" gap={2}>
             <Icon data={Receipt} size={16} />
             <Text variant="subheader-2">
-              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по ЛПУ'}
+              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по подобъектам'}
             </Text>
           </Flex>
           <Flex alignItems="center" gap={2}>
-            {view === 'organizations' && facilities.length > 0 && (
+            {view === 'organizations' && subObjects.length > 0 && (
               <>
                 <TextInput
                   size="m"
-                  placeholder="Поиск по ЛПУ..."
+                  placeholder="Поиск по подобъектам..."
                   value={searchQuery}
                   onUpdate={setSearchQuery}
                   hasClear
@@ -215,22 +215,22 @@ export function PortionsRoute() {
                 <Select
                   size="m"
                   width={280}
-                  label="ЛПУ:"
-                  title="Организация:"
-                  value={[showAll ? ALL_FACILITIES : (selected?.id ?? ALL_FACILITIES)]}
-                  onUpdate={(value) => setSelectedId(value[0] ?? ALL_FACILITIES)}
+                  label="Подобъект:"
+                  title="Подобъект:"
+                  value={[showAll ? ALL_SUBOBJECTS : (selected?.id ?? ALL_SUBOBJECTS)]}
+                  onUpdate={(value) => setSelectedId(value[0] ?? ALL_SUBOBJECTS)}
                   placeholder="Выберите школу, например школа 5"
                   options={[
-                    { value: ALL_FACILITIES, content: 'Все' },
-                    ...filteredFacilities.map((facility) => ({
-                      value: facility.id,
-                      content: facility.name,
+                    { value: ALL_SUBOBJECTS, content: 'Все' },
+                    ...filteredFacilities.map((subObject) => ({
+                      value: subObject.id,
+                      content: subObject.name,
                     })),
                   ]}
                 />
               </>
             )}
-            {view === 'dishes' && kitchens.length > 0 && (
+            {view === 'dishes' && objectsList.length > 0 && (
               <>
                 <TextInput
                   size="m"
@@ -250,11 +250,11 @@ export function PortionsRoute() {
                 <Select
                   size="m"
                   width={280}
-                  label="Пищеблок:"
-                  title="Пищеблок:"
-                  value={activeKitchenId ? [activeKitchenId] : []}
-                  onUpdate={(value) => setSelectedKitchenId(value[0] ?? null)}
-                  options={kitchens.map((unit) => ({
+                  label="Объект:"
+                  title="Объект:"
+                  value={activeObjectId ? [activeObjectId] : []}
+                  onUpdate={(value) => setSelectedObjectId(value[0] ?? null)}
+                  options={objectsList.map((unit) => ({
                     value: unit.id,
                     content: unit.name,
                   }))}
@@ -289,7 +289,7 @@ export function PortionsRoute() {
                   </Button>
                   {/* Кнопку заполнения показываем, пока день пуст; после
                       заполнения остаются только надпись и переход на сегодня. */}
-                  {facilities.length > 0 && (portions.data?.entries.length ?? 0) === 0 && (
+                  {subObjects.length > 0 && (portions.data?.entries.length ?? 0) === 0 && (
                     <Button
                       size="s"
                       view="action"
@@ -307,24 +307,24 @@ export function PortionsRoute() {
               {portions.isError && (
                 <ErrorState error={portions.error} onRetry={() => void portions.refetch()} />
               )}
-              {!portions.isPending && !portions.isError && facilities.length === 0 && (
-                <EmptyState text="Сначала добавьте ЛПУ в разделе «Объекты»" />
+              {!portions.isPending && !portions.isError && subObjects.length === 0 && (
+                <EmptyState text="Сначала добавьте подобъекты в разделе «Объекты»" />
               )}
-              {!portions.isPending && !portions.isError && facilities.length > 0 && showAll && (
+              {!portions.isPending && !portions.isError && subObjects.length > 0 && showAll && (
                 <SummaryPortionsTable
                   date={date}
-                  facilities={facilities}
+                  subObjects={subObjects}
                   headcountOf={headcountOf}
                 />
               )}
               {!portions.isPending &&
                 !portions.isError &&
-                facilities.length > 0 &&
+                subObjects.length > 0 &&
                 !showAll &&
                 selected && (
                   <DepartmentPortionsTable
                     date={date}
-                    facility={selected}
+                    subObject={selected}
                     headcountOf={headcountOf}
                   />
                 )}
@@ -355,12 +355,12 @@ export function PortionsRoute() {
 
 function DepartmentPortionsTable({
   date,
-  facility,
+  subObject,
   headcountOf,
 }: {
   date: string;
-  facility: Facility;
-  headcountOf: (facilityId: string, departmentId: string, tableId: string) => number | null;
+  subObject: SubObject;
+  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null;
 }) {
   const update = useUpdatePortionHeadcount();
   const toaster = useToaster();
@@ -369,7 +369,7 @@ function DepartmentPortionsTable({
     update.mutate(
       {
         date,
-        facilityId: facility.id,
+        subObjectId: subObject.id,
         departmentId,
         tableId,
         headcount,
@@ -387,13 +387,13 @@ function DepartmentPortionsTable({
   };
 
   const rows = useMemo(() => {
-    const flat = facility.departments.flatMap((department) =>
+    const flat = subObject.departments.flatMap((department) =>
       department.tables.map((table) => ({
         id: table.id,
         departmentId: department.id,
         departmentName: department.name,
         tableName: table.name,
-        headcount: headcountOf(facility.id, department.id, table.id),
+        headcount: headcountOf(subObject.id, department.id, table.id),
         defaultHeadcount: table.headcount,
         isTotal: false as boolean,
       }))
@@ -422,10 +422,10 @@ function DepartmentPortionsTable({
         isLastInDepartment: true,
       },
     ];
-  }, [facility, headcountOf]);
+  }, [subObject, headcountOf]);
 
   if (rows.length === 0) {
-    return <EmptyState text="В этом ЛПУ нет отделений" />;
+    return <EmptyState text="В этом подобъекте нет групп" />;
   }
 
   return (
@@ -526,24 +526,24 @@ function HeadcountInput({
 
 function SummaryPortionsTable({
   date,
-  facilities,
+  subObjects,
   headcountOf,
 }: {
   date: string;
-  facilities: Facility[];
-  headcountOf: (facilityId: string, departmentId: string, tableId: string) => number | null;
+  subObjects: SubObject[];
+  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null;
 }) {
   const update = useUpdatePortionHeadcount();
   const toaster = useToaster();
 
   const commit = (
-    row: { facilityId: string; departmentId: string; tableId: string },
+    row: { subObjectId: string; departmentId: string; tableId: string },
     headcount: number
   ) => {
     update.mutate(
       {
         date,
-        facilityId: row.facilityId,
+        subObjectId: row.subObjectId,
         departmentId: row.departmentId,
         tableId: row.tableId,
         headcount,
@@ -563,17 +563,17 @@ function SummaryPortionsTable({
   const rows = useMemo(() => {
     type Row = {
       id: string;
-      facilityId: string;
+      subObjectId: string;
       departmentId: string;
       tableId: string;
-      facilityName: string;
+      subObjectName: string;
       departmentName: string;
       tableName: string;
       headcount: number | null;
       defaultHeadcount: number;
-      showFacility: boolean;
+      showSubObject: boolean;
       showDepartment: boolean;
-      isLastInFacility: boolean;
+      isLastInSubObject: boolean;
       isLastInDepartment: boolean;
       isTotal: boolean;
       isLastRow?: boolean;
@@ -582,28 +582,28 @@ function SummaryPortionsTable({
     const data: Row[] = [];
     let grand = 0;
 
-    for (const facility of facilities) {
-      const facilityRows: {
+    for (const subObject of subObjects) {
+      const subObjectRows: {
         id: string;
-        facilityId: string;
+        subObjectId: string;
         departmentId: string;
         tableId: string;
-        facilityName: string;
+        subObjectName: string;
         departmentName: string;
         tableName: string;
         headcount: number | null;
         defaultHeadcount: number;
       }[] = [];
-      for (const department of facility.departments) {
+      for (const department of subObject.departments) {
         for (const table of department.tables) {
-          const headcount = headcountOf(facility.id, department.id, table.id);
+          const headcount = headcountOf(subObject.id, department.id, table.id);
           grand += headcount ?? 0;
-          facilityRows.push({
-            id: `${facility.id}-${department.id}-${table.id}`,
-            facilityId: facility.id,
+          subObjectRows.push({
+            id: `${subObject.id}-${department.id}-${table.id}`,
+            subObjectId: subObject.id,
             departmentId: department.id,
             tableId: table.id,
-            facilityName: facility.name,
+            subObjectName: subObject.name,
             departmentName: department.name,
             tableName: table.name,
             headcount,
@@ -611,14 +611,14 @@ function SummaryPortionsTable({
           });
         }
       }
-      facilityRows.forEach((row, index) => {
-        const prev = index > 0 ? facilityRows[index - 1] : null;
-        const next = index < facilityRows.length - 1 ? facilityRows[index + 1] : null;
+      subObjectRows.forEach((row, index) => {
+        const prev = index > 0 ? subObjectRows[index - 1] : null;
+        const next = index < subObjectRows.length - 1 ? subObjectRows[index + 1] : null;
         data.push({
           ...row,
-          showFacility: index === 0,
+          showSubObject: index === 0,
           showDepartment: !prev || prev.departmentName !== row.departmentName,
-          isLastInFacility: next === null,
+          isLastInSubObject: next === null,
           isLastInDepartment: !next || next.departmentName !== row.departmentName,
           isTotal: false,
         });
@@ -634,22 +634,22 @@ function SummaryPortionsTable({
         // Идентификаторов у итоговой строки нет — заглушки нужны, чтобы
         // объединение с обычными строками осталось однородным. Читаются
         // они только в ветке isTotal === false, то есть никогда.
-        facilityId: '__grand',
+        subObjectId: '__grand',
         departmentId: '__grand',
         tableId: '__grand',
-        facilityName: 'Всего',
+        subObjectName: 'Всего',
         departmentName: '',
         tableName: '',
         headcount: grand,
         defaultHeadcount: 0,
-        showFacility: true,
+        showSubObject: true,
         showDepartment: false,
-        isLastInFacility: true,
+        isLastInSubObject: true,
         isLastInDepartment: true,
         isTotal: true,
       },
     ];
-  }, [facilities, headcountOf]);
+  }, [subObjects, headcountOf]);
 
   if (rows.length === 0) {
     return <EmptyState text="Нет данных для сводного порционника" />;
@@ -668,24 +668,24 @@ function SummaryPortionsTable({
           if (!row.isLastInDepartment) {
             classes.push('objects-group-row_no-divider');
             if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInFacility) {
+          } else if (!row.isLastInSubObject) {
             classes.push('objects-group-row_facility-divider');
           }
           return classes;
         }}
         columns={[
           {
-            id: 'facilityName',
-            name: 'ЛПУ',
+            id: 'subObjectName',
+            name: 'Подобъект',
             width: '28%',
             template: (row) =>
               row.isTotal ? (
                 <Text variant="body-2" style={{ fontWeight: 600 }}>
                   Всего
                 </Text>
-              ) : row.showFacility ? (
+              ) : row.showSubObject ? (
                 <Text variant="body-2" style={{ fontWeight: 600 }}>
-                  {row.facilityName}
+                  {row.subObjectName}
                 </Text>
               ) : null,
             placeholder: () => null,
@@ -783,11 +783,11 @@ function DishesDistributionTable({
       isDishTotal: boolean;
       isGrandTotal: boolean;
       showDish: boolean;
-      showFacility: boolean;
+      showSubObject: boolean;
       showDepartment: boolean;
       isFirstInDish: boolean;
       isLastInDish: boolean;
-      isLastInFacility: boolean;
+      isLastInSubObject: boolean;
       isLastInDepartment: boolean;
       isBeforeTotal?: boolean;
     };
@@ -805,12 +805,12 @@ function DishesDistributionTable({
         const row = dishRows[i];
         const prev = i > 0 ? dishRows[i - 1] : null;
         const next = i < dishRows.length - 1 ? dishRows[i + 1] : null;
-        const sameFacilityAsPrev = prev !== null && prev.facilityName === row.facilityName;
+        const sameSubObjectAsPrev = prev !== null && prev.subObjectName === row.subObjectName;
         const sameDepartmentAsPrev =
-          sameFacilityAsPrev && prev !== null && prev.departmentName === row.departmentName;
-        const sameFacilityAsNext = next !== null && next.facilityName === row.facilityName;
+          sameSubObjectAsPrev && prev !== null && prev.departmentName === row.departmentName;
+        const sameSubObjectAsNext = next !== null && next.subObjectName === row.subObjectName;
         const sameDepartmentAsNext =
-          sameFacilityAsNext && next !== null && next.departmentName === row.departmentName;
+          sameSubObjectAsNext && next !== null && next.departmentName === row.departmentName;
         dishPortions += row.portions;
         result.push({
           ...row,
@@ -818,11 +818,11 @@ function DishesDistributionTable({
           isDishTotal: false,
           isGrandTotal: false,
           showDish: i === 0,
-          showFacility: !sameFacilityAsPrev,
+          showSubObject: !sameSubObjectAsPrev,
           showDepartment: !sameDepartmentAsPrev,
           isFirstInDish: i === 0,
           isLastInDish: next === null,
-          isLastInFacility: !sameFacilityAsNext,
+          isLastInSubObject: !sameSubObjectAsNext,
           isLastInDepartment: !sameDepartmentAsNext,
         });
       }
@@ -831,18 +831,18 @@ function DishesDistributionTable({
         id: `__dish-total-${dishName}`,
         dishName,
         mealType: '',
-        facilityName: '',
+        subObjectName: '',
         departmentName: '',
         tableName: '',
         portions: dishPortions,
         isDishTotal: true,
         isGrandTotal: false,
         showDish: true,
-        showFacility: false,
+        showSubObject: false,
         showDepartment: false,
         isFirstInDish: false,
         isLastInDish: true,
-        isLastInFacility: true,
+        isLastInSubObject: true,
         isLastInDepartment: true,
       });
     }
@@ -852,18 +852,18 @@ function DishesDistributionTable({
         id: '__grand-total',
         dishName: 'Общее количество всех блюд',
         mealType: '',
-        facilityName: '',
+        subObjectName: '',
         departmentName: '',
         tableName: '',
         portions: totalPortions,
         isDishTotal: false,
         isGrandTotal: true,
         showDish: true,
-        showFacility: false,
+        showSubObject: false,
         showDepartment: false,
         isFirstInDish: false,
         isLastInDish: true,
-        isLastInFacility: true,
+        isLastInSubObject: true,
         isLastInDepartment: true,
       });
     }
@@ -901,7 +901,7 @@ function DishesDistributionTable({
           if (!row.isLastInDepartment) {
             classes.push('objects-group-row_no-divider');
             if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInFacility) {
+          } else if (!row.isLastInSubObject) {
             classes.push('objects-group-row_department-divider');
           } else if (!row.isLastInDish) {
             classes.push('objects-group-row_facility-divider');
@@ -940,13 +940,13 @@ function DishesDistributionTable({
             placeholder: () => null,
           },
           {
-            id: 'facilityName',
-            name: 'ЛПУ',
+            id: 'subObjectName',
+            name: 'Подобъект',
             width: '20%',
             template: (row) =>
-              row.isDishTotal || row.isGrandTotal ? null : row.showFacility ? (
+              row.isDishTotal || row.isGrandTotal ? null : row.showSubObject ? (
                 <Text variant="body-2" style={{ fontWeight: 400 }}>
-                  {row.facilityName}
+                  {row.subObjectName}
                 </Text>
               ) : null,
             placeholder: () => null,

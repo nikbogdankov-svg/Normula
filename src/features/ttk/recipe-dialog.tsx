@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Icon, Label, Table, Text, useToaster } from '@gravity-ui/uikit';
-import { Pencil, Xmark } from '@gravity-ui/icons';
+import {
+  Button,
+  Dialog,
+  Drawer,
+  Flex,
+  Icon,
+  Label,
+  Table,
+  Text,
+  useToaster,
+} from '@gravity-ui/uikit';
+import { Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUpdateRecipe } from './api';
+import { useDeleteRecipe, useUpdateRecipe } from './api';
 import { useRecipeForm } from './recipe-form';
 import type { Recipe } from './types';
 import { useDrawerHeight } from './use-drawer-height';
@@ -36,11 +46,13 @@ export function RecipeDialog({
 }) {
   const height = useDrawerHeight();
   const update = useUpdateRecipe();
+  const remove = useDeleteRecipe();
   const toaster = useToaster();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<Recipe | null>(null);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [editKey, setEditKey] = useState(0);
   const modeRef = useRef(mode);
   /** Закрытие только через явный requestClose — dismiss от Floating UI игнорируем. */
@@ -93,6 +105,44 @@ export function RecipeDialog({
     setMode('view');
   };
 
+  const startDelete = () => {
+    setConfirmDeleteOpen(true);
+  };
+
+  const cancelDelete = () => {
+    setConfirmDeleteOpen(false);
+  };
+
+  const runDelete = (deletionMode: 'soft' | 'immediate') => {
+    if (!view) return;
+
+    remove.mutate(
+      { id: view.id, mode: deletionMode },
+      {
+        onSuccess: () => {
+          toaster.add(
+            deletionMode === 'immediate'
+              ? { name: 'ttk-deleted', title: 'ТТК удалена', theme: 'success' }
+              : {
+                  name: 'ttk-deleted',
+                  title: 'ТТК удалена',
+                  content: 'Останется в меню до конца периода',
+                  theme: 'success',
+                }
+          );
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'ttk-delete',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
   const save = () => {
     if (!view) return;
 
@@ -121,178 +171,252 @@ export function RecipeDialog({
   if (!view) return null;
 
   return (
-    <Drawer
-      open={open}
-      onOpenChange={(nextOpen, _event, reason) => {
-        if (nextOpen) {
-          setOpen(true);
-          return;
-        }
+    <>
+      <Drawer
+        open={open}
+        onOpenChange={(nextOpen, _event, reason) => {
+          if (nextOpen) {
+            setOpen(true);
+            return;
+          }
 
-        // Явное закрытие (крестик / Отмена в просмотре).
-        if (allowCloseRef.current) {
-          allowCloseRef.current = false;
-          setOpen(false);
-          onClose();
-          return;
-        }
+          // Явное закрытие (крестик / Отмена в просмотре).
+          if (allowCloseRef.current) {
+            allowCloseRef.current = false;
+            setOpen(false);
+            onClose();
+            return;
+          }
 
-        // В просмотре — только клик по вуали или Escape.
-        // focus-out и пр. при смене mode игнорируем, иначе Save закрывает drawer.
-        if (
-          modeRef.current === 'view' &&
-          !update.isPending &&
-          (reason === 'outside-press' || reason === 'escape-key')
-        ) {
-          setOpen(false);
-          onClose();
-        }
-      }}
-      disableOutsideClick={mode === 'edit' || update.isPending}
-      disableEscapeKeyDown={mode === 'edit' || update.isPending}
-      placement="bottom"
-      size={height}
-      maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
-      contentOverflow="auto"
-      className="ttk-recipe-drawer"
-      contentClassName="ttk-recipe-drawer__panel"
-    >
-      <div className="ttk-recipe-drawer__card">
-        {/* Оба режима в DOM: hidden вместо размонтирования — иначе drawer закрывается. */}
-        <div className="ttk-recipe-drawer__mode" hidden={mode !== 'view'}>
-          <div className="ttk-recipe-drawer__header">
-            <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-3">{view.name}</Text>
-              <Label theme="normal" size="s">
-                Выход порции: {view.portionYield}
-              </Label>
-              <Label theme="normal" size="s">
-                {view.price} ₽
-              </Label>
+          // В просмотре — только клик по вуали или Escape.
+          // focus-out и пр. при смене mode игнорируем, иначе Save закрывает drawer.
+          if (
+            modeRef.current === 'view' &&
+            !update.isPending &&
+            (reason === 'outside-press' || reason === 'escape-key')
+          ) {
+            setOpen(false);
+            onClose();
+          }
+        }}
+        disableOutsideClick={mode === 'edit' || update.isPending}
+        disableEscapeKeyDown={mode === 'edit' || update.isPending}
+        placement="bottom"
+        size={height}
+        maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
+        contentOverflow="auto"
+        className="ttk-recipe-drawer"
+        contentClassName="ttk-recipe-drawer__panel"
+      >
+        <div className="ttk-recipe-drawer__card">
+          {/* Оба режима в DOM: hidden вместо размонтирования — иначе drawer закрывается. */}
+          <div className="ttk-recipe-drawer__mode" hidden={mode !== 'view'}>
+            <div className="ttk-recipe-drawer__header">
+              <div className="ttk-recipe-drawer__title-row">
+                <Text variant="subheader-3">{view.name}</Text>
+                <Label theme="normal" size="s">
+                  Выход порции: {view.portionYield}
+                </Label>
+                <Label theme="normal" size="s">
+                  {view.price} ₽
+                </Label>
+              </div>
+              <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+                <Icon data={Xmark} size={20} />
+              </Button>
             </div>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
-              <Icon data={Xmark} size={20} />
-            </Button>
+
+            <div className="ttk-recipe-drawer__body">
+              <div className="ttk-recipe-drawer__meta">
+                <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
+                <MetaRow title="Температура:">{view.temperature}</MetaRow>
+                <MetaRow title="Срок реализации:">{view.shelfLife}</MetaRow>
+                <MetaRow title="Рецепт:">{view.recipe}</MetaRow>
+              </div>
+
+              <div className="ttk-recipe-drawer__table-wrap">
+                <Table
+                  width="max"
+                  data={[
+                    ...view.ingredients,
+                    {
+                      name: 'Выход',
+                      grossPerPortion: '',
+                      netPerPortion: view.outputPerPortion,
+                      grossPer100: '',
+                      netPer100: view.outputPer100,
+                      pricePerKg: '',
+                    },
+                  ]}
+                  columns={[
+                    {
+                      id: 'name',
+                      name: 'Наименование',
+                      template: (row) => <Text variant="body-2">{row.name}</Text>,
+                    },
+                    {
+                      id: 'grossPerPortion',
+                      name: '1 порция, Брутто, г',
+                      align: 'right',
+                      template: (row) => <Text variant="body-2">{row.grossPerPortion}</Text>,
+                    },
+                    {
+                      id: 'netPerPortion',
+                      name: '1 порция, Нетто, г',
+                      align: 'right',
+                      template: (row) => <Text variant="body-2">{row.netPerPortion}</Text>,
+                    },
+                    {
+                      id: 'grossPer100',
+                      name: '100 порций, Брутто, кг',
+                      align: 'right',
+                      template: (row) => <Text variant="body-2">{row.grossPer100}</Text>,
+                    },
+                    {
+                      id: 'netPer100',
+                      name: '100 порций, Нетто, кг',
+                      align: 'right',
+                      template: (row) => <Text variant="body-2">{row.netPer100}</Text>,
+                    },
+                    {
+                      id: 'pricePerKg',
+                      name: 'Цена за 1кг',
+                      align: 'right',
+                      template: (row) => <Text variant="body-2">{row.pricePerKg}</Text>,
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
+                <Table
+                  width="max"
+                  data={[view.nutrition]}
+                  columns={[
+                    {
+                      id: 'protein',
+                      name: 'Белки, г',
+                      align: 'center',
+                      template: (row) => <Text variant="body-2">{row.protein}</Text>,
+                    },
+                    {
+                      id: 'fat',
+                      name: 'Жиры, г',
+                      align: 'center',
+                      template: (row) => <Text variant="body-2">{row.fat}</Text>,
+                    },
+                    {
+                      id: 'carbs',
+                      name: 'Углеводы, г',
+                      align: 'center',
+                      template: (row) => <Text variant="body-2">{row.carbs}</Text>,
+                    },
+                    {
+                      id: 'kcal',
+                      name: 'Энерг. ценность, ккал',
+                      align: 'center',
+                      template: (row) => <Text variant="body-2">{row.kcal}</Text>,
+                    },
+                    {
+                      id: 'vitaminC',
+                      name: 'Витамин С, мг',
+                      align: 'center',
+                      template: (row) => <Text variant="body-2">{row.vitaminC}</Text>,
+                    },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <div className="ttk-recipe-drawer__footer ttk-recipe-drawer__footer_view">
+              <Button view="outlined-danger" size="l" onClick={startDelete}>
+                <Icon data={TrashBin} size={16} />
+                Удалить
+              </Button>
+              <Flex gap={2}>
+                <Button view="outlined" size="l" onClick={requestClose}>
+                  Отмена
+                </Button>
+                <Button view="normal" size="l" onClick={startEdit}>
+                  <Icon data={Pencil} size={16} />
+                  Редактировать
+                </Button>
+              </Flex>
+            </div>
           </div>
 
-          <div className="ttk-recipe-drawer__body">
-            <div className="ttk-recipe-drawer__meta">
-              <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
-              <MetaRow title="Температура:">{view.temperature}</MetaRow>
-              <MetaRow title="Срок реализации:">{view.shelfLife}</MetaRow>
-              <MetaRow title="Рецепт:">{view.recipe}</MetaRow>
+          <div className="ttk-recipe-drawer__mode" hidden={mode !== 'edit'}>
+            <div className="ttk-recipe-drawer__header">
+              <div className="ttk-recipe-drawer__title-row">
+                <Text variant="subheader-3">Редактировать ТТК</Text>
+              </div>
+              <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+                <Icon data={Xmark} size={20} />
+              </Button>
             </div>
 
-            <div className="ttk-recipe-drawer__table-wrap">
-              <Table
-                width="max"
-                data={[
-                  ...view.ingredients,
-                  {
-                    name: 'Выход',
-                    grossPerPortion: '',
-                    netPerPortion: view.outputPerPortion,
-                    grossPer100: '',
-                    netPer100: view.outputPer100,
-                    pricePerKg: '',
-                  },
-                ]}
-                columns={[
-                  {
-                    id: 'name',
-                    name: 'Наименование',
-                    template: (row) => <Text variant="body-2">{row.name}</Text>,
-                  },
-                  {
-                    id: 'grossPerPortion',
-                    name: '1 порция, Брутто, г',
-                    align: 'right',
-                    template: (row) => <Text variant="body-2">{row.grossPerPortion}</Text>,
-                  },
-                  {
-                    id: 'netPerPortion',
-                    name: '1 порция, Нетто, г',
-                    align: 'right',
-                    template: (row) => <Text variant="body-2">{row.netPerPortion}</Text>,
-                  },
-                  {
-                    id: 'grossPer100',
-                    name: '100 порций, Брутто, кг',
-                    align: 'right',
-                    template: (row) => <Text variant="body-2">{row.grossPer100}</Text>,
-                  },
-                  {
-                    id: 'netPer100',
-                    name: '100 порций, Нетто, кг',
-                    align: 'right',
-                    template: (row) => <Text variant="body-2">{row.netPer100}</Text>,
-                  },
-                  {
-                    id: 'pricePerKg',
-                    name: 'Цена за 1кг',
-                    align: 'right',
-                    template: (row) => <Text variant="body-2">{row.pricePerKg}</Text>,
-                  },
-                ]}
-              />
+            <div className="ttk-recipe-drawer__body ttk-recipe-drawer__body_create">
+              {form.fields}
             </div>
 
-            <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
-              <Table
-                width="max"
-                data={[view.nutrition]}
-                columns={[
-                  { id: 'protein', name: 'Белки, г', align: 'center', template: (row) => <Text variant="body-2">{row.protein}</Text> },
-                  { id: 'fat', name: 'Жиры, г', align: 'center', template: (row) => <Text variant="body-2">{row.fat}</Text> },
-                  { id: 'carbs', name: 'Углеводы, г', align: 'center', template: (row) => <Text variant="body-2">{row.carbs}</Text> },
-                  { id: 'kcal', name: 'Энерг. ценность, ккал', align: 'center', template: (row) => <Text variant="body-2">{row.kcal}</Text> },
-                  { id: 'vitaminC', name: 'Витамин С, мг', align: 'center', template: (row) => <Text variant="body-2">{row.vitaminC}</Text> },
-                ]}
-              />
+            <div className="ttk-recipe-drawer__footer">
+              <Button view="outlined" size="l" onClick={cancelEdit}>
+                Отмена
+              </Button>
+              <Button
+                view="action"
+                size="l"
+                onClick={save}
+                disabled={!form.canSubmit}
+                loading={update.isPending}
+              >
+                Сохранить
+              </Button>
             </div>
-          </div>
-
-          <div className="ttk-recipe-drawer__footer">
-            <Button view="outlined" size="l" onClick={requestClose}>
-              Отмена
-            </Button>
-            <Button view="normal" size="l" onClick={startEdit}>
-              <Icon data={Pencil} size={16} />
-              Редактировать
-            </Button>
           </div>
         </div>
+      </Drawer>
 
-        <div className="ttk-recipe-drawer__mode" hidden={mode !== 'edit'}>
-          <div className="ttk-recipe-drawer__header">
-            <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-3">Редактировать ТТК</Text>
-            </div>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
-              <Icon data={Xmark} size={20} />
-            </Button>
-          </div>
-
-          <div className="ttk-recipe-drawer__body ttk-recipe-drawer__body_create">
-            {form.fields}
-          </div>
-
-          <div className="ttk-recipe-drawer__footer">
-            <Button view="outlined" size="l" onClick={cancelEdit}>
+      <Dialog open={confirmDeleteOpen} onClose={cancelDelete} size="s">
+        <Dialog.Header caption={`Удалить «${view.name}»?`} />
+        <Dialog.Divider />
+        <Dialog.Body>
+          <Flex direction="column" gap={3}>
+            <Text variant="body-2">
+              ТТК используется в меню и других разделах. Выберите, как её удалить.
+            </Text>
+            <Flex direction="column" gap={2}>
+              <Button
+                view="outlined-danger"
+                size="l"
+                onClick={() => runDelete('soft')}
+                loading={remove.isPending}
+              >
+                Удалить после конца периода
+              </Button>
+              <Text variant="body-1" color="secondary">
+                До конца периода ТТК останется в меню и других разделах
+              </Text>
+            </Flex>
+            <Flex direction="column" gap={2}>
+              <Button
+                view="outlined"
+                size="l"
+                onClick={() => runDelete('immediate')}
+                loading={remove.isPending}
+              >
+                Удалить сейчас
+              </Button>
+              <Text variant="body-1" color="secondary">
+                Будет убрана из всех разделов немедленно
+              </Text>
+            </Flex>
+            <Button view="flat" size="l" onClick={cancelDelete} disabled={remove.isPending}>
               Отмена
             </Button>
-            <Button
-              view="action"
-              size="l"
-              onClick={save}
-              disabled={!form.canSubmit}
-              loading={update.isPending}
-            >
-              Сохранить
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Drawer>
+          </Flex>
+        </Dialog.Body>
+      </Dialog>
+    </>
   );
 }

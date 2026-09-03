@@ -1,6 +1,7 @@
 /* Нижний drawer создания прихода. */
 .create-receipt-drawer {
-  z-index: 990;
+  /* 995: выше фона деталей (990), но ниже поп-апов Select (1000). */
+  z-index: 995;
   background-color: rgba(0, 0, 0, 0.75);
 }
 
