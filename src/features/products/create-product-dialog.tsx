@@ -1,0 +1,62 @@
+import { useEffect, useState } from 'react';
+import { Button, Dialog, Flex, Icon, useToaster } from '@gravity-ui/uikit';
+import { Plus } from '@gravity-ui/icons';
+import { useCreateProduct, useProductCategories } from './api';
+import { useProductForm } from './product-form';
+import './product-dialog.css';
+
+/** Создание продукта в модалке (popup size s). */
+export function CreateProductDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const create = useCreateProduct();
+  const categories = useProductCategories();
+  const toaster = useToaster();
+  const [formKey, setFormKey] = useState(0);
+  const form = useProductForm(null, String(formKey), categories.data?.categories ?? []);
+
+  // При каждом открытии — свежая форма.
+  useEffect(() => {
+    if (open) setFormKey((key) => key + 1);
+  }, [open]);
+
+  const submit = () => {
+    create.mutate(form.getBody(), {
+      onSuccess: () => {
+        toaster.add({ name: 'product-created', title: 'Продукт создан', theme: 'success' });
+        onClose();
+      },
+      onError: (e) =>
+        toaster.add({
+          name: 'product-create',
+          title: 'Ошибка',
+          content: e.message,
+          theme: 'danger',
+        }),
+    });
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} size="s" className="product-dialog">
+      <Dialog.Header caption="Создать продукт" />
+      <Dialog.Divider />
+      <Dialog.Body>{form.fields}</Dialog.Body>
+      <Dialog.Divider />
+      <Dialog.Footer>
+        <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
+          <Button view="outlined" size="l" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            view="action"
+            size="l"
+            onClick={submit}
+            disabled={!form.canSubmit}
+            loading={create.isPending}
+          >
+            <Icon data={Plus} size={16} />
+            Создать продукт
+          </Button>
+        </Flex>
+      </Dialog.Footer>
+    </Dialog>
+  );
+}

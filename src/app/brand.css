@@ -70,6 +70,19 @@ body,
   --_--border-width: 1px;
 }
 
+/* Popup списков (Select, меню и пр.) всегда выше любого drawer (z-index: 100000),
+   иначе при открытом drawer выбор скрывается за подложкой. Gravity вешает z-index
+   на внешнюю ненумерованную обёртку popup (порт в <body>), поэтому одеваем её выше. */
+div[data-floating-ui-status]:has(> .g-popup) {
+  z-index: 100001 !important;
+}
+
+/* Диалог (удаление и пр.) поверх любого drawer (z-index: 100000). */
+.g-root .g-dialog,
+.g-root .g-modal {
+  z-index: 100001 !important;
+}
+
 /* Отступы всех popup/Dialog из макета. */
 .g-root .g-dialog {
   --_--side-padding: 16px;

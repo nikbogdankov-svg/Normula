@@ -13,9 +13,7 @@
 }
 
 /* Линия между отделениями в одном ЛПУ — начинается от «Отделение», «Организация» пропущена. */
-.objects-group-table
-  .objects-group-row_department-divider
-  .g-table__cell:first-child {
+.objects-group-table .objects-group-row_department-divider .g-table__cell:first-child {
   border-block-end-color: transparent;
 }
 

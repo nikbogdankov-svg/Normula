@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
+import { useCateringObjects } from '@/features/objects/api';
 import type { ReceiptItem, WarehouseReceipt } from './types';
 import './warehouse-receipt-drawer.css';
 
@@ -67,11 +68,14 @@ function ItemDetails({ item }: { item: ReceiptItem }) {
 export function ReceiptDrawer({
   receipt,
   onClose,
+  onEdit,
 }: {
   receipt: WarehouseReceipt | null;
   onClose: () => void;
+  onEdit?: (receipt: WarehouseReceipt) => void;
 }) {
   const height = useDrawerHeight();
+  const objects = useCateringObjects();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<WarehouseReceipt | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -162,7 +166,19 @@ export function ReceiptDrawer({
 
         <div className="warehouse-receipt-drawer__body">
           <Flex direction="column" gap={4}>
-            <Flex direction="column" gap={2}>
+            <Flex direction="column">
+              <div className="warehouse-receipt-drawer__unit" style={{ marginBottom: 12 }}>
+                <Flex alignItems="center" gap={1}>
+                  <Text variant="body-3" color="secondary">
+                    Объект:
+                  </Text>
+                  <Text variant="body-3">
+                    {view.unitId
+                      ? (objects.data?.objects.find((k) => k.id === view.unitId)?.name ?? '—')
+                      : '—'}
+                  </Text>
+                </Flex>
+              </div>
               <div className="warehouse-receipt-drawer__items">
                 <div className="warehouse-receipt-drawer__items-head">
                   <Text variant="body-2">Товар</Text>
@@ -214,6 +230,24 @@ export function ReceiptDrawer({
               </div>
             </Flex>
           </Flex>
+        </div>
+
+        <div className="warehouse-receipt-drawer__footer">
+          <div className="warehouse-receipt-drawer__footer-inner">
+            <Button view="outlined" size="l" onClick={requestClose}>
+              Закрыть
+            </Button>
+            <Button
+              view="normal"
+              size="l"
+              onClick={() => {
+                onEdit?.(view);
+                requestClose();
+              }}
+            >
+              Редактировать
+            </Button>
+          </div>
         </div>
       </div>
     </Drawer>

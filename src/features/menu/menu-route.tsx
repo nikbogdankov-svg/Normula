@@ -16,6 +16,8 @@ import { useApi } from '@/shared/api/use-api';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
+import { useDiets } from '@/features/diets/api';
+import type { Diet } from '@/features/diets/types';
 import {
   formatDateRange,
   formatDayHeader,
@@ -46,13 +48,24 @@ const EMPTY_DISHES: MenuDishRef[] = [];
 
 const ORG_OPTIONS = [{ value: 'school-5', content: 'Школа номер 5' }];
 
-const DIET_OPTIONS = [
-  { value: 'Основная', content: 'Основная' },
-  { value: 'Щадящая', content: 'Щадящая' },
-  { value: 'Диабетическая', content: 'Диабетическая' },
-];
-
 const CYCLE_DAYS = 14;
+
+/** Находит диету в справочнике по имени (меню пока хранит dietName строкой). */
+function findDietByName(diets: Diet[] | undefined, name: string): Diet | undefined {
+  return diets?.find((diet) => diet.name === name);
+}
+
+/** Норма на день из справочника диет; если диета не найдена — фолбэк на отдел нормы. */
+function resolveDietNorm(diet: Diet | undefined, fallback: DayNorm): DayNorm {
+  if (!diet) return fallback;
+  return {
+    kcal: diet.kcal,
+    protein: diet.protein,
+    fat: diet.fat,
+    carbs: diet.carbs,
+    price: diet.pricePerDay,
+  };
+}
 
 /**
  * Раздел «Меню»: сразу сетка приёмов по датам (без списка циклов).
@@ -155,6 +168,7 @@ function MenuByDates({
   const { data, isPending, isError, error, refetch } = useMenu(menuId);
   const updateMenu = useUpdateMenu(menuId);
   const updateSlot = useUpdateMenuSlot(menuId);
+  const diets = useDiets();
   const toaster = useToaster();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
   const [organizationId, setOrganizationId] = useState(ORG_OPTIONS[0].value);
@@ -235,7 +249,10 @@ function MenuByDates({
 
   const hasDayViolation = (day: number): boolean => {
     const totals = dayTotals.get(day) ?? sumDishes([]);
-    const base = normForDiet(menu?.dietName ?? 'Основная');
+    const base = resolveDietNorm(
+      findDietByName(diets.data?.diets, menu?.dietName ?? 'Основная'),
+      normForDiet(menu?.dietName ?? 'Основная')
+    );
     const activeNorm: DayNorm = {
       kcal: customNorm?.kcal ?? base.kcal,
       protein: customNorm?.protein ?? base.protein,
@@ -282,8 +299,8 @@ function MenuByDates({
       return;
     }
 
-    const weekIsEmpty = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1).every(
-      (day) => MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
+    const weekIsEmpty = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1).every((day) =>
+      MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
     );
 
     if (weekIsEmpty) {
@@ -311,7 +328,10 @@ function MenuByDates({
   }
 
   const days = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1);
-  const baseNorm = normForDiet(menu.dietName);
+  const baseNorm = resolveDietNorm(
+    findDietByName(diets.data?.diets, menu.dietName),
+    normForDiet(menu.dietName)
+  );
   const norm: DayNorm = {
     kcal: customNorm?.kcal ?? baseNorm.kcal,
     protein: customNorm?.protein ?? baseNorm.protein,
@@ -320,6 +340,17 @@ function MenuByDates({
     price: customPriceLimit ?? baseNorm.price,
   };
   const priceLimit = norm.price;
+  const dietOptions = (diets.data?.diets ?? []).map((diet) => ({
+    value: diet.name,
+    content: diet.name,
+  }));
+  if (dietOptions.length === 0) {
+    dietOptions.push(
+      { value: 'Основная', content: 'Основная' },
+      { value: 'Щадящая', content: 'Щадящая' },
+      { value: 'Диабетическая', content: 'Диабетическая' }
+    );
+  }
   const isEmptyWeek = days.every((day) =>
     MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
   );
@@ -517,7 +548,7 @@ function MenuByDates({
             width={200}
             value={[menu.dietName]}
             onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
-            options={DIET_OPTIONS}
+            options={dietOptions}
           />
           {(isEmptyWeek || !isEmptyWeek) && (
             <Button
