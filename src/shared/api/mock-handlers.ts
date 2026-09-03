@@ -8,15 +8,20 @@ import type {
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
+import type { Product, ProductCategory } from '@/features/products/types';
+import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
 import {
   formatKettle,
+  isFacilityType,
   type DistributionRow,
   type Facility,
+  type FacilityType,
   type KitchenUnit,
 } from '@/features/objects/types';
 import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
+import type { WarehouseReceipt } from '@/features/warehouse-receipts/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -42,6 +47,9 @@ export const MOCKED_PREFIXES = [
   '/v1/portions',
   '/v1/warehouse',
   '/v1/write-offs',
+  '/v1/products',
+  '/v1/product-categories',
+  '/v1/diets',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -362,6 +370,154 @@ const sampleRecipe = (index: number): Recipe => {
 };
 
 const recipes: Recipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
+
+// --- Продукты (справочник КБЖУ) ---
+
+const PRODUCT_NAMES = [
+  'Мука пшеничная',
+  'Сахар-песок',
+  'Масло растительное',
+  'Молоко 3,2%',
+  'Яйцо куриное',
+  'Говядина',
+  'Курица',
+  'Рыба',
+  'Картофель',
+  'Морковь',
+  'Лук репчатый',
+  'Сметана',
+  'Творог 9%',
+  'Соль',
+  'Хлеб пшеничный',
+  'Рис',
+  'Гречка',
+  'Макароны',
+  'Сыр твёрдый',
+  'Яблоки',
+];
+
+// Категории продуктов — справочник внутри справочника.
+const PRODUCT_CATEGORIES: ProductCategory[] = [
+  { id: 'c-1', name: 'Бакалея' },
+  { id: 'c-2', name: 'Овощи' },
+  { id: 'c-3', name: 'Фрукты и ягоды' },
+  { id: 'c-4', name: 'Молочные продукты и яйца' },
+  { id: 'c-5', name: 'Мясо и птица' },
+  { id: 'c-6', name: 'Рыба' },
+  { id: 'c-7', name: 'Крупы и макаронные изделия' },
+  { id: 'c-8', name: 'Хлебобулочные изделия' },
+];
+
+const PRODUCT_NAME_CATEGORY: Record<string, string> = {
+  'Мука пшеничная': 'c-1',
+  'Сахар-песок': 'c-1',
+  'Масло растительное': 'c-1',
+  Соль: 'c-1',
+  Картофель: 'c-2',
+  Морковь: 'c-2',
+  'Лук репчатый': 'c-2',
+  Яблоки: 'c-3',
+  'Молоко 3,2%': 'c-4',
+  'Яйцо куриное': 'c-4',
+  Сметана: 'c-4',
+  'Творог 9%': 'c-4',
+  'Сыр твёрдый': 'c-4',
+  Говядина: 'c-5',
+  Курица: 'c-5',
+  Рыба: 'c-6',
+  Рис: 'c-7',
+  Гречка: 'c-7',
+  Макароны: 'c-7',
+  'Хлеб пшеничный': 'c-8',
+};
+
+const sampleProduct = (index: number): Product => {
+  const kcal = 80 + (index % 15) * 27;
+
+  return {
+    id: `p-${index}`,
+    name: PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length],
+    categoryId: PRODUCT_NAME_CATEGORY[PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length]] ?? 'c-1',
+    kcal,
+    protein: Number(((2 + (index % 9) * 1.7) / 1.7).toFixed(1)),
+    fat: Number(((1 + (index % 8) * 1.5) / 1.5).toFixed(1)),
+    carbs: Number(((8 + (index % 12) * 3.1) / 3.1).toFixed(1)),
+    vitaminC: Number((0.4 + (index % 7) * 2.3).toFixed(1)),
+  };
+};
+
+const products: Product[] = Array.from({ length: 20 }, (_, index) => sampleProduct(index + 1));
+
+// Soft-удалённые продукты: ушли из справочника, но остаются в меню и других
+// разделах до конца недели, поэтому из products не вырезаются.
+const deletedProductIds = new Set<string>();
+// Soft-удалённые ТТК: аналогично продуктам — остаются в меню до конца периода.
+const deletedRecipeIds = new Set<string>();
+
+const mockedDiets: Diet[] = [
+  {
+    id: 'diet-main',
+    name: 'Основной',
+    appliesTo: ['school', 'kindergarten', 'hospital'],
+    pricePerDay: 450,
+    kcal: 1800,
+    protein: 90,
+    fat: 60,
+    carbs: 250,
+  },
+  {
+    id: 'diet-gentle',
+    name: 'Щадящий',
+    appliesTo: ['school', 'kindergarten', 'hospital'],
+    pricePerDay: 430,
+    kcal: 1750,
+    protein: 85,
+    fat: 55,
+    carbs: 240,
+  },
+  {
+    id: 'diet-gluten-free',
+    name: 'Безглютеновый',
+    appliesTo: ['school', 'kindergarten', 'hospital'],
+    pricePerDay: 460,
+    kcal: 1800,
+    protein: 90,
+    fat: 60,
+    carbs: 240,
+  },
+  {
+    id: 'diet-lactose-free',
+    name: 'Безлактозный',
+    appliesTo: ['school', 'kindergarten', 'hospital'],
+    pricePerDay: 455,
+    kcal: 1800,
+    protein: 90,
+    fat: 55,
+    carbs: 250,
+  },
+  {
+    id: 'diet-diabetic',
+    name: 'Диабетический',
+    appliesTo: ['school', 'kindergarten', 'hospital'],
+    pricePerDay: 440,
+    kcal: 1600,
+    protein: 85,
+    fat: 50,
+    carbs: 200,
+  },
+  {
+    id: 'diet-vegetarian',
+    name: 'Вегетарианский',
+    appliesTo: ['school', 'kindergarten'],
+    pricePerDay: 420,
+    kcal: 1700,
+    protein: 70,
+    fat: 55,
+    carbs: 250,
+  },
+];
+// Soft-удалённые диеты: скрыты из справочника, но остаются в объектах/меню.
+const deletedDietIds = new Set<string>();
 
 function emptySlots(cycleDays: number): CycleMenu['slots'] {
   const slots: CycleMenu['slots'] = [];
@@ -817,7 +973,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const sort = params.get('sort') ?? 'name';
     const ascending = (params.get('order') ?? 'asc') !== 'desc';
 
-    let found = recipes;
+    let found = recipes.filter((r) => !deletedRecipeIds.has(r.id));
     if (query) found = found.filter((r) => r.name.toLowerCase().includes(query));
     if (collectionId) found = found.filter((r) => r.collectionId === collectionId);
 
@@ -906,6 +1062,197 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     });
 
     return { recipe: found } as T;
+  }
+
+  if (ttkRecipe && method === 'DELETE') {
+    const found = recipes.find((r) => r.id === ttkRecipe.id);
+    if (!found) throw new Error('mock: ТТК не найдена');
+
+    const mode = params.get('mode') ?? 'soft';
+    if (mode === 'immediate') {
+      const index = recipes.indexOf(found);
+      recipes.splice(index, 1);
+    } else {
+      deletedRecipeIds.add(ttkRecipe.id);
+    }
+
+    return {} as T;
+  }
+
+  // Продукты (справочник КБЖУ)
+  if (route === '/v1/product-categories' && method === 'GET') {
+    return { categories: PRODUCT_CATEGORIES } as T;
+  }
+
+  if (route === '/v1/products' && method === 'GET') {
+    const query = (params.get('search') ?? '').trim().toLowerCase();
+    const sort = params.get('sort') ?? 'name';
+    const ascending = (params.get('order') ?? 'asc') !== 'desc';
+    const categoryId = params.get('categoryId') ?? '';
+
+    let found = products.filter((p) => !deletedProductIds.has(p.id));
+    if (categoryId) found = found.filter((p) => p.categoryId === categoryId);
+    if (query) found = found.filter((p) => p.name.toLowerCase().includes(query));
+
+    const sorted = [...found].sort((a, b) => {
+      const dir = ascending ? 1 : -1;
+
+      if (sort === 'kcal') return (a.kcal - b.kcal) * dir;
+      if (sort === 'protein') return (a.protein - b.protein) * dir;
+      if (sort === 'fat') return (a.fat - b.fat) * dir;
+      if (sort === 'carbs') return (a.carbs - b.carbs) * dir;
+
+      return a.name.localeCompare(b.name, 'ru') * dir;
+    });
+
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const pageSize = Math.max(1, Number(params.get('pageSize')) || 10);
+    const total = sorted.length;
+    const start = (page - 1) * pageSize;
+    const pageProducts = sorted.slice(start, start + pageSize);
+
+    return { products: pageProducts, total, page, pageSize } as T;
+  }
+
+  if (route === '/v1/products' && method === 'POST') {
+    const body = options.body as {
+      name: string;
+      categoryId: string;
+      kcal: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+      vitaminC: number;
+    };
+    const product: Product = {
+      id: `p-${Date.now()}`,
+      name: body.name,
+      categoryId: body.categoryId ?? '',
+      kcal: body.kcal ?? 0,
+      protein: body.protein ?? 0,
+      fat: body.fat ?? 0,
+      carbs: body.carbs ?? 0,
+      vitaminC: body.vitaminC ?? 0,
+    };
+    products.unshift(product);
+
+    return { product } as T;
+  }
+
+  const productId = match('/v1/products/:id', route);
+  if (productId && method === 'PATCH') {
+    const found = products.find((p) => p.id === productId.id);
+    if (!found) throw new Error('mock: продукт не найден');
+
+    const body = options.body as {
+      name: string;
+      categoryId: string;
+      kcal: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+      vitaminC: number;
+    };
+
+    Object.assign(found, {
+      name: body.name,
+      categoryId: body.categoryId ?? found.categoryId,
+      kcal: body.kcal ?? 0,
+      protein: body.protein ?? 0,
+      fat: body.fat ?? 0,
+      carbs: body.carbs ?? 0,
+      vitaminC: body.vitaminC ?? found.vitaminC,
+    });
+
+    return { product: found } as T;
+  }
+
+  if (productId && method === 'DELETE') {
+    const found = products.find((p) => p.id === productId.id);
+    if (!found) throw new Error('mock: продукт не найден');
+
+    const mode = params.get('mode') ?? 'soft';
+    if (mode === 'immediate') {
+      const index = products.indexOf(found);
+      products.splice(index, 1);
+    } else {
+      deletedProductIds.add(productId.id);
+    }
+
+    return {} as T;
+  }
+
+  // Диеты: справочник рационов питания (см. features/diets).
+  if (route === '/v1/diets' && method === 'GET') {
+    const diets = mockedDiets.filter((diet) => !deletedDietIds.has(diet.id));
+    return { diets } as T;
+  }
+
+  if (route === '/v1/diets' && method === 'POST') {
+    const body = options.body as {
+      name: string;
+      appliesTo: FacilityType[];
+      pricePerDay: number;
+      kcal: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+    };
+    const diet: Diet = {
+      id: `diet-${Date.now()}`,
+      name: body.name,
+      appliesTo: body.appliesTo ?? [],
+      pricePerDay: body.pricePerDay ?? 0,
+      kcal: body.kcal ?? 0,
+      protein: body.protein ?? 0,
+      fat: body.fat ?? 0,
+      carbs: body.carbs ?? 0,
+    };
+    mockedDiets.unshift(diet);
+
+    return { diet } as T;
+  }
+
+  const dietId = match('/v1/diets/:id', route);
+  if (dietId && method === 'PATCH') {
+    const found = mockedDiets.find((diet) => diet.id === dietId.id);
+    if (!found) throw new Error('mock: диета не найдена');
+
+    const body = options.body as {
+      name: string;
+      appliesTo: FacilityType[];
+      pricePerDay: number;
+      kcal: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+    };
+    Object.assign(found, {
+      name: body.name,
+      appliesTo: body.appliesTo ?? found.appliesTo,
+      pricePerDay: body.pricePerDay ?? found.pricePerDay,
+      kcal: body.kcal ?? found.kcal,
+      protein: body.protein ?? found.protein,
+      fat: body.fat ?? found.fat,
+      carbs: body.carbs ?? found.carbs,
+    });
+
+    return { diet: found } as T;
+  }
+
+  if (dietId && method === 'DELETE') {
+    const found = mockedDiets.find((diet) => diet.id === dietId.id);
+    if (!found) throw new Error('mock: диета не найдена');
+
+    const mode = params.get('mode') ?? 'soft';
+    if (mode === 'immediate') {
+      const index = mockedDiets.indexOf(found);
+      mockedDiets.splice(index, 1);
+    } else {
+      deletedDietIds.add(dietId.id);
+    }
+
+    return {} as T;
   }
 
   // Администрирование: персонал и роли (staff.v1.StaffService)
@@ -1236,11 +1583,11 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       headcount: number;
     };
     const facility = findFacility(body.facilityId);
-    if (!facility) throw new Error('mock: ЛПУ не найдено');
+    if (!facility) throw new Error('mock: учреждение не найдено');
     const department = facility.departments.find((item) => item.id === body.departmentId);
-    if (!department) throw new Error('mock: отделение не найдено');
+    if (!department) throw new Error('mock: группа/класс не найдены');
     const table = department.tables.find((item) => item.id === body.tableId);
-    if (!table) throw new Error('mock: стол не найден');
+    if (!table) throw new Error('mock: рацион не найден');
     table.headcount = Math.max(0, body.headcount);
     rebuildDistribution();
     return { kitchens } as T;
@@ -1251,6 +1598,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       address: string;
+      type: string;
       kettleNumber: number;
       departments: Array<{
         id: string;
@@ -1259,11 +1607,12 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       }>;
     };
     const facility = findFacility(facilityRoute.id);
-    if (!facility) throw new Error('mock: ЛПУ не найдено');
+    if (!facility) throw new Error('mock: учреждение не найдено');
 
     const oldDepartments = facility.departments;
     facility.name = body.name.trim();
     facility.address = body.address.trim();
+    facility.type = isFacilityType(body.type) ? body.type : facility.type;
     facility.kettleNumber = Math.max(1, body.kettleNumber);
     facility.departments = body.departments.map((department) => {
       const oldDepartment = oldDepartments.find((item) => item.id === department.id);
@@ -1340,6 +1689,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       date: string;
       invoiceNumber: string;
       warehouseId: string;
+      unitId?: string;
       items: Array<{
         productId?: string;
         productName?: string;
@@ -1375,6 +1725,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       date: body.date,
       invoiceNumber: body.invoiceNumber,
       warehouseId: body.warehouseId,
+      unitId: body.unitId ?? undefined,
       items: body.items.map((item, idx) => ({
         id: `rec-item-${Date.now()}-${idx}`,
         productId: item.productId ?? `prod-${Date.now()}-${idx}`,
@@ -1399,6 +1750,66 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     };
     warehouseReceipts.unshift(receipt);
     return { receipt } as T;
+  }
+
+  if (route.startsWith('/v1/warehouse-receipts/') && method === 'PATCH') {
+    const id = route.split('/').pop() ?? '';
+    const body = options.body as {
+      date: string;
+      invoiceNumber: string;
+      warehouseId: string;
+      unitId?: string;
+      items: Array<{
+        productId?: string;
+        productName?: string;
+        unit?: string;
+        quantity: number;
+        unitPrice: number;
+        packaging?: string;
+        productionDate?: string;
+        manufacturer?: string;
+        supplier?: string;
+        documentNumber?: string;
+        documentType?: string;
+        organoleptic?: string;
+        storageConditions?: string;
+        expiryDate?: string;
+        note?: string;
+      }>;
+    };
+    const existing = warehouseReceipts.find((r) => r.id === id);
+    if (!existing) {
+      return { error: { code: 404, message: 'Приход не найден' } } as T;
+    }
+    const updated = {
+      ...existing,
+      date: body.date,
+      invoiceNumber: body.invoiceNumber,
+      warehouseId: body.warehouseId,
+      unitId: body.unitId ?? undefined,
+      items: body.items.map((item, idx) => ({
+        id: existing.items[idx]?.id ?? `rec-item-${Date.now()}-${idx}`,
+        productId: item.productId ?? existing.items[idx]?.productId ?? `prod-${Date.now()}-${idx}`,
+        productName: item.productName || existing.items[idx]?.productName || 'Неизвестный товар',
+        quantity: item.quantity,
+        unit: item.unit || existing.items[idx]?.unit || 'шт',
+        unitPrice: item.unitPrice,
+        totalPrice: item.quantity * item.unitPrice,
+        packaging: item.packaging ?? '',
+        productionDate: item.productionDate ?? '',
+        manufacturer: item.manufacturer ?? '',
+        supplier: item.supplier ?? '',
+        documentType: item.documentType ?? '',
+        documentNumber: item.documentNumber ?? '',
+        organoleptic: item.organoleptic ?? '',
+        storageConditions: item.storageConditions ?? '',
+        expiryDate: item.expiryDate ?? '',
+        note: item.note ?? '',
+      })),
+      updatedAt: new Date().toISOString(),
+    } as WarehouseReceipt;
+    Object.assign(existing, updated);
+    return { receipt: existing } as T;
   }
 
   // Склад: остатки
@@ -1509,6 +1920,7 @@ const kitchens: KitchenUnit[] = [
         id: 'lpu-1',
         name: 'Больница №1',
         address: 'корп. А',
+        type: 'hospital',
         kettleNumber: 1,
         departments: [
           {
@@ -1516,14 +1928,15 @@ const kitchens: KitchenUnit[] = [
             name: 'Терапия',
             tables: [
               { id: 'tbl-1-1-1', name: 'Основная', headcount: 42 },
-              { id: 'tbl-1-1-2', name: 'Щадящая', headcount: 18 },
+              { id: 'tbl-1-1-2', name: 'Щадящая', headcount: 14 },
+              { id: 'tbl-1-1-3', name: 'Диабетическая', headcount: 6 },
             ],
           },
           {
             id: 'dep-1-2',
             name: 'Хирургия',
             tables: [
-              { id: 'tbl-1-2-1', name: 'Основная', headcount: 30 },
+              { id: 'tbl-1-2-1', name: 'Основная', headcount: 210 },
               { id: 'tbl-1-2-2', name: 'Диабетическая', headcount: 12 },
             ],
           },
@@ -1531,14 +1944,23 @@ const kitchens: KitchenUnit[] = [
       },
       {
         id: 'lpu-3',
-        name: 'Поликлиника №3',
-        address: 'дневной стационар',
+        name: 'Больница №4',
+        address: 'корп. Д',
+        type: 'hospital',
         kettleNumber: 1,
         departments: [
           {
             id: 'dep-3-1',
-            name: 'Дневной стационар',
-            tables: [{ id: 'tbl-3-1-1', name: 'Основная', headcount: 22 }],
+            name: 'Кардиология',
+            tables: [{ id: 'tbl-3-1-1', name: 'Основная', headcount: 38 }],
+          },
+          {
+            id: 'dep-3-2',
+            name: 'Неврология',
+            tables: [
+              { id: 'tbl-3-2-1', name: 'Основная', headcount: 45 },
+              { id: 'tbl-3-2-2', name: 'Диабетическая', headcount: 5 },
+            ],
           },
         ],
       },
@@ -1550,43 +1972,48 @@ const kitchens: KitchenUnit[] = [
     facilities: [
       {
         id: 'lpu-2',
-        name: 'Больница №5',
+        name: 'Школа №5',
         address: 'корп. Б',
+        type: 'school',
         kettleNumber: 2,
         departments: [
           {
             id: 'dep-2-1',
-            name: 'Педиатрия',
+            name: 'Начальная школа',
             tables: [
-              { id: 'tbl-2-1-1', name: 'Основная', headcount: 36 },
-              { id: 'tbl-2-1-2', name: 'Щадящая', headcount: 14 },
+              { id: 'tbl-2-1-1', name: 'Основная', headcount: 96 },
+              { id: 'tbl-2-1-2', name: 'Вегетарианская', headcount: 8 },
             ],
           },
           {
             id: 'dep-2-2',
-            name: 'Неврология',
-            tables: [{ id: 'tbl-2-2-1', name: 'Основная', headcount: 28 }],
+            name: 'Средняя и старшая школа',
+            tables: [
+              { id: 'tbl-2-2-1', name: 'Основная', headcount: 140 },
+              { id: 'tbl-2-2-2', name: 'Безглютеновая', headcount: 4 },
+            ],
           },
         ],
       },
       {
         id: 'lpu-5',
-        name: 'Роддом №1',
-        address: 'корп. Г',
+        name: 'Детский сад №3',
+        address: 'ул. Садовая, 5',
+        type: 'kindergarten',
         kettleNumber: 2,
         departments: [
           {
             id: 'dep-5-1',
-            name: 'Послеродовое',
+            name: 'Младшая группа',
             tables: [
-              { id: 'tbl-5-1-1', name: 'Основная', headcount: 40 },
-              { id: 'tbl-5-1-2', name: 'Щадящая', headcount: 15 },
+              { id: 'tbl-5-1-1', name: 'Основная', headcount: 30 },
+              { id: 'tbl-5-1-2', name: 'Щадящая', headcount: 6 },
             ],
           },
           {
             id: 'dep-5-2',
-            name: 'Патология',
-            tables: [{ id: 'tbl-5-2-1', name: 'Основная', headcount: 20 }],
+            name: 'Подготовительная группа',
+            tables: [{ id: 'tbl-5-2-1', name: 'Основная', headcount: 34 }],
           },
         ],
       },
@@ -1598,29 +2025,51 @@ const kitchens: KitchenUnit[] = [
     facilities: [
       {
         id: 'lpu-4',
-        name: 'Больница №2',
+        name: 'Школа №2',
         address: 'корп. В',
+        type: 'school',
         kettleNumber: 3,
         departments: [
           {
             id: 'dep-4-1',
-            name: 'Кардиология',
+            name: '1–4 классы',
             tables: [
-              { id: 'tbl-4-1-1', name: 'Основная', headcount: 38 },
-              { id: 'tbl-4-1-2', name: 'Щадящая', headcount: 16 },
+              { id: 'tbl-4-1-1', name: 'Основная', headcount: 88 },
+              { id: 'tbl-4-1-2', name: 'Безлактозная', headcount: 7 },
             ],
           },
           {
             id: 'dep-4-2',
-            name: 'Реанимация',
-            tables: [{ id: 'tbl-4-2-1', name: 'Основная', headcount: 10 }],
+            name: '5–11 классы',
+            tables: [
+              { id: 'tbl-4-2-1', name: 'Основная', headcount: 150 },
+              { id: 'tbl-4-2-2', name: 'Диабетическая', headcount: 9 },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'lpu-6',
+        name: 'Больница №3',
+        address: 'корп. Д',
+        type: 'hospital',
+        kettleNumber: 3,
+        departments: [
+          {
+            id: 'dep-6-1',
+            name: 'Терапия',
+            tables: [
+              { id: 'tbl-6-1-1', name: 'Основная', headcount: 42 },
+              { id: 'tbl-6-1-2', name: 'Щадящая', headcount: 18 },
+              { id: 'tbl-6-1-3', name: 'Диабетическая', headcount: 12 },
+            ],
           },
           {
-            id: 'dep-4-3',
-            name: 'Ортопедия',
+            id: 'dep-6-2',
+            name: 'Хирургия',
             tables: [
-              { id: 'tbl-4-3-1', name: 'Основная', headcount: 24 },
-              { id: 'tbl-4-3-2', name: 'Диабетическая', headcount: 8 },
+              { id: 'tbl-6-2-1', name: 'Основная', headcount: 30 },
+              { id: 'tbl-6-2-2', name: 'Диабетическая', headcount: 8 },
             ],
           },
         ],

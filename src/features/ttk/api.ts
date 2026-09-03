@@ -119,6 +119,19 @@ export function useUpdateRecipe() {
   });
 }
 
+export type RecipeDeleteMode = 'soft' | 'immediate';
+
+export function useDeleteRecipe() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: RecipeDeleteMode }) =>
+      api.request<void>(`/v1/ttk/${id}?mode=${mode}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useImportCollections() {
   const api = useApi();
   const invalidate = useInvalidate();

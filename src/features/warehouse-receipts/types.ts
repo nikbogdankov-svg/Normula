@@ -4,6 +4,8 @@ export interface WarehouseReceipt {
   date: string; // ISO 8601
   invoiceNumber: string;
   warehouseId: string;
+  /** Пищеблок, на который записан приход. */
+  unitId?: string;
   items: ReceiptItem[];
   createdAt: string;
   updatedAt: string;
@@ -36,6 +38,8 @@ export interface CreateReceiptRequest {
   date: string;
   invoiceNumber: string;
   warehouseId: string;
+  /** Пищеблок, на который записывается приход. */
+  unitId?: string;
   items: Array<{
     productId?: string;
     productName?: string;

@@ -12,9 +12,10 @@ import {
   CircleCheck,
   CircleDashed,
 } from '@gravity-ui/icons';
-import { useCreateReceipt } from './api';
+import { useCreateReceipt, useUpdateReceipt } from './api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import type { CreateReceiptRequest } from './types';
+import { useKitchen } from '@/features/objects/api';
+import type { CreateReceiptRequest, ReceiptItem, WarehouseReceipt } from './types';
 import './create-receipt-drawer.css';
 
 /**
@@ -228,23 +229,56 @@ function toIsoDate(value: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** гггг-мм-дд → дд/мм/гггг (для показа в форме). */
+function isoToLocal(value?: string): string {
+  if (!value) return '';
+  const [yyyy, mm, dd] = value.split('-');
+  if (!yyyy || !mm || !dd) return value;
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+/** Строка прихода → черновик строки формы. */
+function receiptToDraft(item: ReceiptItem): DraftItem {
+  return {
+    productName: item.productName,
+    unit: item.unit,
+    quantity: item.quantity ? String(item.quantity) : '',
+    unitPrice: item.unitPrice ? String(item.unitPrice) : '',
+    packaging: item.packaging ?? '',
+    productionDate: isoToLocal(item.productionDate),
+    manufacturer: item.manufacturer ?? '',
+    supplier: item.supplier ?? '',
+    documentNumber: item.documentNumber ?? '',
+    documentType: item.documentType ?? '',
+    organoleptic: item.organoleptic ?? '',
+    storageConditions: item.storageConditions ?? '',
+    expiryDate: isoToLocal(item.expiryDate),
+    note: item.note ?? '',
+  };
+}
+
 /** Создание прихода (накладной) в нижнем drawer. */
 export function CreateReceiptDrawer({
   open,
   onClose,
   warehouseId,
+  initial = null,
 }: {
   open: boolean;
   onClose: () => void;
   warehouseId: string;
+  initial?: WarehouseReceipt | null;
 }) {
   const height = useDrawerHeight();
   const create = useCreateReceipt();
+  const update = useUpdateReceipt();
   const toaster = useToaster();
+  const kitchens = useKitchen();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [date, setDate] = useState(todayLocal());
+  const [unitId, setUnitId] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
@@ -254,14 +288,24 @@ export function CreateReceiptDrawer({
       return;
     }
 
-    setInvoiceNumber('');
-    setDate(todayLocal());
-    setItems([emptyItem()]);
-    setExpandedIndex(0);
+    if (initial) {
+      setInvoiceNumber(initial.invoiceNumber);
+      setDate(isoToLocal(initial.date));
+      setUnitId(initial.unitId ?? '');
+      setItems(initial.items.length ? initial.items.map(receiptToDraft) : [emptyItem()]);
+      setExpandedIndex(0);
+    } else {
+      setInvoiceNumber('');
+      setDate(todayLocal());
+      setUnitId('');
+      setItems([emptyItem()]);
+      setExpandedIndex(0);
+    }
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id]);
 
   // После анимации закрытия размонтируем drawer.
   useEffect(() => {
@@ -294,6 +338,7 @@ export function CreateReceiptDrawer({
     date: toIsoDate(date.trim()),
     invoiceNumber: invoiceNumber.trim(),
     warehouseId,
+    unitId: unitId || undefined,
     items: filledItems.map((row) => ({
       productName: row.productName,
       unit: row.unit,
@@ -313,19 +358,28 @@ export function CreateReceiptDrawer({
   });
 
   const submit = () => {
-    create.mutate(getBody(), {
-      onSuccess: () => {
-        toaster.add({ name: 'receipt-created', title: 'Приход создан', theme: 'success' });
-        requestClose();
-      },
-      onError: (e) =>
-        toaster.add({
-          name: 'receipt-create',
-          title: 'Ошибка',
-          content: e.message,
-          theme: 'danger',
-        }),
-    });
+    const onSuccess = () => {
+      toaster.add({
+        name: initial ? 'receipt-updated' : 'receipt-created',
+        title: initial ? 'Приход обновлён' : 'Приход создан',
+        theme: 'success',
+      });
+      requestClose();
+    };
+    const onError = (e: Error) =>
+      toaster.add({
+        name: initial ? 'receipt-update' : 'receipt-create',
+        title: 'Ошибка',
+        content: e.message,
+        theme: 'danger',
+      });
+
+    const body = getBody();
+    if (initial) {
+      update.mutate({ id: initial.id, data: body }, { onSuccess, onError });
+    } else {
+      create.mutate(body, { onSuccess, onError });
+    }
   };
 
   if (!mounted) return null;
@@ -346,7 +400,9 @@ export function CreateReceiptDrawer({
       <div className="create-receipt-drawer__card">
         <div className="create-receipt-drawer__header">
           <div className="create-receipt-drawer__header-inner">
-            <Text variant="subheader-3">Добавить приход </Text>
+            <Text variant="subheader-3">
+              {initial ? 'Редактировать приход' : 'Добавить приход'}{' '}
+            </Text>
             <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
               <Icon data={Xmark} size={20} />
             </Button>
@@ -365,6 +421,20 @@ export function CreateReceiptDrawer({
                 style={{ flex: 1 }}
               />
               <ItemDate label="Дата:" value={date} onUpdate={(v) => setDate(v)} flex={1} />
+              <div style={{ flex: 1 }}>
+                <Select
+                  size="l"
+                  label="Пищеблок:"
+                  placeholder="Выберите пищеблок"
+                  value={unitId ? [unitId] : []}
+                  options={(kitchens.data?.kitchens ?? []).map((k) => ({
+                    value: k.id,
+                    content: k.name,
+                  }))}
+                  onUpdate={(next) => setUnitId(next[0] ?? '')}
+                  width="max"
+                />
+              </div>
             </Flex>
 
             <Flex direction="column" gap={3}>
@@ -398,19 +468,16 @@ export function CreateReceiptDrawer({
                       onUpdate={(v) => updateItem(index, { unitPrice: v })}
                     />
                     <ItemStatusIcon status={itemStatus(row, index, expandedIndex)} />
-                    {index > 0 ? (
-                      <Button
-                        view="flat"
-                        size="l"
-                        onClick={() => removeItem(index)}
-                        title="Удалить"
-                        aria-label="Удалить товар"
-                      >
-                        <Icon data={TrashBin} size={18} />
-                      </Button>
-                    ) : (
-                      <span style={{ width: 36, flexShrink: 0 }} />
-                    )}
+                    <Button
+                      view="flat"
+                      size="l"
+                      onClick={() => removeItem(index)}
+                      title="Удалить"
+                      aria-label="Удалить товар"
+                      disabled={items.length <= 1}
+                    >
+                      <Icon data={TrashBin} size={18} />
+                    </Button>
                     <Button
                       view="flat"
                       size="l"
@@ -534,10 +601,10 @@ export function CreateReceiptDrawer({
               size="l"
               onClick={submit}
               disabled={!allItemsComplete}
-              loading={create.isPending}
+              loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={Plus} size={16} />
-              Создать приход
+              {initial ? 'Сохранить' : 'Создать приход'}
             </Button>
           </div>
         </div>

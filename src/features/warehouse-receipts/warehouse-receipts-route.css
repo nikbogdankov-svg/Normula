@@ -80,6 +80,7 @@
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
   padding-inline-end: 12px;
+  text-align: end;
 }
 
 .wr-page__header {
@@ -108,6 +109,7 @@
 .wr-page__scroll .wr-page__table-body .g-table__body .g-table__row .g-table__cell:last-child {
   border-radius: 0 8px 8px 0;
   background-clip: padding-box;
+  text-align: end;
 }
 
 /* Hover строки-карточки: переопределяем глобальный стиль brand.css,

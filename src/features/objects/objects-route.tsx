@@ -69,7 +69,7 @@ export function ObjectsRoute() {
   const kitchens = kitchen.data.kitchens;
   const activeKitchenId = selectedKitchenId ?? kitchens[0]?.id ?? null;
   const facilities = activeKitchenId
-    ? kitchens.find((k) => k.id === activeKitchenId)?.facilities ?? []
+    ? (kitchens.find((k) => k.id === activeKitchenId)?.facilities ?? [])
     : kitchens.flatMap((k) => k.facilities);
 
   return (
@@ -120,8 +120,7 @@ function FacilitiesCard({
         for (const table of department.tables) {
           const prevRow = result[result.length - 1];
           const showFacility = !prevRow || prevRow.facilityId !== facility.id;
-          const showDepartment =
-            showFacility || !prevRow || prevRow.departmentId !== department.id;
+          const showDepartment = showFacility || !prevRow || prevRow.departmentId !== department.id;
           result.push({
             id: table.id,
             facilityId: facility.id,
@@ -168,18 +167,19 @@ function FacilitiesCard({
             }))}
           />
         )}
-        <Button
-          view="normal-contrast"
-          size="l"
-          onClick={() => setCreating(true)}
-        >
+        <Button view="normal-contrast" size="l" onClick={() => setCreating(true)}>
           <Icon data={Plus} size={16} />
           Добавить пищеблок
         </Button>
       </Flex>
 
       <Card view="filled" style={{ padding: 0 }}>
-        <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ padding: '12px 16px' }}>
+        <Flex
+          alignItems="center"
+          justifyContent="space-between"
+          gap={2}
+          style={{ padding: '12px 16px' }}
+        >
           <Flex alignItems="center" gap={2}>
             <Icon data={House} size={16} />
             <Text variant="subheader-2">Пищеблок</Text>
@@ -197,63 +197,65 @@ function FacilitiesCard({
           )}
         </Flex>
 
-      <div
-        style={{
-          borderTop: '1px solid var(--g-color-line-generic)',
-          paddingTop: 4,
-          paddingBottom: 8,
-        }}
-      >
-        {facilities.length === 0 ? (
-          <EmptyState text="ЛПУ пока не добавлены" />
-        ) : rows.length === 0 ? (
-          <EmptyState text="В этом пищеблоке нет отделений" />
-        ) : (
-          <div className="admin-table-wrap">
-            <Table
-              width="max"
-              className="admin-table objects-group-table objects-facility-tables"
-              data={rows}
-              getRowClassNames={(row) =>
-                groupRowClassNames({
-                  isLastInDepartment: row.isLastInDepartment,
-                  isLastInFacility: row.isLastInFacility,
-                  nextShowDepartment: row.nextShowDepartment,
-                  nextShowFacility: row.nextShowFacility,
-                })
-              }
-              columns={[
-                {
-                  id: 'facilityName',
-                  name: 'ЛПУ',
-                  width: '35%',
-                  template: (row) => (row.showFacility ? row.facilityName : null),
-                  placeholder: () => null,
-                },
-                {
-                  id: 'departmentName',
-                  name: 'Отделение',
-                  width: '35%',
-                  template: (row) => (row.showDepartment ? row.departmentName : null),
-                  placeholder: () => null,
-                },
-                {
-                  id: 'tableName',
-                  name: 'Стол',
-                  width: '30%',
-                },
-              ]}
-            />
-          </div>
-        )}
-      </div>
-
-    </Card>
+        <div
+          style={{
+            borderTop: '1px solid var(--g-color-line-generic)',
+            paddingTop: 4,
+            paddingBottom: 8,
+          }}
+        >
+          {facilities.length === 0 ? (
+            <EmptyState text="Учреждения пока не добавлены" />
+          ) : rows.length === 0 ? (
+            <EmptyState text="В этом пищеблоке нет групп/классов" />
+          ) : (
+            <div className="admin-table-wrap">
+              <Table
+                width="max"
+                className="admin-table objects-group-table objects-facility-tables"
+                data={rows}
+                getRowClassNames={(row) =>
+                  groupRowClassNames({
+                    isLastInDepartment: row.isLastInDepartment,
+                    isLastInFacility: row.isLastInFacility,
+                    nextShowDepartment: row.nextShowDepartment,
+                    nextShowFacility: row.nextShowFacility,
+                  })
+                }
+                columns={[
+                  {
+                    id: 'facilityName',
+                    name: 'Учреждение',
+                    width: '35%',
+                    template: (row) => (row.showFacility ? row.facilityName : null),
+                    placeholder: () => null,
+                  },
+                  {
+                    id: 'departmentName',
+                    name: 'Группа / класс',
+                    width: '35%',
+                    template: (row) => (row.showDepartment ? row.departmentName : null),
+                    placeholder: () => null,
+                  },
+                  {
+                    id: 'tableName',
+                    name: 'Рацион',
+                    width: '30%',
+                  },
+                ]}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
 
       <EditFacilityDialog
         kitchen={editing ? selectedKitchen : null}
         mode={creating ? 'create' : 'edit'}
-        onClose={() => { setEditing(false); setCreating(false); }}
+        onClose={() => {
+          setEditing(false);
+          setCreating(false);
+        }}
       />
     </>
   );

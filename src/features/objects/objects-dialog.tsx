@@ -1,28 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Button, Drawer, Icon, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import { Button, Drawer, Icon, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useCreateKitchen, useUpdateFacility } from './api';
-import type { Facility, KitchenUnit, UpdateFacilityRequest } from './types';
+import {
+  DIET_CATALOG,
+  type DietTypeId,
+  type Facility,
+  type FacilityType,
+  type KitchenUnit,
+  type UpdateFacilityRequest,
+} from './types';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './kitchen-drawer.css';
-
-const TABLE_TYPES = [
-  { id: 'main', label: 'Основной', storageName: 'Основная' },
-  { id: 'gentle', label: 'Щадящий', storageName: 'Щадящая' },
-  { id: 'diet', label: 'Диетический', storageName: 'Диабетическая' },
-] as const;
-
-type TableTypeId = (typeof TABLE_TYPES)[number]['id'];
 
 type DepartmentForm = {
   id: string;
   name: string;
-  selectedTypes: TableTypeId[];
-  tableIds: Partial<Record<TableTypeId, string>>;
+  selectedTypes: DietTypeId[];
+  tableIds: Partial<Record<DietTypeId, string>>;
 };
 
 type FacilityForm = {
   id: string;
+  type: FacilityType;
   name: string;
   departments: DepartmentForm[];
 };
@@ -32,12 +32,10 @@ type KitchenForm = {
   facilities: FacilityForm[];
 };
 
-function tableNameToTypeId(name: string): TableTypeId | null {
+function tableNameToTypeId(name: string): DietTypeId | null {
   const normalized = name.toLowerCase();
-  if (normalized.includes('основ')) return 'main';
-  if (normalized.includes('щад')) return 'gentle';
-  if (normalized.includes('диет')) return 'diet';
-  return null;
+  const match = DIET_CATALOG.find((item) => normalized.includes(item.storageName.toLowerCase()));
+  return match?.id ?? null;
 }
 
 const emptyDepartment = (): DepartmentForm => ({
@@ -49,6 +47,7 @@ const emptyDepartment = (): DepartmentForm => ({
 
 const emptyFacility = (): FacilityForm => ({
   id: `fac-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  type: 'school',
   name: '',
   departments: [emptyDepartment()],
 });
@@ -56,10 +55,11 @@ const emptyFacility = (): FacilityForm => ({
 function facilityToForm(facility: Facility): FacilityForm {
   return {
     id: facility.id,
+    type: facility.type,
     name: facility.name,
     departments: facility.departments.map((department) => {
-      const tableIds: Partial<Record<TableTypeId, string>> = {};
-      const selectedTypes: TableTypeId[] = [];
+      const tableIds: Partial<Record<DietTypeId, string>> = {};
+      const selectedTypes: DietTypeId[] = [];
 
       for (const table of department.tables) {
         const typeId = tableNameToTypeId(table.name);
@@ -95,12 +95,13 @@ function facilityFormToPatch(form: FacilityForm, original: Facility): UpdateFaci
   return {
     name: form.name.trim(),
     address: original.address,
+    type: form.type,
     kettleNumber: original.kettleNumber,
     departments: form.departments.map((department) => ({
       id: department.id,
       name: department.name.trim(),
       tables: department.selectedTypes.map((typeId) => {
-        const type = TABLE_TYPES.find((item) => item.id === typeId)!;
+        const type = DIET_CATALOG.find((item) => item.id === typeId)!;
         return {
           id:
             department.tableIds[typeId] ??
@@ -134,6 +135,7 @@ function hasChanges(form: KitchenForm, original: KitchenUnit): boolean {
     const facOrig = original.facilities.find((f) => f.id === facForm.id);
     if (!facOrig) return true;
     if (facForm.name.trim() !== facOrig.name) return true;
+    if (facForm.type !== facOrig.type) return true;
     if (facForm.departments.length !== facOrig.departments.length) return true;
 
     for (let j = 0; j < facForm.departments.length; j++) {
@@ -188,7 +190,7 @@ function FacilityBlock({
     });
   };
 
-  const toggleTableType = (deptIndex: number, typeId: TableTypeId) => {
+  const toggleTableType = (deptIndex: number, typeId: DietTypeId) => {
     const department = facility.departments[deptIndex];
     const selected = department.selectedTypes.includes(typeId);
 
@@ -210,18 +212,45 @@ function FacilityBlock({
       <Flex gap={2} alignItems="flex-end">
         <TextInput
           size="l"
-          label="Название ЛПУ:"
-          placeholder="Больница №1"
+          label="Название учреждения:"
+          placeholder="Школа №1"
           value={facility.name}
           onUpdate={(value) => onUpdate(facilityIndex, { name: value })}
           style={{ flex: 1 }}
         />
+        <Flex direction="column" gap={1}>
+          <Select
+            size="l"
+            width={200}
+            value={[facility.type]}
+            options={[
+              { value: 'school', content: 'Школа' },
+              { value: 'kindergarten', content: 'Детский сад' },
+              { value: 'hospital', content: 'Больница' },
+            ]}
+            onUpdate={(newValue) => {
+              const nextType = newValue[0] as FacilityType;
+              onUpdate(facilityIndex, {
+                type: nextType,
+                departments: facility.departments.map((department) => ({
+                  ...department,
+                  selectedTypes: department.selectedTypes.filter((id) =>
+                    (
+                      DIET_CATALOG.find((item) => item.id === id)?.appliesTo as
+                        readonly string[] | undefined
+                    )?.includes(nextType)
+                  ),
+                })),
+              });
+            }}
+          />
+        </Flex>
         {canRemove && (
           <Button
             view="flat"
             size="l"
-            title="Удалить ЛПУ"
-            aria-label="Удалить ЛПУ"
+            title="Удалить учреждение"
+            aria-label="Удалить учреждение"
             onClick={() => onRemove(facilityIndex)}
           >
             <Icon data={TrashBin} size={18} />
@@ -230,17 +259,24 @@ function FacilityBlock({
       </Flex>
 
       {facility.departments.map((department, deptIndex) => (
-        <Flex
-          key={department.id}
-          direction="column"
-          gap={2}
-          className="kitchen-drawer__department"
-        >
+        <Flex key={department.id} direction="column" gap={2} className="kitchen-drawer__department">
           <Flex gap={2} alignItems="flex-end">
             <TextInput
               size="l"
-              label="Отделение:"
-              placeholder="Терапия"
+              label={
+                facility.type === 'school'
+                  ? 'Класс (параллель):'
+                  : facility.type === 'kindergarten'
+                    ? 'Группа:'
+                    : 'Отделение:'
+              }
+              placeholder={
+                facility.type === 'school'
+                  ? '1–4 классы'
+                  : facility.type === 'kindergarten'
+                    ? 'Старшая группа'
+                    : 'Терапия'
+              }
               value={department.name}
               onUpdate={(value) => updateDepartment(deptIndex, { name: value })}
               style={{ flex: 1 }}
@@ -249,8 +285,8 @@ function FacilityBlock({
               <Button
                 view="flat"
                 size="l"
-                title="Удалить отделение"
-                aria-label="Удалить отделение"
+                title="Удалить группу"
+                aria-label="Удалить группу"
                 onClick={() =>
                   onUpdate(facilityIndex, {
                     departments: facility.departments.filter((_, i) => i !== deptIndex),
@@ -263,11 +299,13 @@ function FacilityBlock({
           </Flex>
 
           <Text variant="body-1" className="kitchen-drawer__table-hint">
-            Стол (должен быть выбран хотя бы один)
+            Рацион (должен быть выбран хотя бы один)
           </Text>
 
           <Flex gap={2} wrap>
-            {TABLE_TYPES.map((type) => (
+            {DIET_CATALOG.filter((item) =>
+              (item.appliesTo as readonly string[]).includes(facility.type)
+            ).map((type) => (
               <TableTypeChip
                 key={type.id}
                 label={type.label}
@@ -290,7 +328,11 @@ function FacilityBlock({
         style={{ alignSelf: 'flex-start' }}
       >
         <Icon data={Plus} size={16} />
-        Добавить отделение
+        {facility.type === 'school'
+          ? 'Добавить класс'
+          : facility.type === 'kindergarten'
+            ? 'Добавить группу'
+            : 'Добавить отделение'}
       </Button>
     </Flex>
   );
@@ -407,7 +449,12 @@ export function EditFacilityDialog({
           requestClose();
         },
         onError: (e) =>
-          toaster.add({ name: 'kitchen-create', title: 'Не удалось создать', content: e.message, theme: 'danger' }),
+          toaster.add({
+            name: 'kitchen-create',
+            title: 'Не удалось создать',
+            content: e.message,
+            theme: 'danger',
+          }),
       });
       return;
     }
@@ -438,7 +485,7 @@ export function EditFacilityDialog({
           title: 'Не удалось сохранить',
           content: e.message,
           theme: 'danger',
-        }),
+        })
       );
   };
 
@@ -509,7 +556,7 @@ export function EditFacilityDialog({
               style={{ alignSelf: 'flex-start' }}
             >
               <Icon data={Plus} size={16} />
-              Добавить ЛПУ
+              Добавить учреждение
             </Button>
           </Flex>
         </div>

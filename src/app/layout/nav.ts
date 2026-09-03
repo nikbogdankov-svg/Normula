@@ -1,11 +1,11 @@
 import {
-   Archive,
-   ArrowLeftFromLine,
-   ArrowRightArrowLeft,
-   ArrowRightToLine,
-   Box,
-   Calendar,
-   Cubes3Overlap,
+  Archive,
+  ArrowLeftFromLine,
+  ArrowRightArrowLeft,
+  ArrowRightToLine,
+  Box,
+  Calendar,
+  Cubes3Overlap,
   BookOpen,
   Files,
   FileText,
@@ -82,9 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: 'Финансы',
-    items: [
-      { to: '/app/accounts', label: 'Счета', icon: Wallet, wip: true },
-    ],
+    items: [{ to: '/app/accounts', label: 'Счета', icon: Wallet, wip: true }],
   },
   {
     title: 'Документы',
@@ -98,8 +96,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/norms', label: 'Нормы', icon: ListCheck, wip: true },
-      { to: '/app/products', label: 'Продукты', icon: ShoppingCart, wip: true },
-      { to: '/app/diets', label: 'Диеты', icon: Heart, wip: true },
+      { to: '/app/products', label: 'Продукты', icon: ShoppingCart },
+      { to: '/app/diets', label: 'Диеты', icon: Heart },
     ],
   },
   {

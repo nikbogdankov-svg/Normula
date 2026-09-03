@@ -34,3 +34,21 @@ export function useCreateReceipt() {
     },
   });
 }
+
+export function useUpdateReceipt() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CreateReceiptRequest }) =>
+      api.request<WarehouseReceipt>(`/v1/warehouse-receipts/${id}`, {
+        method: 'PATCH',
+        body: data,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: [KEY, api.organizationId],
+      });
+    },
+  });
+}
