@@ -1,27 +1,42 @@
 import { useEffect, useState } from 'react';
-import { Button, Dialog, Flex, Icon, useToaster } from '@gravity-ui/uikit';
-import { Plus } from '@gravity-ui/icons';
-import { useCreateProduct, useProductCategories } from './api';
+import { Button, Dialog, Flex, useToaster } from '@gravity-ui/uikit';
+import { useCreateProduct } from './api';
 import { useProductForm } from './product-form';
 import './product-dialog.css';
 
-/** Создание продукта в модалке (popup size s). */
-export function CreateProductDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * Минимальный диалог создания продукта (имя + единица), вызываемый inline
+ * из автокомплитов ТТК и приходных склада. Возвращает созданный продукт.
+ */
+export function CreateProductDialog({
+  open,
+  initialName,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  initialName?: string;
+  onClose: () => void;
+  onCreated: (product: { id: string; name: string; unit: string }) => void;
+}) {
   const create = useCreateProduct();
-  const categories = useProductCategories();
   const toaster = useToaster();
   const [formKey, setFormKey] = useState(0);
-  const form = useProductForm(null, String(formKey), categories.data?.categories ?? []);
+  const form = useProductForm(null, String(formKey));
 
-  // При каждом открытии — свежая форма.
   useEffect(() => {
-    if (open) setFormKey((key) => key + 1);
+    if (open) {
+      setFormKey((key) => key + 1);
+      if (initialName) form.setInitialName(initialName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при открытии
   }, [open]);
 
   const submit = () => {
     create.mutate(form.getBody(), {
-      onSuccess: () => {
+      onSuccess: (data) => {
         toaster.add({ name: 'product-created', title: 'Продукт создан', theme: 'success' });
+        onCreated(data.product);
         onClose();
       },
       onError: (e) =>
@@ -52,7 +67,6 @@ export function CreateProductDialog({ open, onClose }: { open: boolean; onClose:
             disabled={!form.canSubmit}
             loading={create.isPending}
           >
-            <Icon data={Plus} size={16} />
             Создать продукт
           </Button>
         </Flex>

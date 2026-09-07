@@ -1,0 +1,22 @@
+/* Автокомплит продукта (ProductPicker) в ТТК и приходных склада. */
+
+.product-picker__select {
+  width: 100%;
+}
+
+.product-picker__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-picker__unit {
+  color: var(--g-color-text-secondary);
+}
+
+.product-picker__create-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--g-color-text-link);
+}

@@ -8,7 +8,7 @@ import type {
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
-import type { Product, ProductCategory } from '@/features/products/types';
+import type { Product } from '@/features/products/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
@@ -48,7 +48,6 @@ export const MOCKED_PREFIXES = [
   '/v1/warehouse',
   '/v1/write-offs',
   '/v1/products',
-  '/v1/product-categories',
   '/v1/diets',
 ];
 
@@ -293,8 +292,6 @@ const sampleRecipe = (index: number): Recipe => {
     portionYield: index % 2 === 0 ? '150/50' : '90/50',
     price: 95 + (index % 7) * 18,
     kcal,
-    temperature: 'Отпуск не ниже 65°С',
-    shelfLife: 'Не более 2х часов с момента реализации',
     recipe:
       'Подготовленное мясо, нарезанное широкими кусками, отбивают до толщины 5-8 мм и нарезают ' +
       'брусочками длиной 3-4 см массой 5-7 г. Затем кладут ровным слоем на сковороду, посыпают ' +
@@ -371,7 +368,7 @@ const sampleRecipe = (index: number): Recipe => {
 
 const recipes: Recipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
 
-// --- Продукты (справочник КБЖУ) ---
+// --- Продукты (общий справочник SKU: имя + единица) ---
 
 const PRODUCT_NAMES = [
   'Мука пшеничная',
@@ -396,60 +393,28 @@ const PRODUCT_NAMES = [
   'Яблоки',
 ];
 
-// Категории продуктов — справочник внутри справочника.
-const PRODUCT_CATEGORIES: ProductCategory[] = [
-  { id: 'c-1', name: 'Бакалея' },
-  { id: 'c-2', name: 'Овощи' },
-  { id: 'c-3', name: 'Фрукты и ягоды' },
-  { id: 'c-4', name: 'Молочные продукты и яйца' },
-  { id: 'c-5', name: 'Мясо и птица' },
-  { id: 'c-6', name: 'Рыба' },
-  { id: 'c-7', name: 'Крупы и макаронные изделия' },
-  { id: 'c-8', name: 'Хлебобулочные изделия' },
-];
-
-const PRODUCT_NAME_CATEGORY: Record<string, string> = {
-  'Мука пшеничная': 'c-1',
-  'Сахар-песок': 'c-1',
-  'Масло растительное': 'c-1',
-  Соль: 'c-1',
-  Картофель: 'c-2',
-  Морковь: 'c-2',
-  'Лук репчатый': 'c-2',
-  Яблоки: 'c-3',
-  'Молоко 3,2%': 'c-4',
-  'Яйцо куриное': 'c-4',
-  Сметана: 'c-4',
-  'Творог 9%': 'c-4',
-  'Сыр твёрдый': 'c-4',
-  Говядина: 'c-5',
-  Курица: 'c-5',
-  Рыба: 'c-6',
-  Рис: 'c-7',
-  Гречка: 'c-7',
-  Макароны: 'c-7',
-  'Хлеб пшеничный': 'c-8',
+// Единица закупки по умолчанию для справочных названий.
+const PRODUCT_UNIT: Record<string, string> = {
+  'Молоко 3,2%': 'л',
+  'Масло растительное': 'л',
+  'Яйцо куриное': 'шт',
+  Яблоки: 'кг',
 };
 
 const sampleProduct = (index: number): Product => {
-  const kcal = 80 + (index % 15) * 27;
+  const name = PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length];
 
   return {
     id: `p-${index}`,
-    name: PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length],
-    categoryId: PRODUCT_NAME_CATEGORY[PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length]] ?? 'c-1',
-    kcal,
-    protein: Number(((2 + (index % 9) * 1.7) / 1.7).toFixed(1)),
-    fat: Number(((1 + (index % 8) * 1.5) / 1.5).toFixed(1)),
-    carbs: Number(((8 + (index % 12) * 3.1) / 3.1).toFixed(1)),
-    vitaminC: Number((0.4 + (index % 7) * 2.3).toFixed(1)),
+    name,
+    unit: PRODUCT_UNIT[name] ?? 'кг',
   };
 };
 
 const products: Product[] = Array.from({ length: 20 }, (_, index) => sampleProduct(index + 1));
 
-// Soft-удалённые продукты: ушли из справочника, но остаются в меню и других
-// разделах до конца недели, поэтому из products не вырезаются.
+// Soft-удалённые продукты: ушли из справочника, но остаются привязаны к ТТК
+// и приходным до конца периода, поэтому из products не вырезаются.
 const deletedProductIds = new Set<string>();
 // Soft-удалённые ТТК: аналогично продуктам — остаются в меню до конца периода.
 const deletedRecipeIds = new Set<string>();
@@ -1003,10 +968,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       portionYield: string;
-      temperature: string;
-      shelfLife: string;
       recipe: string;
-      ingredients: Array<{ name: string; grossPerPortion: string; netPerPortion: string }>;
+      ingredients: Array<{
+        name: string;
+        productId?: string;
+        grossPerPortion: string;
+        netPerPortion: string;
+      }>;
     };
     const base = sampleRecipe(recipes.length + 1);
     const recipe: Recipe = {
@@ -1016,13 +984,12 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       collectionId: '',
       collectionName: '',
       portionYield: body.portionYield,
-      temperature: body.temperature,
-      shelfLife: body.shelfLife,
       recipe: body.recipe,
       ingredients: (body.ingredients ?? [])
         .filter((row) => row.name.trim())
         .map((row) => ({
           name: row.name,
+          productId: row.productId ?? undefined,
           grossPerPortion: row.grossPerPortion,
           netPerPortion: row.netPerPortion,
           grossPer100: '',
@@ -1043,22 +1010,24 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       portionYield: string;
-      temperature: string;
-      shelfLife: string;
       recipe: string;
-      ingredients: Array<{ name: string; grossPerPortion: string; netPerPortion: string }>;
+      ingredients: Array<{
+        name: string;
+        productId?: string;
+        grossPerPortion: string;
+        netPerPortion: string;
+      }>;
     };
 
     Object.assign(found, {
       name: body.name,
       portionYield: body.portionYield,
-      temperature: body.temperature,
-      shelfLife: body.shelfLife,
       recipe: body.recipe,
       ingredients: (body.ingredients ?? [])
         .filter((row) => row.name.trim())
         .map((row) => ({
           name: row.name,
+          productId: row.productId ?? undefined,
           grossPerPortion: row.grossPerPortion,
           netPerPortion: row.netPerPortion,
           grossPer100: '',
@@ -1085,60 +1054,26 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return {} as T;
   }
 
-  // Продукты (справочник КБЖУ)
-  if (route === '/v1/product-categories' && method === 'GET') {
-    return { categories: PRODUCT_CATEGORIES } as T;
-  }
-
+  // Продукты (общий справочник SKU)
   if (route === '/v1/products' && method === 'GET') {
     const query = (params.get('search') ?? '').trim().toLowerCase();
-    const sort = params.get('sort') ?? 'name';
-    const ascending = (params.get('order') ?? 'asc') !== 'desc';
-    const categoryId = params.get('categoryId') ?? '';
 
     let found = products.filter((p) => !deletedProductIds.has(p.id));
-    if (categoryId) found = found.filter((p) => p.categoryId === categoryId);
     if (query) found = found.filter((p) => p.name.toLowerCase().includes(query));
 
-    const sorted = [...found].sort((a, b) => {
-      const dir = ascending ? 1 : -1;
+    const pageSize = Math.max(1, Number(params.get('pageSize')) || 100);
+    const total = found.length;
+    const pageProducts = found.slice(0, pageSize);
 
-      if (sort === 'kcal') return (a.kcal - b.kcal) * dir;
-      if (sort === 'protein') return (a.protein - b.protein) * dir;
-      if (sort === 'fat') return (a.fat - b.fat) * dir;
-      if (sort === 'carbs') return (a.carbs - b.carbs) * dir;
-
-      return a.name.localeCompare(b.name, 'ru') * dir;
-    });
-
-    const page = Math.max(1, Number(params.get('page')) || 1);
-    const pageSize = Math.max(1, Number(params.get('pageSize')) || 10);
-    const total = sorted.length;
-    const start = (page - 1) * pageSize;
-    const pageProducts = sorted.slice(start, start + pageSize);
-
-    return { products: pageProducts, total, page, pageSize } as T;
+    return { products: pageProducts, total } as T;
   }
 
   if (route === '/v1/products' && method === 'POST') {
-    const body = options.body as {
-      name: string;
-      categoryId: string;
-      kcal: number;
-      protein: number;
-      fat: number;
-      carbs: number;
-      vitaminC: number;
-    };
+    const body = options.body as { name: string; unit: string };
     const product: Product = {
       id: `p-${Date.now()}`,
-      name: body.name,
-      categoryId: body.categoryId ?? '',
-      kcal: body.kcal ?? 0,
-      protein: body.protein ?? 0,
-      fat: body.fat ?? 0,
-      carbs: body.carbs ?? 0,
-      vitaminC: body.vitaminC ?? 0,
+      name: body.name.trim(),
+      unit: body.unit?.trim() || 'шт',
     };
     products.unshift(product);
 
@@ -1150,24 +1085,11 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const found = products.find((p) => p.id === productId.id);
     if (!found) throw new Error('mock: продукт не найден');
 
-    const body = options.body as {
-      name: string;
-      categoryId: string;
-      kcal: number;
-      protein: number;
-      fat: number;
-      carbs: number;
-      vitaminC: number;
-    };
+    const body = options.body as { name: string; unit: string };
 
     Object.assign(found, {
-      name: body.name,
-      categoryId: body.categoryId ?? found.categoryId,
-      kcal: body.kcal ?? 0,
-      protein: body.protein ?? 0,
-      fat: body.fat ?? 0,
-      carbs: body.carbs ?? 0,
-      vitaminC: body.vitaminC ?? found.vitaminC,
+      name: body.name.trim() || found.name,
+      unit: body.unit?.trim() || found.unit,
     });
 
     return { product: found } as T;
@@ -1568,11 +1490,32 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   if (route === '/v1/objects' && method === 'POST') {
-    const body = options.body as { name: string };
+    const body = options.body as {
+      name: string;
+      menuId?: string;
+      mealIds?: MealId[];
+      departments: Array<{
+        id: string;
+        name: string;
+        mealIds: MealId[];
+        tables: Array<{ id: string; name: string }>;
+      }>;
+    };
     const newObject: CateringObject = {
       id: `object-${Date.now()}`,
       name: body.name.trim(),
-      mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+      menuId: body.menuId ?? undefined,
+      mealIds: body.mealIds ?? ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+      departments: (body.departments ?? []).map((department) => ({
+        id: department.id,
+        name: department.name.trim(),
+        mealIds: department.mealIds ?? [],
+        tables: department.tables.map((table) => ({
+          id: table.id,
+          name: table.name.trim(),
+          headcount: 0,
+        })),
+      })),
       subObjects: [],
     };
     objects.push(newObject);
@@ -1631,6 +1574,65 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return { objects } as T;
   }
 
+  // --- Обновление объекта (name/menuId/mealIds/departments) ---
+  const objectRoute = match('/v1/objects/:id', route);
+  if (objectRoute && method === 'PATCH') {
+    const body = options.body as {
+      name: string;
+      menuId?: string;
+      mealIds?: MealId[];
+      departments: Array<{
+        id: string;
+        name: string;
+        mealIds: MealId[];
+        tables: Array<{ id: string; name: string }>;
+      }>;
+    };
+    const obj = objects.find((item) => item.id === objectRoute.id);
+    if (!obj) throw new Error('mock: объект не найден');
+    const oldDepartments = obj.departments;
+    obj.name = body.name.trim();
+    if (body.menuId !== undefined) obj.menuId = body.menuId;
+    if (body.mealIds) obj.mealIds = body.mealIds;
+    obj.departments = body.departments.map((department) => {
+      const oldDepartment = oldDepartments.find((item) => item.id === department.id);
+      return {
+        id: department.id,
+        name: department.name.trim(),
+        mealIds: department.mealIds ?? [],
+        tables: department.tables.map((table) => {
+          const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
+          return {
+            id: table.id,
+            name: table.name.trim(),
+            headcount: oldTable?.headcount ?? 0,
+          };
+        }),
+      };
+    });
+    prunePortionEntries();
+    rebuildDistribution();
+    return { objects } as T;
+  }
+
+  const createSubObjectRoute = match('/v1/objects/:objectId/sub-objects', route);
+  if (createSubObjectRoute && method === 'POST') {
+    const body = options.body as { name?: string };
+    const obj = objects.find((item) => item.id === createSubObjectRoute.objectId);
+    if (!obj) throw new Error('mock: объект не найден');
+    const subObject: SubObject = {
+      id: `sobj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: (body.name ?? '').trim() || 'Новый подобъект',
+      address: '',
+      type: 'school',
+      kettleNumber: 1,
+      menuSource: 'object',
+      departments: [],
+    };
+    obj.subObjects.push(subObject);
+    return { objects } as T;
+  }
+
   const subObjectRoute = match('/v1/objects/sub-objects/:id', route);
   if (subObjectRoute && method === 'PATCH') {
     const body = options.body as {
@@ -1639,6 +1641,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       type: string;
       kettleNumber: number;
       menuSource: string;
+      menuId?: string;
       mealIds?: MealId[];
       departments: Array<{
         id: string;
@@ -1656,6 +1659,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     subObject.type = isFacilityType(body.type) ? body.type : subObject.type;
     subObject.kettleNumber = Math.max(1, body.kettleNumber);
     subObject.menuSource = body.menuSource === 'own' ? 'own' : 'object';
+    subObject.menuId = subObject.menuSource === 'own' ? body.menuId : undefined;
     subObject.mealIds = body.mealIds;
     subObject.departments = body.departments.map((department) => {
       const oldDepartment = oldDepartments.find((item) => item.id === department.id);
@@ -1958,8 +1962,19 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 const objects: CateringObject[] = [
   {
     id: 'object-1',
-    name: 'Центральный объект',
+    name: 'Больница №1',
+    menuId: 'menu-1',
     mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+    departments: [
+      {
+        id: 'obj-dep-1-1',
+        name: 'Административный корпус',
+        tables: [
+          { id: 'obj-tbl-1-1-1', name: 'Основная', headcount: 18 },
+          { id: 'obj-tbl-1-1-2', name: 'Щадящая', headcount: 4 },
+        ],
+      },
+    ],
     subObjects: [
       {
         id: 'sub-1-1',
@@ -2017,6 +2032,13 @@ const objects: CateringObject[] = [
     id: 'object-2',
     name: 'Объект №2',
     mealIds: ['breakfast', 'lunch'],
+    departments: [
+      {
+        id: 'obj-dep-2-1',
+        name: 'Спортивный комплекс',
+        tables: [{ id: 'obj-tbl-2-1-1', name: 'Основная', headcount: 12 }],
+      },
+    ],
     subObjects: [
       {
         id: 'sub-2-1',
@@ -2051,6 +2073,7 @@ const objects: CateringObject[] = [
         type: 'kindergarten',
         kettleNumber: 2,
         menuSource: 'own',
+        menuId: 'menu-1',
         departments: [
           {
             id: 'dep-5-1',
@@ -2073,6 +2096,13 @@ const objects: CateringObject[] = [
     id: 'object-3',
     name: 'Объект №3',
     mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
+    departments: [
+      {
+        id: 'obj-dep-3-1',
+        name: 'Пищеблок (своя столовая)',
+        tables: [{ id: 'obj-tbl-3-1-1', name: 'Основная', headcount: 25 }],
+      },
+    ],
     subObjects: [
       {
         id: 'sub-3-4',

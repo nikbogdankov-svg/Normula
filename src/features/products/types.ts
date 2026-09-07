@@ -1,56 +1,35 @@
 /**
- * Контракт раздела «Продукты» — справочник продуктов/ингредиентов.
+ * Контракт справочника продуктов (SKU).
  *
- * Справочник служит источником КБЖУ: из него меню и ТТК берут пищевую ценность.
+ * Продукт — общая единица между ТТК и складом: у него есть только имя и единица
+ * закупки. Цены в нём НЕ хранятся — они берутся из приходных склада (последняя
+ * цена по продукту). КБЖУ и категории убраны как невостребованные.
+ *
+ * Создаётся продукт inline в момент использования: в ТТК (состав рецепта) или
+ * в приходной склада, когда нужного товара ещё нет в справочнике.
+ *
  * Бэкенда под него пока нет — эндпоинты описаны здесь и реализованы
  * в mock-handlers, как и у других справочников.
  */
 
-/** Категория продукта (бакалея, овощи, мясо и т.п.). */
-export interface ProductCategory {
-  id: string;
-  name: string;
-}
-
-/** Продукт с пищевой ценностью на 100 г. */
+/** Продукт (SKU). Единица — закупочная (кг, л, шт и т.п.). */
 export interface Product {
   id: string;
   name: string;
-  categoryId: string;
-  /** Калорийность на 100 г, ккал. */
-  kcal: number;
-  /** Белки на 100 г, г. */
-  protein: number;
-  /** Жиры на 100 г, г. */
-  fat: number;
-  /** Углеводы на 100 г, г. */
-  carbs: number;
-  /** Витамин С на 100 г, мг. */
-  vitaminC: number;
+  /** Единица закупки: кг, л, шт и т.п. */
+  unit: string;
 }
 
-export interface ListProductsResponse {
-  products: Product[];
-  total: number;
-  /** Текущая страница (1-based). */
-  page: number;
-  /** Количество продуктов на странице. */
-  pageSize: number;
-}
-
-export interface ListProductCategoriesResponse {
-  categories: ProductCategory[];
-}
-
+/** Тело создания продукта — те же поля, что и в Product. */
 export interface CreateProductRequest {
   name: string;
-  categoryId: string;
-  kcal: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  vitaminC: number;
+  unit: string;
 }
 
 /** Тело обновления продукта — те же поля, что и при создании. */
 export type UpdateProductRequest = CreateProductRequest;
+
+export interface ListProductsResponse {
+  products: Product[];
+  total: number;
+}
