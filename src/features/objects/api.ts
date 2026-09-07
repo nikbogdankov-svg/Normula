@@ -3,8 +3,10 @@ import { useApi } from '@/shared/api/use-api';
 import type {
   CateringObject,
   CateringObjectsResponse,
+  CreateObjectRequest,
   DistributionPreviewResponse,
   UpdateObjectMenuRequest,
+  UpdateObjectRequest,
   UpdateSubObjectRequest,
   UpdateTableHeadcountRequest,
 } from './types';
@@ -67,15 +69,43 @@ export function useUpdateSubObject() {
   });
 }
 
+export function useCreateSubObject() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ objectId, name }: { objectId: string; name: string }) =>
+      api.request<CateringObjectsResponse>(`/v1/objects/${objectId}/sub-objects`, {
+        method: 'POST',
+        body: { name },
+      }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useCreateObject() {
   const api = useApi();
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: (name: string) =>
+    mutationFn: (body: CreateObjectRequest) =>
       api.request<{ object: CateringObject }>('/v1/objects', {
         method: 'POST',
-        body: { name },
+        body,
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateObject() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateObjectRequest }) =>
+      api.request<CateringObjectsResponse>(`/v1/objects/${id}`, {
+        method: 'PATCH',
+        body: patch,
       }),
     onSuccess: invalidate,
   });

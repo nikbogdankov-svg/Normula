@@ -11,11 +11,13 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye, Gear, FloppyDisk } from '@gravity-ui/icons';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eye } from '@gravity-ui/icons';
 import { useApi } from '@/shared/api/use-api';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
+import { useCateringObjects } from '@/features/objects/api';
+import type { CateringObject } from '@/features/objects/types';
 import { useDiets } from '@/features/diets/api';
 import type { Diet } from '@/features/diets/types';
 import {
@@ -35,7 +37,6 @@ import {
   compareToNorm,
   formatMetric,
   normForDiet,
-  parseRuNumber,
   sumDishes,
   type DayNorm,
   type DayTotals,
@@ -45,8 +46,6 @@ import { MEALS, type CycleMenu, type MealId, type MenuDishRef } from './types';
 import './menu-route.css';
 
 const EMPTY_DISHES: MenuDishRef[] = [];
-
-const ORG_OPTIONS = [{ value: 'school-5', content: 'Школа номер 5' }];
 
 const CYCLE_DAYS = 14;
 
@@ -65,6 +64,25 @@ function resolveDietNorm(diet: Diet | undefined, fallback: DayNorm): DayNorm {
     carbs: diet.carbs,
     price: diet.pricePerDay,
   };
+}
+
+/**
+ * Приёмы пищи в зависимости от выбора объекта/подобъекта.
+ * Пустой mealIds у подобъекта — как у объекта, пустой mealIds у объекта — все.
+ */
+function resolveActiveMeals(
+  allObjects: CateringObject[] | undefined,
+  objectId: string | null,
+  subObjectId: string | null
+): MealId[] {
+  const object = allObjects?.find((candidate) => candidate.id === objectId);
+  let source: MealId[] | undefined = subObjectId
+    ? object?.subObjects.find((candidate) => candidate.id === subObjectId)?.mealIds
+    : undefined;
+  if (!source || source.length === 0) source = object?.mealIds;
+  if (!source || source.length === 0) source = MEALS.map((meal) => meal.id);
+  const active = new Set(source);
+  return MEALS.filter((meal) => active.has(meal.id)).map((meal) => meal.id);
 }
 
 /**
@@ -169,17 +187,11 @@ function MenuByDates({
   const updateMenu = useUpdateMenu(menuId);
   const updateSlot = useUpdateMenuSlot(menuId);
   const diets = useDiets();
+  const objects = useCateringObjects();
   const toaster = useToaster();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
-  const [organizationId, setOrganizationId] = useState(ORG_OPTIONS[0].value);
-  const [parametersOpen, setParametersOpen] = useState(false);
-  const [customPriceLimit, setCustomPriceLimit] = useState<number | null>(null);
-  const [customNorm, setCustomNorm] = useState<Partial<DayNorm> | null>(null);
-  const [parametersDraftLimit, setParametersDraftLimit] = useState<string>('');
-  const [parametersDraftKcal, setParametersDraftKcal] = useState<string>('');
-  const [parametersDraftProtein, setParametersDraftProtein] = useState<string>('');
-  const [parametersDraftFat, setParametersDraftFat] = useState<string>('');
-  const [parametersDraftCarbs, setParametersDraftCarbs] = useState<string>('');
+  const [objectId, setObjectId] = useState<string | null>(null);
+  const [subObjectId, setSubObjectId] = useState<string | null>(null);
   const [fillMenuOpen, setFillMenuOpen] = useState(false);
   const [fillMenuSourceId, setFillMenuSourceId] = useState<string | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
@@ -202,6 +214,20 @@ function MenuByDates({
     setViewStartDate(null);
     setAllowedViolationDays(new Set());
   }, [menuId]);
+
+  useEffect(() => {
+    const list = objects.data?.objects ?? [];
+    if (list.length === 0) return;
+    setObjectId((current) => current ?? list[0].id);
+  }, [objects.data]);
+
+  /** Приёмы пищи сетки — зависят от выбранного объекта/подобъекта. */
+  const activeMeals = resolveActiveMeals(objects.data?.objects, objectId, subObjectId);
+
+  useEffect(() => {
+    if (!picker || activeMeals.includes(picker.mealId)) return;
+    setPicker(null);
+  }, [picker, activeMeals]);
 
   useEffect(() => {
     const weekTimer = weekTimerRef;
@@ -239,13 +265,13 @@ function MenuByDates({
     const map = new Map<number, DayTotals>();
     for (let day = 1; day <= CYCLE_DAYS; day += 1) {
       const dishes: MenuDishRef[] = [];
-      for (const meal of MEALS) {
-        dishes.push(...(slotMap.get(slotKey(day, meal.id)) ?? []));
+      for (const meal of activeMeals) {
+        dishes.push(...(slotMap.get(slotKey(day, meal)) ?? []));
       }
       map.set(day, sumDishes(dishes));
     }
     return map;
-  }, [menu, slotMap]);
+  }, [menu, slotMap, activeMeals]);
 
   const hasDayViolation = (day: number): boolean => {
     const totals = dayTotals.get(day) ?? sumDishes([]);
@@ -253,19 +279,12 @@ function MenuByDates({
       findDietByName(diets.data?.diets, menu?.dietName ?? 'Основная'),
       normForDiet(menu?.dietName ?? 'Основная')
     );
-    const activeNorm: DayNorm = {
-      kcal: customNorm?.kcal ?? base.kcal,
-      protein: customNorm?.protein ?? base.protein,
-      fat: customNorm?.fat ?? base.fat,
-      carbs: customNorm?.carbs ?? base.carbs,
-      price: customPriceLimit ?? base.price,
-    };
     return (
-      compareToNorm(totals.kcal, activeNorm.kcal) !== 'ok' ||
-      compareToNorm(totals.protein, activeNorm.protein) !== 'ok' ||
-      compareToNorm(totals.fat, activeNorm.fat) !== 'ok' ||
-      compareToNorm(totals.carbs, activeNorm.carbs) !== 'ok' ||
-      comparePriceToLimit(totals.price, activeNorm.price) !== 'ok'
+      compareToNorm(totals.kcal, base.kcal) !== 'ok' ||
+      compareToNorm(totals.protein, base.protein) !== 'ok' ||
+      compareToNorm(totals.fat, base.fat) !== 'ok' ||
+      compareToNorm(totals.carbs, base.carbs) !== 'ok' ||
+      comparePriceToLimit(totals.price, base.price) !== 'ok'
     );
   };
 
@@ -300,7 +319,7 @@ function MenuByDates({
     }
 
     const weekIsEmpty = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1).every((day) =>
-      MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
+      activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
     );
 
     if (weekIsEmpty) {
@@ -309,7 +328,7 @@ function MenuByDates({
     }
 
     setFillMenuSourceId((current) => current ?? menuId ?? fillMenuOptions[0].id);
-  }, [fillMenuOpen, fillMenuOptions, menuId, slotMap]);
+  }, [fillMenuOpen, fillMenuOptions, menuId, slotMap, activeMeals]);
 
   if (isPending && !menu) {
     return (
@@ -328,32 +347,48 @@ function MenuByDates({
   }
 
   const days = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1);
-  const baseNorm = resolveDietNorm(
+  const norm = resolveDietNorm(
     findDietByName(diets.data?.diets, menu.dietName),
     normForDiet(menu.dietName)
   );
-  const norm: DayNorm = {
-    kcal: customNorm?.kcal ?? baseNorm.kcal,
-    protein: customNorm?.protein ?? baseNorm.protein,
-    fat: customNorm?.fat ?? baseNorm.fat,
-    carbs: customNorm?.carbs ?? baseNorm.carbs,
-    price: customPriceLimit ?? baseNorm.price,
-  };
   const priceLimit = norm.price;
-  const dietOptions = (diets.data?.diets ?? []).map((diet) => ({
-    value: diet.name,
-    content: diet.name,
-  }));
-  if (dietOptions.length === 0) {
-    dietOptions.push(
-      { value: 'Основная', content: 'Основная' },
-      { value: 'Щадящая', content: 'Щадящая' },
-      { value: 'Диабетическая', content: 'Диабетическая' }
-    );
-  }
-  const isEmptyWeek = days.every((day) =>
-    MEALS.every((meal) => (slotMap.get(slotKey(day, meal.id)) ?? []).length === 0)
+  const objectsList = objects.data?.objects ?? [];
+  const selectedDietNames = new Set(
+    (subObjectId
+      ? objectsList
+          .find((object) => object.subObjects.some((subObject) => subObject.id === subObjectId))
+          ?.subObjects.find((subObject) => subObject.id === subObjectId)
+      : objectsList.find((object) => object.id === objectId)
+    )?.departments.flatMap((department) => department.tables.map((table) => table.name)) ?? []
   );
+  const dietOptions =
+    selectedDietNames.size > 0
+      ? [...selectedDietNames].map((name) => ({ value: name, content: name }))
+      : diets.data?.diets && diets.data.diets.length > 0
+        ? diets.data.diets.map((diet) => ({ value: diet.name, content: diet.name }))
+        : [
+            { value: 'Основная', content: 'Основная' },
+            { value: 'Щадящая', content: 'Щадящая' },
+            { value: 'Диабетическая', content: 'Диабетическая' },
+          ];
+  const isEmptyWeek = days.every((day) =>
+    activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
+  );
+  const objectOptions = objectsList.map((object) => ({
+    label: object.name,
+    options: [
+      { value: `object:${object.id}`, content: object.name },
+      ...object.subObjects.map((subObject) => ({
+        value: `subobject:${subObject.id}`,
+        content: subObject.name,
+      })),
+    ],
+  }));
+  const selectedObjectValue = subObjectId
+    ? `subobject:${subObjectId}`
+    : objectId
+      ? `object:${objectId}`
+      : null;
   const fillFromSourceMenu = async (sourceMenuId: string) => {
     const sourceMenu = fillMenuOptions.find((candidate) => candidate.id === sourceMenuId);
     if (!sourceMenu) return;
@@ -369,13 +404,13 @@ function MenuByDates({
     setFillMenuSubmitting(true);
     try {
       const payloads = days.flatMap((day) =>
-        MEALS.map((meal) => ({
+        activeMeals.map((mealId) => ({
           day,
-          mealId: meal.id,
+          mealId,
           dishes:
             sourceMenu.id === menuId || toIsoDate(dateForCycleDay(startDate, day)) > today
-              ? (sourceSlots.get(slotKey(day, meal.id)) ?? [])
-              : (currentSlots.get(slotKey(day, meal.id)) ?? []),
+              ? (sourceSlots.get(slotKey(day, mealId)) ?? [])
+              : (currentSlots.get(slotKey(day, mealId)) ?? []),
         }))
       );
 
@@ -405,11 +440,11 @@ function MenuByDates({
       });
 
       const payloads = days.flatMap((day) =>
-        MEALS.map((meal) => ({
+        activeMeals.map((mealId) => ({
           day,
-          mealId: meal.id,
+          mealId,
           dishes:
-            menu.slots.find((slot) => slotKey(slot.day, slot.mealId) === slotKey(day, meal.id))
+            menu.slots.find((slot) => slotKey(slot.day, slot.mealId) === slotKey(day, mealId))
               ?.dishes ?? [],
         }))
       );
@@ -499,6 +534,47 @@ function MenuByDates({
     <div className="menu-page">
       <Flex className="menu-toolbar" alignItems="center" justifyContent="space-between" gap={3}>
         <Flex alignItems="center" gap={2}>
+          <Select
+            size="l"
+            label="Объект:"
+            width={280}
+            value={selectedObjectValue ? [selectedObjectValue] : []}
+            placeholder="Выберите объект"
+            onUpdate={(values) => {
+              const raw = values[0];
+              if (!raw) {
+                setObjectId(null);
+                setSubObjectId(null);
+                return;
+              }
+              const sep = raw.indexOf(':');
+              const kind = sep === -1 ? '' : raw.slice(0, sep);
+              const id = sep === -1 ? raw : raw.slice(sep + 1);
+              if (kind === 'subobject') {
+                const parent = objectsList.find((object) =>
+                  object.subObjects.some((subObject) => subObject.id === id)
+                );
+                setObjectId(parent?.id ?? null);
+                setSubObjectId(id);
+                return;
+              }
+              setObjectId(id);
+              setSubObjectId(null);
+            }}
+            options={objectOptions}
+            disabled={objectsList.length === 0}
+          />
+          <Select
+            size="l"
+            label="Рацион:"
+            width={200}
+            value={[menu.dietName]}
+            onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
+            options={dietOptions}
+          />
+        </Flex>
+
+        <Flex alignItems="center" gap={2}>
           <Button
             view="outlined"
             size="l"
@@ -529,63 +605,16 @@ function MenuByDates({
             disabled={weekLoading}
             onClick={() => goToWeek(startOfWeekMonday())}
           >
-            Текущая неделя
+            Сегодня
           </Button>
-        </Flex>
-
-        <Flex alignItems="center" gap={2}>
-          <Select
-            size="l"
-            label="Организация:"
-            width={250}
-            value={[organizationId]}
-            onUpdate={(value) => setOrganizationId(value[0] ?? ORG_OPTIONS[0].value)}
-            options={ORG_OPTIONS}
-          />
-          <Select
-            size="l"
-            label="Диета:"
-            width={200}
-            value={[menu.dietName]}
-            onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
-            options={dietOptions}
-          />
-          {(isEmptyWeek || !isEmptyWeek) && (
-            <Button
-              type="button"
-              view={isEmptyWeek ? 'action' : 'normal-contrast'}
-              size="l"
-              onClick={() => setFillMenuOpen(true)}
-              disabled={weekLoading}
-            >
-              Заполнение меню
-            </Button>
-          )}
           <Button
-            view="normal-contrast"
+            type="button"
+            view={isEmptyWeek ? 'action' : 'normal-contrast'}
             size="l"
-            onClick={() => {
-              setParametersDraftLimit(
-                customPriceLimit !== null ? String(customPriceLimit) : String(norm.price)
-              );
-              setParametersDraftKcal(
-                customNorm?.kcal !== undefined ? String(customNorm.kcal) : String(norm.kcal)
-              );
-              setParametersDraftProtein(
-                customNorm?.protein !== undefined
-                  ? String(customNorm.protein)
-                  : String(norm.protein)
-              );
-              setParametersDraftFat(
-                customNorm?.fat !== undefined ? String(customNorm.fat) : String(norm.fat)
-              );
-              setParametersDraftCarbs(
-                customNorm?.carbs !== undefined ? String(customNorm.carbs) : String(norm.carbs)
-              );
-              setParametersOpen(true);
-            }}
+            onClick={() => setFillMenuOpen(true)}
+            disabled={weekLoading}
           >
-            <Icon data={Gear} size={16} />
+            Заполнение меню
           </Button>
         </Flex>
       </Flex>
@@ -597,7 +626,7 @@ function MenuByDates({
             style={
               {
                 '--menu-days': days.length,
-                '--menu-meal-rows': MEALS.length,
+                '--menu-meal-rows': activeMeals.length,
               } as CSSProperties
             }
           >
@@ -624,23 +653,22 @@ function MenuByDates({
               );
             })}
 
-            {MEALS.map((meal, mealIndex) => {
+            {activeMeals.map((mealId, mealIndex) => {
+              const label = MEALS.find((meal) => meal.id === mealId)?.label ?? mealId;
               const beforeTotal =
-                mealIndex === MEALS.length - 1 ? ' menu-grid__cell_before-total' : '';
+                mealIndex === activeMeals.length - 1 ? ' menu-grid__cell_before-total' : '';
 
               return (
-                <Fragment key={meal.id}>
-                  <div className={`menu-grid__cell menu-grid__meal${beforeTotal}`}>
-                    {meal.label}
-                  </div>
+                <Fragment key={mealId}>
+                  <div className={`menu-grid__cell menu-grid__meal${beforeTotal}`}>{label}</div>
                   {days.map((day, dayIndex) => {
-                    const dishes = slotMap.get(slotKey(day, meal.id)) ?? [];
+                    const dishes = slotMap.get(slotKey(day, mealId)) ?? [];
                     const totals = sumDishes(dishes);
                     const end = dayIndex === days.length - 1 ? ' menu-grid__cell_end' : '';
 
                     return (
                       <div
-                        key={`${meal.id}-${day}`}
+                        key={`${mealId}-${day}`}
                         className={`menu-grid__cell menu-grid__slot${end}${beforeTotal}`}
                       >
                         <button
@@ -649,7 +677,7 @@ function MenuByDates({
                           disabled={!periodSynced || weekLoading}
                           onClick={() => {
                             if (!periodSynced || weekLoading) return;
-                            setPicker({ day, mealId: meal.id });
+                            setPicker({ day, mealId });
                           }}
                         >
                           {dishes.length === 0 ? (
@@ -709,132 +737,6 @@ function MenuByDates({
           </div>
         )}
       </div>
-
-      <Dialog open={parametersOpen} onClose={() => setParametersOpen(false)} size="s">
-        <Dialog.Header caption="Параметры на день" />
-        <Dialog.Divider />
-        <Dialog.Body>
-          <Flex direction="column" gap={3}>
-            <TextInput
-              className="menu-price-input"
-              size="l"
-              type="number"
-              label="Лимит цены:"
-              placeholder={`${norm.price}`}
-              value={parametersDraftLimit}
-              onUpdate={setParametersDraftLimit}
-              endContent={
-                <span style={{ paddingInlineEnd: 8 }}>
-                  <Text color="secondary">₽</Text>
-                </span>
-              }
-              style={{ width: '100%' }}
-            />
-            <TextInput
-              className="menu-price-input"
-              size="l"
-              type="number"
-              label="Калорийность:"
-              placeholder={`${norm.kcal}`}
-              value={parametersDraftKcal}
-              onUpdate={setParametersDraftKcal}
-              endContent={
-                <span style={{ paddingInlineEnd: 8 }}>
-                  <Text color="secondary">ккал</Text>
-                </span>
-              }
-              style={{ width: '100%' }}
-            />
-            <Flex gap={2}>
-              <TextInput
-                className="menu-price-input"
-                size="l"
-                type="number"
-                label="Белки:"
-                placeholder={`${norm.protein}`}
-                value={parametersDraftProtein}
-                onUpdate={setParametersDraftProtein}
-                endContent={
-                  <span style={{ paddingInlineEnd: 8 }}>
-                    <Text color="secondary">г</Text>
-                  </span>
-                }
-                style={{ width: '100%' }}
-              />
-              <TextInput
-                className="menu-price-input"
-                size="l"
-                type="number"
-                label="Жиры:"
-                placeholder={`${norm.fat}`}
-                value={parametersDraftFat}
-                onUpdate={setParametersDraftFat}
-                endContent={
-                  <span style={{ paddingInlineEnd: 8 }}>
-                    <Text color="secondary">г</Text>
-                  </span>
-                }
-                style={{ width: '100%' }}
-              />
-              <TextInput
-                className="menu-price-input"
-                size="l"
-                type="number"
-                label="Углеводы:"
-                placeholder={`${norm.carbs}`}
-                value={parametersDraftCarbs}
-                onUpdate={setParametersDraftCarbs}
-                endContent={
-                  <span style={{ paddingInlineEnd: 8 }}>
-                    <Text color="secondary">г</Text>
-                  </span>
-                }
-                style={{ width: '100%' }}
-              />
-            </Flex>
-          </Flex>
-        </Dialog.Body>
-        <Dialog.Divider />
-        <Dialog.Footer>
-          <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
-            <Button type="button" view="outlined" size="l" onClick={() => setParametersOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              type="button"
-              view="action"
-              size="l"
-              onClick={() => {
-                setCustomPriceLimit(
-                  parametersDraftLimit.trim() === '' ? null : parseRuNumber(parametersDraftLimit)
-                );
-                setCustomNorm({
-                  kcal:
-                    parametersDraftKcal.trim() === ''
-                      ? undefined
-                      : parseRuNumber(parametersDraftKcal),
-                  protein:
-                    parametersDraftProtein.trim() === ''
-                      ? undefined
-                      : parseRuNumber(parametersDraftProtein),
-                  fat:
-                    parametersDraftFat.trim() === ''
-                      ? undefined
-                      : parseRuNumber(parametersDraftFat),
-                  carbs:
-                    parametersDraftCarbs.trim() === ''
-                      ? undefined
-                      : parseRuNumber(parametersDraftCarbs),
-                });
-                setParametersOpen(false);
-              }}
-            >
-              <Icon data={FloppyDisk} size={16} />
-              Сохранить
-            </Button>
-          </Flex>
-        </Dialog.Footer>
-      </Dialog>
 
       <Dialog
         open={fillMenuOpen}

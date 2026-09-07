@@ -43,8 +43,6 @@ function dishToRecipe(dish: ExtractedDish, collectionName: string): Recipe {
     portionYield: dish.portionYield,
     price: 0,
     kcal: 0,
-    temperature: dish.temperature,
-    shelfLife: dish.shelfLife,
     recipe: dish.recipe,
     ingredients: dish.ingredients.map((row) => ({
       name: row.name,
@@ -341,8 +339,6 @@ function ImportReviewDrawer({
                   ...dish,
                   name: body.name,
                   portionYield: body.portionYield,
-                  temperature: body.temperature,
-                  shelfLife: body.shelfLife,
                   recipe: body.recipe,
                   ingredients: body.ingredients,
                 }

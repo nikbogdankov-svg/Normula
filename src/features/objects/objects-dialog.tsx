@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Icon, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
-import { useCreateObject, useUpdateSubObject } from './api';
+import { useCreateObject, useUpdateObject, useUpdateSubObject } from './api';
 import { MEALS, type MealId } from '@/features/menu/types';
 import {
   DIET_CATALOG,
   type CateringObject,
   type DietTypeId,
   type FacilityType,
-  type MenuSource,
   type SubObject,
   type UpdateSubObjectRequest,
 } from './types';
@@ -27,13 +26,17 @@ type SubObjectForm = {
   id: string;
   type: FacilityType;
   name: string;
-  menuSource: MenuSource;
-  mealIds: MealId[];
   departments: DepartmentForm[];
 };
 
 type ObjectForm = {
   name: string;
+  menuId?: string;
+  mealIds: MealId[];
+  departments: DepartmentForm[];
+};
+
+type SubObjectsForm = {
   subObjects: SubObjectForm[];
 };
 
@@ -43,63 +46,92 @@ function tableNameToTypeId(name: string): DietTypeId | null {
   return match?.id ?? null;
 }
 
+/** Пустой mealIds в контракте означает «все» — в форме приводим к явному списку. */
+function normalizeMealIds(mealIds?: MealId[]): MealId[] {
+  return mealIds && mealIds.length > 0 ? [...mealIds] : MEALS.map((meal) => meal.id);
+}
+
 const emptyDepartment = (): DepartmentForm => ({
   id: `dep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: '',
   selectedTypes: ['main'],
   tableIds: {},
-  mealIds: [],
+  mealIds: normalizeMealIds(),
 });
 
 const emptySubObject = (): SubObjectForm => ({
   id: `sobj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   type: 'school',
   name: '',
-  menuSource: 'object',
-  mealIds: [],
   departments: [emptyDepartment()],
 });
+
+function departmentsToForm(departments: CateringObject['departments']): DepartmentForm[] {
+  return departments.map((department) => {
+    const tableIds: Partial<Record<DietTypeId, string>> = {};
+    const selectedTypes: DietTypeId[] = [];
+
+    for (const table of department.tables) {
+      const typeId = tableNameToTypeId(table.name);
+      if (typeId && !selectedTypes.includes(typeId)) {
+        selectedTypes.push(typeId);
+        tableIds[typeId] = table.id;
+      }
+    }
+
+    if (selectedTypes.length === 0 && department.tables.length > 0) {
+      selectedTypes.push('main');
+      tableIds.main = department.tables[0].id;
+    }
+
+    return {
+      id: department.id,
+      name: department.name,
+      selectedTypes,
+      tableIds,
+      mealIds: normalizeMealIds(department.mealIds),
+    };
+  });
+}
 
 function subObjectToForm(subObject: SubObject): SubObjectForm {
   return {
     id: subObject.id,
     type: subObject.type,
     name: subObject.name,
-    menuSource: subObject.menuSource,
-    mealIds: subObject.mealIds ? [...subObject.mealIds] : [],
-    departments: subObject.departments.map((department) => {
-      const tableIds: Partial<Record<DietTypeId, string>> = {};
-      const selectedTypes: DietTypeId[] = [];
-
-      for (const table of department.tables) {
-        const typeId = tableNameToTypeId(table.name);
-        if (typeId && !selectedTypes.includes(typeId)) {
-          selectedTypes.push(typeId);
-          tableIds[typeId] = table.id;
-        }
-      }
-
-      if (selectedTypes.length === 0 && department.tables.length > 0) {
-        selectedTypes.push('main');
-        tableIds.main = department.tables[0].id;
-      }
-
-      return {
-        id: department.id,
-        name: department.name,
-        selectedTypes,
-        tableIds,
-        mealIds: department.mealIds ? [...department.mealIds] : [],
-      };
-    }),
+    departments: departmentsToForm(subObject.departments),
   };
 }
 
 function objectToForm(object: CateringObject): ObjectForm {
   return {
     name: object.name,
-    subObjects: object.subObjects.map(subObjectToForm),
+    menuId: object.menuId,
+    mealIds: object.mealIds ? [...object.mealIds] : [],
+    departments: departmentsToForm(object.departments),
   };
+}
+
+function departmentsFormHasChanges(
+  formDepartments: DepartmentForm[],
+  originalDepartments: CateringObject['departments']
+): boolean {
+  if (formDepartments.length !== originalDepartments.length) return true;
+
+  for (let i = 0; i < formDepartments.length; i++) {
+    const formDept = formDepartments[i];
+    const origDept = originalDepartments.find((d) => d.id === formDept.id);
+    if (!origDept) return true;
+    if (formDept.name.trim() !== origDept.name) return true;
+    if (formDept.selectedTypes.length !== origDept.tables.length) return true;
+    if (
+      JSON.stringify(normalizeMealIds(formDept.mealIds)) !==
+      JSON.stringify(normalizeMealIds(origDept.mealIds))
+    )
+      return true;
+  }
+
+  return false;
 }
 
 function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateSubObjectRequest {
@@ -108,8 +140,9 @@ function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateS
     address: original.address,
     type: form.type,
     kettleNumber: original.kettleNumber,
-    menuSource: form.menuSource,
-    mealIds: form.mealIds,
+    menuSource: original.menuSource,
+    menuId: original.menuId,
+    mealIds: original.mealIds ?? [],
     departments: form.departments.map((department) => ({
       id: department.id,
       name: department.name.trim(),
@@ -127,30 +160,45 @@ function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateS
   };
 }
 
-function isFormReady(form: ObjectForm): boolean {
+function isObjectFormReady(form: ObjectForm): boolean {
   if (!form.name.trim()) return false;
-  if (form.subObjects.length === 0) return false;
-  return form.subObjects.every(
+  return form.departments.every(
+    (department) =>
+      department.name.trim() !== '' &&
+      department.selectedTypes.length > 0 &&
+      department.mealIds.length > 0
+  );
+}
+
+function isSubObjectsFormReady(subObjects: SubObjectForm[]): boolean {
+  return subObjects.every(
     (subObject) =>
       subObject.name.trim() !== '' &&
       subObject.departments.length > 0 &&
       subObject.departments.every(
-        (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
+        (department) =>
+          department.name.trim() !== '' &&
+          department.selectedTypes.length > 0 &&
+          department.mealIds.length > 0
       )
   );
 }
 
-function hasChanges(form: ObjectForm, original: CateringObject): boolean {
+function hasObjectChanges(form: ObjectForm, original: CateringObject): boolean {
   if (form.name.trim() !== original.name) return true;
-  if (form.subObjects.length !== original.subObjects.length) return true;
+  if (JSON.stringify(form.mealIds) !== JSON.stringify(original.mealIds ?? [])) return true;
+  return departmentsFormHasChanges(form.departments, original.departments);
+}
 
-  for (let i = 0; i < form.subObjects.length; i++) {
-    const sobjForm = form.subObjects[i];
+function hasSubObjectsChanges(subObjects: SubObjectForm[], original: CateringObject): boolean {
+  if (subObjects.length !== original.subObjects.length) return true;
+
+  for (let i = 0; i < subObjects.length; i++) {
+    const sobjForm = subObjects[i];
     const sobjOrig = original.subObjects.find((s) => s.id === sobjForm.id);
     if (!sobjOrig) return true;
     if (sobjForm.name.trim() !== sobjOrig.name) return true;
     if (sobjForm.type !== sobjOrig.type) return true;
-    if (sobjForm.menuSource !== sobjOrig.menuSource) return true;
     if (sobjForm.departments.length !== sobjOrig.departments.length) return true;
 
     for (let j = 0; j < sobjForm.departments.length; j++) {
@@ -159,6 +207,11 @@ function hasChanges(form: ObjectForm, original: CateringObject): boolean {
       if (!deptOrig) return true;
       if (deptForm.name.trim() !== deptOrig.name) return true;
       if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
+      if (
+        JSON.stringify(normalizeMealIds(deptForm.mealIds)) !==
+        JSON.stringify(normalizeMealIds(deptOrig.mealIds))
+      )
+        return true;
     }
   }
 
@@ -186,6 +239,133 @@ function MealChip({
   );
 }
 
+function DepartmentBlock({
+  variant,
+  department,
+  index,
+  onUpdate,
+  onRemove,
+  canRemove,
+}: {
+  variant: FacilityType | 'object';
+  department: DepartmentForm;
+  index: number;
+  onUpdate: (index: number, patch: Partial<DepartmentForm>) => void;
+  onRemove: (index: number) => void;
+  canRemove: boolean;
+}) {
+  const isObject = variant === 'object';
+  const nameLabel = isObject
+    ? 'Название группы/отделения:'
+    : variant === 'school'
+      ? 'Класс (параллель):'
+      : variant === 'kindergarten'
+        ? 'Группа:'
+        : 'Отделение:';
+  const namePlaceholder = isObject
+    ? 'Корпус / отделение'
+    : variant === 'school'
+      ? '1–4 классы'
+      : variant === 'kindergarten'
+        ? 'Старшая группа'
+        : 'Терапия';
+
+  const toggleTableType = (typeId: DietTypeId) => {
+    const selected = department.selectedTypes.includes(typeId);
+
+    if (selected) {
+      if (department.selectedTypes.length <= 1) return;
+      onUpdate(index, {
+        selectedTypes: department.selectedTypes.filter((item) => item !== typeId),
+      });
+      return;
+    }
+
+    onUpdate(index, {
+      selectedTypes: [...department.selectedTypes, typeId],
+    });
+  };
+
+  const toggleMeal = (meal: MealId) => {
+    const selected = department.mealIds.includes(meal);
+
+    if (selected) {
+      if (department.mealIds.length <= 1) return;
+      onUpdate(index, {
+        mealIds: department.mealIds.filter((item) => item !== meal),
+      });
+      return;
+    }
+
+    onUpdate(index, {
+      mealIds: [...department.mealIds, meal],
+    });
+  };
+
+  return (
+    <Flex key={department.id} direction="column" gap={2} className="kitchen-drawer__department">
+      <Flex gap={2} alignItems="flex-end">
+        <TextInput
+          size="l"
+          label={nameLabel}
+          placeholder={namePlaceholder}
+          value={department.name}
+          onUpdate={(value) => onUpdate(index, { name: value })}
+          style={{ flex: 1 }}
+        />
+        {canRemove && (
+          <Button
+            view="flat"
+            size="l"
+            title="Удалить группу"
+            aria-label="Удалить группу"
+            onClick={() => onRemove(index)}
+          >
+            <Icon data={TrashBin} size={18} />
+          </Button>
+        )}
+      </Flex>
+
+      <Text variant="body-1" className="kitchen-drawer__table-hint">
+        Рацион (должен быть выбран хотя бы один)
+      </Text>
+
+      <Flex gap={2} wrap>
+        {DIET_CATALOG.filter((item) =>
+          isObject ? true : (item.appliesTo as readonly string[]).includes(variant)
+        ).map((type) => (
+          <button
+            key={type.id}
+            type="button"
+            className={`objects-table-chip${
+              department.selectedTypes.includes(type.id) ? ' objects-table-chip_selected' : ''
+            }`}
+            onClick={() => toggleTableType(type.id)}
+          >
+            {department.selectedTypes.includes(type.id) && <Icon data={Check} size={14} />}
+            {type.label}
+          </button>
+        ))}
+      </Flex>
+
+      <Text variant="body-1" className="kitchen-drawer__table-hint">
+        Приёмы пищи группы (минимум один)
+      </Text>
+
+      <Flex gap={2} wrap>
+        {MEALS.map((meal) => (
+          <MealChip
+            key={meal.id}
+            label={meal.label}
+            selected={department.mealIds.includes(meal.id)}
+            onClick={() => toggleMeal(meal.id)}
+          />
+        ))}
+      </Flex>
+    </Flex>
+  );
+}
+
 function SubObjectBlock({
   subObject,
   subObjectIndex,
@@ -205,39 +385,9 @@ function SubObjectBlock({
     });
   };
 
-  const toggleTableType = (deptIndex: number, typeId: DietTypeId) => {
-    const department = subObject.departments[deptIndex];
-    const selected = department.selectedTypes.includes(typeId);
-
-    if (selected) {
-      if (department.selectedTypes.length <= 1) return;
-      updateDepartment(deptIndex, {
-        selectedTypes: department.selectedTypes.filter((item) => item !== typeId),
-      });
-      return;
-    }
-
-    updateDepartment(deptIndex, {
-      selectedTypes: [...department.selectedTypes, typeId],
-    });
-  };
-
-  const toggleMeal = (deptIndex: number, meal: MealId) => {
-    const department = subObject.departments[deptIndex];
-    const selected = department.mealIds.includes(meal);
-    updateDepartment(deptIndex, {
-      mealIds: selected
-        ? department.mealIds.filter((item) => item !== meal)
-        : [...department.mealIds, meal],
-    });
-  };
-
-  const toggleSubObjectMeal = (meal: MealId) => {
-    const selected = subObject.mealIds.includes(meal);
+  const removeDepartment = (deptIndex: number) => {
     onUpdate(subObjectIndex, {
-      mealIds: selected
-        ? subObject.mealIds.filter((item) => item !== meal)
-        : [...subObject.mealIds, meal],
+      departments: subObject.departments.filter((_, i) => i !== deptIndex),
     });
   };
 
@@ -292,117 +442,16 @@ function SubObjectBlock({
         )}
       </Flex>
 
-      <Flex direction="column" gap={1}>
-        <Text variant="body-2" className="kitchen-drawer__table-hint">
-          Меню подобъекта:
-        </Text>
-        <Select
-          size="m"
-          width={280}
-          value={[subObject.menuSource]}
-          options={[
-            { value: 'object', content: 'Меню объекта' },
-            { value: 'own', content: 'Своё меню' },
-          ]}
-          onUpdate={(newValue) =>
-            onUpdate(subObjectIndex, { menuSource: newValue[0] as MenuSource })
-          }
-        />
-      </Flex>
-
-      <Flex direction="column" gap={1}>
-        <Text variant="body-2" className="kitchen-drawer__table-hint">
-          Приёмы пищи подобъекта (не выбрано — как у объекта):
-        </Text>
-        <Flex gap={2} wrap>
-          {MEALS.map((meal) => (
-            <MealChip
-              key={meal.id}
-              label={meal.label}
-              selected={subObject.mealIds.includes(meal.id)}
-              onClick={() => toggleSubObjectMeal(meal.id)}
-            />
-          ))}
-        </Flex>
-      </Flex>
-
       {subObject.departments.map((department, deptIndex) => (
-        <Flex key={department.id} direction="column" gap={2} className="kitchen-drawer__department">
-          <Flex gap={2} alignItems="flex-end">
-            <TextInput
-              size="l"
-              label={
-                subObject.type === 'school'
-                  ? 'Класс (параллель):'
-                  : subObject.type === 'kindergarten'
-                    ? 'Группа:'
-                    : 'Отделение:'
-              }
-              placeholder={
-                subObject.type === 'school'
-                  ? '1–4 классы'
-                  : subObject.type === 'kindergarten'
-                    ? 'Старшая группа'
-                    : 'Терапия'
-              }
-              value={department.name}
-              onUpdate={(value) => updateDepartment(deptIndex, { name: value })}
-              style={{ flex: 1 }}
-            />
-            {subObject.departments.length > 1 && (
-              <Button
-                view="flat"
-                size="l"
-                title="Удалить группу"
-                aria-label="Удалить группу"
-                onClick={() =>
-                  onUpdate(subObjectIndex, {
-                    departments: subObject.departments.filter((_, i) => i !== deptIndex),
-                  })
-                }
-              >
-                <Icon data={TrashBin} size={18} />
-              </Button>
-            )}
-          </Flex>
-
-          <Text variant="body-1" className="kitchen-drawer__table-hint">
-            Рацион (должен быть выбран хотя бы один)
-          </Text>
-
-          <Flex gap={2} wrap>
-            {DIET_CATALOG.filter((item) =>
-              (item.appliesTo as readonly string[]).includes(subObject.type)
-            ).map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                className={`objects-table-chip${
-                  department.selectedTypes.includes(type.id) ? ' objects-table-chip_selected' : ''
-                }`}
-                onClick={() => toggleTableType(deptIndex, type.id)}
-              >
-                {department.selectedTypes.includes(type.id) && <Icon data={Check} size={14} />}
-                {type.label}
-              </button>
-            ))}
-          </Flex>
-
-          <Text variant="body-1" className="kitchen-drawer__table-hint">
-            Приёмы пищи группы (не выбрано — все)
-          </Text>
-
-          <Flex gap={2} wrap>
-            {MEALS.map((meal) => (
-              <MealChip
-                key={meal.id}
-                label={meal.label}
-                selected={department.mealIds.includes(meal.id)}
-                onClick={() => toggleMeal(deptIndex, meal.id)}
-              />
-            ))}
-          </Flex>
-        </Flex>
+        <DepartmentBlock
+          key={department.id}
+          variant={subObject.type}
+          department={department}
+          index={deptIndex}
+          onUpdate={updateDepartment}
+          onRemove={removeDepartment}
+          canRemove={subObject.departments.length > 1}
+        />
       ))}
 
       <Button
@@ -463,8 +512,8 @@ function Flex({
   );
 }
 
-/** Редактирование / создание объекта в нижнем drawer. */
-export function EditSubObjectDialog({
+/** Drawer редактирования / создания объекта (название, собственные группы/отделения). */
+export function ObjectDrawer({
   object,
   mode = 'edit',
   onClose,
@@ -474,8 +523,8 @@ export function EditSubObjectDialog({
   onClose: () => void;
 }) {
   const height = useDrawerHeight();
-  const update = useUpdateSubObject();
   const create = useCreateObject();
+  const update = useUpdateObject();
   const toaster = useToaster();
   const [form, setForm] = useState<ObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
@@ -487,7 +536,7 @@ export function EditSubObjectDialog({
       return;
     }
     if (mode === 'create') {
-      setForm({ name: '', subObjects: [emptySubObject()] });
+      setForm({ name: '', menuId: undefined, mealIds: [], departments: [emptyDepartment()] });
     } else if (object) {
       setForm(objectToForm(object));
     }
@@ -507,31 +556,51 @@ export function EditSubObjectDialog({
     onClose();
   };
 
-  const updateSubObject = (index: number, patch: Partial<SubObjectForm>) => {
+  const updateDepartment = (index: number, patch: Partial<DepartmentForm>) => {
     setForm((current) => {
       if (!current) return current;
       return {
         ...current,
-        subObjects: current.subObjects.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+        departments: current.departments.map((d, i) => (i === index ? { ...d, ...patch } : d)),
       };
     });
   };
 
-  const removeSubObject = (index: number) => {
+  const removeDepartment = (index: number) => {
     setForm((current) => {
       if (!current) return current;
       return {
         ...current,
-        subObjects: current.subObjects.filter((_, i) => i !== index),
+        departments: current.departments.filter((_, i) => i !== index),
       };
     });
   };
 
   const submit = () => {
-    if (!form || !isFormReady(form)) return;
+    if (!form || !isObjectFormReady(form)) return;
+
+    const payload = {
+      name: form.name.trim(),
+      menuId: form.menuId ?? undefined,
+      mealIds: form.mealIds,
+      departments: form.departments.map((department) => ({
+        id: department.id,
+        name: department.name.trim(),
+        mealIds: department.mealIds,
+        tables: department.selectedTypes.map((typeId) => {
+          const type = DIET_CATALOG.find((item) => item.id === typeId)!;
+          return {
+            id:
+              department.tableIds[typeId] ??
+              `tbl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: type.storageName,
+          };
+        }),
+      })),
+    };
 
     if (mode === 'create') {
-      create.mutate(form.name, {
+      create.mutate(payload, {
         onSuccess: () => {
           toaster.add({ name: 'object-created', title: 'Объект создан', theme: 'success' });
           requestClose();
@@ -549,38 +618,32 @@ export function EditSubObjectDialog({
 
     if (!object) return;
 
-    const subObjectUpdates = form.subObjects.map((subObjectForm) => {
-      const original = object.subObjects.find((s) => s.id === subObjectForm.id);
-      if (!original) return Promise.resolve();
-      return update.mutateAsync({
-        id: original.id,
-        patch: subObjectFormToPatch(subObjectForm, original),
-      });
-    });
-
-    Promise.all(subObjectUpdates)
-      .then(() => {
-        toaster.add({
-          name: 'object-updated',
-          title: 'Объект обновлён',
-          theme: 'success',
-        });
-        requestClose();
-      })
-      .catch((e: Error) =>
-        toaster.add({
-          name: 'object-edit',
-          title: 'Не удалось сохранить',
-          content: e.message,
-          theme: 'danger',
-        })
-      );
+    update.mutate(
+      { id: object.id, patch: payload },
+      {
+        onSuccess: () => {
+          toaster.add({
+            name: 'object-updated',
+            title: 'Объект обновлён',
+            theme: 'success',
+          });
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'object-edit',
+            title: 'Не удалось сохранить',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
   };
 
   if (!mounted || !form) return null;
 
-  const ready = isFormReady(form);
-  const changed = object ? hasChanges(form, object) : false;
+  const ready = isObjectFormReady(form);
+  const changed = object ? hasObjectChanges(form, object) : false;
 
   return (
     <Drawer
@@ -620,6 +683,180 @@ export function EditSubObjectDialog({
               autoFocus
             />
 
+            {form.departments.map((department, departmentIndex) => (
+              <DepartmentBlock
+                key={department.id}
+                variant="object"
+                department={department}
+                index={departmentIndex}
+                onUpdate={updateDepartment}
+                onRemove={removeDepartment}
+                canRemove={form.departments.length > 1}
+              />
+            ))}
+
+            <Button
+              view="normal-contrast"
+              size="l"
+              onClick={() =>
+                setForm((current) =>
+                  current
+                    ? { ...current, departments: [...current.departments, emptyDepartment()] }
+                    : current
+                )
+              }
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Icon data={Plus} size={16} />
+              Добавить группу/отделение
+            </Button>
+          </Flex>
+        </div>
+
+        <div className="kitchen-drawer__footer">
+          <div className="kitchen-drawer__footer-inner">
+            <Button view="outlined" size="l" onClick={requestClose}>
+              Отмена
+            </Button>
+            <Button
+              view="action"
+              size="l"
+              loading={mode === 'create' ? create.isPending : update.isPending}
+              disabled={!ready || (mode === 'edit' && !changed)}
+              onClick={submit}
+            >
+              <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
+              {mode === 'create' ? 'Создать' : 'Сохранить'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+
+/** Drawer редактирования подобъектов: название, тип, группы/отделения с рационами и приёмами. */
+export function SubObjectsDrawer({
+  object,
+  onClose,
+}: {
+  object: CateringObject | null;
+  onClose: () => void;
+}) {
+  const height = useDrawerHeight();
+  const update = useUpdateSubObject();
+  const toaster = useToaster();
+  const [form, setForm] = useState<SubObjectsForm | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (!object) {
+      setVisible(false);
+      return;
+    }
+    setForm({ subObjects: object.subObjects.map(subObjectToForm) });
+    setMounted(true);
+    const frame = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, [object]);
+
+  useEffect(() => {
+    if (visible || !mounted) return;
+    const timer = window.setTimeout(() => setMounted(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [visible, mounted]);
+
+  const requestClose = () => {
+    setVisible(false);
+    onClose();
+  };
+
+  const updateSubObject = (index: number, patch: Partial<SubObjectForm>) => {
+    setForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        subObjects: current.subObjects.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+      };
+    });
+  };
+
+  const removeSubObject = (index: number) => {
+    setForm((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        subObjects: current.subObjects.filter((_, i) => i !== index),
+      };
+    });
+  };
+
+  const submit = () => {
+    if (!form || !object || !isSubObjectsFormReady(form.subObjects)) return;
+
+    const steps: Promise<unknown>[] = [];
+
+    for (const subObjectForm of form.subObjects) {
+      const original = object.subObjects.find((s) => s.id === subObjectForm.id);
+      if (!original) continue;
+      steps.push(
+        update.mutateAsync({
+          id: original.id,
+          patch: subObjectFormToPatch(subObjectForm, original),
+        })
+      );
+    }
+
+    Promise.all(steps)
+      .then(() => {
+        toaster.add({
+          name: 'sub-objects-updated',
+          title: 'Подобъекты обновлены',
+          theme: 'success',
+        });
+        requestClose();
+      })
+      .catch((e: Error) =>
+        toaster.add({
+          name: 'sub-objects-edit',
+          title: 'Не удалось сохранить',
+          content: e.message,
+          theme: 'danger',
+        })
+      );
+  };
+
+  if (!mounted || !form || !object) return null;
+
+  const ready = isSubObjectsFormReady(form.subObjects);
+  const changed = hasSubObjectsChanges(form.subObjects, object);
+
+  return (
+    <Drawer
+      open={visible}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) requestClose();
+      }}
+      placement="bottom"
+      size={height}
+      maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
+      contentOverflow="auto"
+      className="kitchen-drawer"
+      contentClassName="kitchen-drawer__panel"
+    >
+      <div className="kitchen-drawer__card">
+        <div className="kitchen-drawer__header">
+          <div className="kitchen-drawer__header-inner">
+            <Text variant="subheader-3">Редактирование подобъектов</Text>
+            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Icon data={Xmark} size={20} />
+            </Button>
+          </div>
+        </div>
+
+        <div className="kitchen-drawer__body">
+          <Flex direction="column" gap={3}>
             {form.subObjects.map((subObject, subObjectIndex) => (
               <SubObjectBlock
                 key={subObject.id}
@@ -632,7 +869,7 @@ export function EditSubObjectDialog({
             ))}
 
             <Button
-              view="normal-contrast"
+              view="normal"
               size="l"
               onClick={() =>
                 setForm((current) =>
@@ -657,12 +894,12 @@ export function EditSubObjectDialog({
             <Button
               view="action"
               size="l"
-              loading={mode === 'create' ? create.isPending : update.isPending}
-              disabled={!ready || (mode === 'edit' && !changed)}
+              loading={update.isPending}
+              disabled={!ready || !changed}
               onClick={submit}
             >
-              <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
-              {mode === 'create' ? 'Создать' : 'Сохранить'}
+              <Icon data={FloppyDisk} size={16} />
+              Сохранить
             </Button>
           </div>
         </div>

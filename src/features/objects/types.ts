@@ -99,7 +99,7 @@ export interface SubObject {
   mealIds?: MealId[];
 }
 
-/** Объект организации: имеет своё меню, содержит подобъекты. */
+/** Объект организации: имеет своё меню, свои группы/классы и подобъекты. */
 export interface CateringObject {
   id: string;
   name: string;
@@ -107,6 +107,8 @@ export interface CateringObject {
   mealIds: MealId[];
   /** Своё меню объекта (id из справочника меню). */
   menuId?: string;
+  /** Группы/классы самого объекта. */
+  departments: Department[];
   subObjects: SubObject[];
 }
 
@@ -149,6 +151,28 @@ export interface UpdateObjectMenuRequest {
   menuId?: string;
   mealIds: MealId[];
 }
+
+/** Группа/класс с рационами при создании/обновлении объекта. */
+export interface ObjectDepartmentRequest {
+  id: string;
+  name: string;
+  mealIds: MealId[];
+  tables: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+/** Создание объекта: название + своё меню + приёмы пищи + группы/рационы. */
+export interface CreateObjectRequest {
+  name: string;
+  menuId?: string;
+  mealIds: MealId[];
+  departments: ObjectDepartmentRequest[];
+}
+
+/** Обновление объекта. */
+export type UpdateObjectRequest = CreateObjectRequest;
 
 /** Строка выхода на раздачу (ОБЪЕКТ-04). */
 export interface DistributionRow {

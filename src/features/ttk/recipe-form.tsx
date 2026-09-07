@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Button, Flex, Icon, Text, TextArea, TextInput } from '@gravity-ui/uikit';
 import { Plus, TrashBin } from '@gravity-ui/icons';
 import type { CreateRecipeIngredient, CreateRecipeRequest, Recipe } from './types';
+import { ProductPicker } from '@/features/products/product-picker';
 
 const emptyIngredient = (): CreateRecipeIngredient => ({
   name: '',
+  productId: undefined,
   grossPerPortion: '',
   netPerPortion: '',
 });
@@ -14,6 +16,7 @@ function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
 
   return recipe.ingredients.map((row) => ({
     name: row.name,
+    productId: row.productId ?? undefined,
     grossPerPortion: row.grossPerPortion,
     netPerPortion: row.netPerPortion,
   }));
@@ -23,8 +26,6 @@ function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
   const [portionYield, setPortionYield] = useState('');
-  const [temperature, setTemperature] = useState('');
-  const [shelfLife, setShelfLife] = useState('');
   const [recipe, setRecipe] = useState('');
   const [ingredients, setIngredients] = useState<CreateRecipeIngredient[]>([emptyIngredient()]);
 
@@ -32,8 +33,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     if (initial) {
       setName(initial.name);
       setPortionYield(initial.portionYield);
-      setTemperature(initial.temperature);
-      setShelfLife(initial.shelfLife);
       setRecipe(initial.recipe);
       setIngredients(ingredientsFromRecipe(initial));
       return;
@@ -41,8 +40,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
     setName('');
     setPortionYield('');
-    setTemperature('');
-    setShelfLife('');
     setRecipe('');
     setIngredients([emptyIngredient()]);
     // Сбрасываем только по ключу сессии формы, не по ссылке на initial.
@@ -53,6 +50,16 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setIngredients((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
+  const updateIngredientProduct = (index: number, product: { id: string; name: string } | null) => {
+    setIngredients((rows) =>
+      rows.map((row, i) =>
+        i === index
+          ? { ...row, productId: product?.id ?? undefined, name: product?.name ?? row.name }
+          : row
+      )
+    );
+  };
+
   const removeIngredient = (index: number) => {
     setIngredients((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   };
@@ -60,8 +67,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const getBody = (): CreateRecipeRequest => ({
     name: name.trim(),
     portionYield: portionYield.trim(),
-    temperature: temperature.trim(),
-    shelfLife: shelfLife.trim(),
     recipe: recipe.trim(),
     ingredients: ingredients.filter((row) => row.name.trim()),
   });
@@ -88,25 +93,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
         />
       </Flex>
 
-      <Flex gap={2}>
-        <TextInput
-          size="l"
-          label="Температура:"
-          placeholder="Отпуск не ниже 65°С"
-          value={temperature}
-          onUpdate={setTemperature}
-          style={{ flex: 1 }}
-        />
-        <TextInput
-          size="l"
-          label="Срок реализации:"
-          placeholder="Не более часов"
-          value={shelfLife}
-          onUpdate={setShelfLife}
-          style={{ flex: 1 }}
-        />
-      </Flex>
-
       <Flex direction="column" gap={2}>
         <Text variant="body-1">Технология приготовления</Text>
         <TextArea
@@ -123,14 +109,13 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
         {ingredients.map((row, index) => (
           <Flex key={index} gap={2} alignItems="flex-end">
-            <TextInput
-              size="l"
-              label="Продукт:"
-              placeholder="Название блюда"
-              value={row.name}
-              onUpdate={(value) => updateIngredient(index, { name: value })}
-              style={{ flex: 2 }}
-            />
+            <div style={{ flex: 2 }}>
+              <ProductPicker
+                value={row.productId}
+                placeholder="Название продукта"
+                onChange={(product) => updateIngredientProduct(index, product)}
+              />
+            </div>
             <TextInput
               size="l"
               label="Брутто на 1 порц, г:"

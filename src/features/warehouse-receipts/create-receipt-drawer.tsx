@@ -15,6 +15,7 @@ import {
 import { useCreateReceipt, useUpdateReceipt } from './api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import { useCateringObjects } from '@/features/objects/api';
+import { ProductPicker } from '@/features/products/product-picker';
 import type { CreateReceiptRequest, ReceiptItem, WarehouseReceipt } from './types';
 import './create-receipt-drawer.css';
 
@@ -145,6 +146,7 @@ function ItemDate({
 }
 
 interface DraftItem {
+  productId: string;
   productName: string;
   unit: string;
   quantity: string;
@@ -162,6 +164,7 @@ interface DraftItem {
 }
 
 const emptyItem = (): DraftItem => ({
+  productId: '',
   productName: '',
   unit: '',
   quantity: '',
@@ -240,6 +243,7 @@ function isoToLocal(value?: string): string {
 /** Строка прихода → черновик строки формы. */
 function receiptToDraft(item: ReceiptItem): DraftItem {
   return {
+    productId: item.productId ?? '',
     productName: item.productName,
     unit: item.unit,
     quantity: item.quantity ? String(item.quantity) : '',
@@ -340,6 +344,7 @@ export function CreateReceiptDrawer({
     warehouseId,
     unitId: unitId || undefined,
     items: filledItems.map((row) => ({
+      productId: row.productId || undefined,
       productName: row.productName,
       unit: row.unit,
       quantity: Number(row.quantity),
@@ -441,13 +446,19 @@ export function CreateReceiptDrawer({
               {items.map((row, index) => (
                 <div key={index} className="create-receipt-drawer__item">
                   <Flex gap={2} alignItems="flex-end" className="create-receipt-drawer__item-main">
-                    <ItemInput
-                      label="Название:"
-                      placeholder="Название товара"
-                      value={row.productName}
-                      onUpdate={(v) => updateItem(index, { productName: v })}
-                      flex={2}
-                    />
+                    <div style={{ flex: 2 }}>
+                      <ProductPicker
+                        value={row.productId}
+                        placeholder="Название товара"
+                        onChange={(product) =>
+                          updateItem(index, {
+                            productId: product?.id ?? '',
+                            productName: product?.name ?? '',
+                            unit: product?.unit ?? row.unit,
+                          })
+                        }
+                      />
+                    </div>
                     <ItemSelect
                       label="Ед. изм.:"
                       placeholder="кг/л/шт"

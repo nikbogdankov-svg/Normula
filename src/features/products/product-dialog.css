@@ -1,49 +1,7 @@
-/* Модалка продукта (popup size s): небольшие правки поверх Dialog Gravity. */
+/* Минимальный диалог создания продукта (имя + единица). */
 
 /* Gravity режет label до 50% ширины поля — в форме показываем целиком. */
 .product-dialog .g-text-input__label {
   max-width: none !important;
   overflow: visible;
-}
-
-/* У числовых полей КБЖУ прячем стрелки изменения значения. */
-.product-dialog .g-text-input__control[type='number']::-webkit-inner-spin-button,
-.product-dialog .g-text-input__control[type='number']::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.product-dialog .g-text-input__control[type='number'] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-.product-dialog__section-title {
-  display: block;
-  margin-bottom: 12px;
-}
-
-/* В форме заголовок прижат к инпутам КБЖУ: от категории 12px (8px gap + 4px),
-   до первого инпута 8px. */
-.product-dialog__section-title_form {
-  margin: 4px 0 0;
-}
-
-.product-dialog__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.product-dialog__meta-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.product-dialog__meta-label {
-  width: 160px;
-  flex-shrink: 0;
-  color: var(--g-color-text-secondary);
 }
