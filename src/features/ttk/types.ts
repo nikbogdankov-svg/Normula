@@ -8,6 +8,8 @@
 /** Строка раскладки продуктов внутри карты. */
 export interface Ingredient {
   name: string;
+  /** id продукта из общего справочника (features/products); пусто — не связан. */
+  productId?: string;
   /** Пустая строка — значит в макете ячейка пустая (например «масса готового»). */
   grossPerPortion: string;
   netPerPortion: string;
@@ -41,8 +43,6 @@ export interface Recipe {
   portionYield: string;
   price: number;
   kcal: number;
-  temperature: string;
-  shelfLife: string;
   recipe: string;
   ingredients: Ingredient[];
   /** Итоговая строка «Выход»: на порцию и на 100 порций. */
@@ -67,6 +67,8 @@ export interface ListCollectionsResponse {
 /** Строка ингредиента в форме создания ТТК (макет «Создать ТТК»). */
 export interface CreateRecipeIngredient {
   name: string;
+  /** id продукта из общего справочника (features/products); пусто — не связан. */
+  productId?: string;
   grossPerPortion: string;
   netPerPortion: string;
 }
@@ -74,8 +76,6 @@ export interface CreateRecipeIngredient {
 export interface CreateRecipeRequest {
   name: string;
   portionYield: string;
-  temperature: string;
-  shelfLife: string;
   /** Технология приготовления. */
   recipe: string;
   ingredients: CreateRecipeIngredient[];

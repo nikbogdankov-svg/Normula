@@ -9,8 +9,6 @@ export interface ExtractedDish {
   id: string;
   name: string;
   portionYield: string;
-  temperature: string;
-  shelfLife: string;
   recipe: string;
   ingredients: CreateRecipeIngredient[];
 }
@@ -31,8 +29,7 @@ export function isExtractableFile(file: File): boolean {
 
 /**
  * Читает файл и достаёт из каждой технологической карты:
- * название, выход порции, температуру, срок реализации,
- * технологию приготовления и ингредиенты из таблицы.
+ * название, выход порции, технологию приготовления и ингредиенты из таблицы.
  */
 export async function extractCollectionFromFile(
   file: File,
@@ -234,8 +231,6 @@ function sectionToDish(
 
   const body = lines.join('\n');
   const portionYield = extractPortionYield(body);
-  const temperature = extractTemperature(body);
-  const shelfLife = extractShelfLife(body);
   const recipe = extractRecipe(body);
 
   // Таблица этой карты (по порядку) или все таблицы файла — для docx.
@@ -248,8 +243,6 @@ function sectionToDish(
     id: `dish-${id}`,
     name,
     portionYield,
-    temperature,
-    shelfLife,
     recipe,
     ingredients,
   };
@@ -304,36 +297,6 @@ function extractPortionYield(text: string): string {
   for (const pattern of patterns) {
     const value = matchField(text, pattern);
     if (value) return normalizeAmount(value);
-  }
-  return '';
-}
-
-function extractTemperature(text: string): string {
-  const patterns = [
-    /температура\s*(?:подачи|отпуска|реализации)?\s*[:：]?\s*([^\n;]{3,100})/i,
-    /(отпуск\s+не\s+ниже\s*[^\n;.]{0,40})/i,
-    /(подавать\s+при\s+температуре[^\n;.]{0,40})/i,
-    /температур\w*\s*[:：]\s*([^\n;]{3,100})/i,
-  ];
-
-  for (const pattern of patterns) {
-    const value = matchField(text, pattern);
-    if (value) return value.replace(/\s+/g, ' ').trim();
-  }
-  return '';
-}
-
-function extractShelfLife(text: string): string {
-  const patterns = [
-    /срок\s*реализации\s*[:：]?\s*([^\n;]{3,120})/i,
-    /срок\s*(?:и\s*)?условия\s*реализации\s*[:：]?\s*([^\n;]{3,120})/i,
-    /срок\s*(?:годности|хранения)\s*[:：]?\s*([^\n;]{3,120})/i,
-    /(не\s+более\s+[^\n;.]{0,80}час\w*)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const value = matchField(text, pattern);
-    if (value) return value.replace(/\s+/g, ' ').trim();
   }
   return '';
 }

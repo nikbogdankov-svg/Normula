@@ -229,8 +229,6 @@ export function RecipeDialog({
             <div className="ttk-recipe-drawer__body">
               <div className="ttk-recipe-drawer__meta">
                 <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
-                <MetaRow title="Температура:">{view.temperature}</MetaRow>
-                <MetaRow title="Срок реализации:">{view.shelfLife}</MetaRow>
                 <MetaRow title="Рецепт:">{view.recipe}</MetaRow>
               </div>
 

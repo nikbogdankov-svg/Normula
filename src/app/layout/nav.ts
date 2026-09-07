@@ -15,7 +15,6 @@ import {
   ListCheck,
   Person,
   Receipt,
-  ShoppingCart,
   SquareListUl,
   Wallet,
 } from '@gravity-ui/icons';
@@ -96,7 +95,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/norms', label: 'Нормы', icon: ListCheck, wip: true },
-      { to: '/app/products', label: 'Продукты', icon: ShoppingCart },
       { to: '/app/diets', label: 'Диеты', icon: Heart },
     ],
   },

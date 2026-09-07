@@ -30,3 +30,17 @@
   font-size: var(--g-text-body-2-font-size);
   vertical-align: top;
 }
+
+/* Теги приёмов пищи в таблицах объектов. */
+.objects-meal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: var(--g-text-body-short-font-size);
+  line-height: var(--g-text-body-short-line-height);
+  background: var(--g-color-base-generic);
+  color: var(--g-color-text-primary);
+  white-space: nowrap;
+}
