@@ -19,7 +19,7 @@
   color: var(--g-color-text-secondary);
   font-weight: var(--g-text-body-font-weight);
   font-size: var(--g-text-body-2-font-size);
-  background-color: var(--g-color-bg-secondary);
+  background-color: transparent;
 }
 
 .admin-table tbody tr {
