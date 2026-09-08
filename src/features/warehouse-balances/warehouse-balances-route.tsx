@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Button, Card, Flex, Icon, Select, Text, TextInput } from '@gravity-ui/uikit';
-import { Magnifier, Archive } from '@gravity-ui/icons';
-import { useOrganizations } from '@/shared/auth';
+import { Magnifier } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { useApi } from '@/shared/api/use-api';
+import { useCateringObjects } from '@/features/objects/api';
 import { useBalances } from './api';
 import type { WarehouseBalance } from './types';
 import './warehouse-balances-route.css';
 
 export function WarehouseBalancesRoute() {
   const api = useApi();
-  const { organizations } = useOrganizations();
+  const objects = useCateringObjects();
   const [warehouseId, setWarehouseId] = useState('');
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<WarehouseBalance | null>(null);
 
   useEffect(() => {
-    if (!organizations?.length) return;
-    setWarehouseId((current) => current || organizations[0].id);
-  }, [organizations]);
+    const first = objects.data?.objects[0];
+    if (first) setWarehouseId((current) => current || first.id);
+  }, [objects.data]);
 
   const { data, isLoading, error } = useBalances(warehouseId);
 
@@ -28,6 +28,24 @@ export function WarehouseBalancesRoute() {
       <Flex direction="column" className="warehouse-balances-page">
         <NoOrganizationSelectedState />
       </Flex>
+    );
+  }
+
+  if (objects.isPending) {
+    return (
+      <Flex justifyContent="center" style={{ padding: 48 }}>
+        <Text variant="body-1">Загрузка...</Text>
+      </Flex>
+    );
+  }
+
+  if (objects.isError || !objects.data) {
+    return (
+      <Card view="filled" style={{ padding: 16 }}>
+        <Text variant="body-1" color="danger">
+          Ошибка: {objects.error instanceof Error ? objects.error.message : 'неизвестная ошибка'}
+        </Text>
+      </Card>
     );
   }
 
@@ -81,61 +99,62 @@ export function WarehouseBalancesRoute() {
     );
   });
 
+  const avgPriceByProduct: Record<string, number> = {};
+  for (const balance of data.balances) {
+    for (const item of balance.items) {
+      const totalQty = item.batches.reduce((sum, batch) => sum + batch.remaining, 0);
+      const weighted = item.batches.reduce((sum, batch) => sum + batch.price * batch.remaining, 0);
+      avgPriceByProduct[item.productName] =
+        totalQty > 0 ? Math.round((weighted / totalQty) * 100) / 100 : 0;
+    }
+  }
+
   return (
     <div className="warehouse-balances-page">
-      <Card view="filled" style={{ padding: 0, margin: 16 }}>
-        <Flex
-          alignItems="center"
-          justifyContent="space-between"
-          gap={4}
-          style={{ padding: '12px 16px' }}
-        >
-          <Flex alignItems="center" gap={2}>
-            <Icon data={Archive} size={16} />
-            <Text variant="subheader-2">Остатки товаров</Text>
-          </Flex>
-          <Flex alignItems="center" gap={2} wrap>
-            <Select
-              size="m"
-              width={220}
-              label="Склад:"
-              placeholder="Выберите школу, больницу или учреждение"
-              value={[warehouseId]}
-              onUpdate={(value) => setWarehouseId(value[0] ?? '')}
-              options={
-                organizations?.length
-                  ? organizations.map((organization) => ({
-                      value: organization.id,
-                      content: organization.name,
-                    }))
-                  : []
-              }
-            />
-            <TextInput
-              size="m"
-              placeholder="Поиск по товару или партии"
-              value={search}
-              onUpdate={setSearch}
-              hasClear
-              startContent={
-                <span
-                  style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
-                >
-                  <Icon data={Magnifier} size={16} />
-                </span>
-              }
-              style={{ width: 320 }}
-            />
-          </Flex>
+      <Flex
+        alignItems="center"
+        justifyContent="space-between"
+        gap={4}
+        wrap
+        style={{ padding: '16px 16px 0' }}
+      >
+        <Flex alignItems="center" gap={4} wrap>
+          <Select
+            size="l"
+            width={220}
+            label="Объект:"
+            placeholder="Выберите объект"
+            value={[warehouseId]}
+            onUpdate={(value) => setWarehouseId(value[0] ?? '')}
+            options={
+              objects.data?.objects.length
+                ? objects.data.objects.map((object) => ({
+                    value: object.id,
+                    content: object.name,
+                  }))
+                : []
+            }
+          />
         </Flex>
+        <Flex alignItems="center" gap={4} wrap>
+          <TextInput
+            size="l"
+            placeholder="Поиск по товару или партии"
+            value={search}
+            onUpdate={setSearch}
+            hasClear
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <Icon data={Magnifier} size={16} />
+              </span>
+            }
+            style={{ width: 320 }}
+          />
+        </Flex>
+      </Flex>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--g-color-line-generic)',
-            paddingTop: 4,
-            paddingBottom: 8,
-          }}
-        >
+      <Card view="filled" style={{ padding: 0, margin: 16 }}>
+        <div style={{ paddingTop: 4, paddingBottom: 8 }}>
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
@@ -148,33 +167,46 @@ export function WarehouseBalancesRoute() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row, index) => (
-                  <tr
-                    key={row.id}
-                    className={[
-                      index === filteredRows.length - 1 ? 'admin-table__row_last' : '',
-                      !row.isLastBatchOfProduct ? 'admin-table__row_no-border' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    <td>
-                      {row.isFirstBatchOfProduct ? (
-                        <HighlightText text={row.productName} query={search} />
-                      ) : (
-                        ''
-                      )}
-                    </td>
-                    <td>
-                      <HighlightText text={row.batchNumber} query={search} />
-                    </td>
-                    <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
-                    <td>{row.price} ₽</td>
-                    <td>
-                      {row.remaining} {row.unit}
-                    </td>
-                  </tr>
-                ))}
+                {filteredRows.flatMap((row, index) => {
+                  const isEnd = index === filteredRows.length - 1;
+                  const main = (
+                    <tr key={row.id} className="admin-table__row_no-border">
+                      <td>
+                        {row.isFirstBatchOfProduct ? (
+                          <HighlightText text={row.productName} query={search} />
+                        ) : (
+                          ''
+                        )}
+                      </td>
+                      <td>
+                        <HighlightText text={row.batchNumber} query={search} />
+                      </td>
+                      <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
+                      <td>{row.price} ₽</td>
+                      <td>
+                        {row.remaining} {row.unit}
+                      </td>
+                    </tr>
+                  );
+                  if (!row.isLastBatchOfProduct) return [main];
+                  return [
+                    main,
+                    <tr key={`avg-${row.id}`} className={isEnd ? 'admin-table__row_last' : ''}>
+                      <td colSpan={3} />
+                      <td>
+                        <span
+                          style={{
+                            color: 'var(--g-color-text-primary)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Средняя цена {avgPriceByProduct[row.productName]} ₽
+                        </span>
+                      </td>
+                      <td />
+                    </tr>,
+                  ];
+                })}
               </tbody>
             </table>
           </div>

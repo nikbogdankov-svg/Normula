@@ -54,13 +54,13 @@ export const NAV_GROUPS: NavGroup[] = [
     title: 'Планирование',
     items: [
       { to: '/app/menu', label: 'Меню', icon: SquareListUl },
+      { to: '/app/portions', label: 'Порционник', icon: Receipt },
       { to: '/app/ttk', label: 'ТТК', icon: FileText },
     ],
   },
   {
     title: 'Производство',
     items: [
-      { to: '/app/portions', label: 'Порционник', icon: Receipt },
       { to: '/app/cooking-plan', label: 'План приготовления', icon: Calendar, wip: true },
       { to: '/app/products-layout', label: 'Раскладка продуктов', icon: Box, wip: true },
       {

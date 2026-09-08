@@ -112,7 +112,9 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
             <div style={{ flex: 2 }}>
               <ProductPicker
                 value={row.productId}
+                valueLabel={row.name}
                 placeholder="Название продукта"
+                size="l"
                 onChange={(product) => updateIngredientProduct(index, product)}
               />
             </div>
@@ -132,25 +134,22 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
               onUpdate={(value) => updateIngredient(index, { netPerPortion: value })}
               style={{ flex: 1 }}
             />
-            {index > 0 ? (
-              <Button
-                view="flat"
-                size="l"
-                onClick={() => removeIngredient(index)}
-                title="Удалить"
-                aria-label="Удалить ингредиент"
-              >
-                <Icon data={TrashBin} size={18} />
-              </Button>
-            ) : (
-              <span style={{ width: 40, flexShrink: 0 }} />
-            )}
+            <Button
+              view="flat"
+              size="l"
+              onClick={() => removeIngredient(index)}
+              title="Удалить ингредиент"
+              aria-label="Удалить ингредиент"
+              disabled={ingredients.length <= 1}
+            >
+              <Icon data={TrashBin} size={18} />
+            </Button>
           </Flex>
         ))}
 
         <Button
-          view="normal"
-          size="m"
+          view="normal-contrast"
+          size="l"
           onClick={() => setIngredients((rows) => [...rows, emptyIngredient()])}
           style={{ alignSelf: 'flex-start' }}
         >
