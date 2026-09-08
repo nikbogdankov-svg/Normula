@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Flex, TextInput } from '@gravity-ui/uikit';
+import { Flex, Select, TextInput, type SelectOption } from '@gravity-ui/uikit';
 import type { CreateProductRequest, Product } from './types';
 
 type Draft = {
@@ -8,6 +8,8 @@ type Draft = {
 };
 
 const emptyDraft: Draft = { name: '', unit: '' };
+
+const UNIT_OPTIONS = ['кг', 'г', 'л', 'мл', 'шт', 'уп', 'кор', 'ящ'];
 
 /** Состояние и разметка минимальной формы создания продукта (имя + единица). */
 export function useProductForm(initial?: Product | null, resetKey?: string) {
@@ -24,6 +26,13 @@ export function useProductForm(initial?: Product | null, resetKey?: string) {
 
   const patch = (field: keyof Draft, value: string) =>
     setDraft((current) => ({ ...current, [field]: value }));
+
+  /** Единица сохраняется как есть: если её нет в списке, добавляем вручную. */
+  const unitOptions: SelectOption[] = draft.unit
+    ? [...UNIT_OPTIONS, draft.unit]
+        .filter((unit, index, all) => all.indexOf(unit) === index)
+        .map((unit): SelectOption => ({ value: unit, content: unit }))
+    : UNIT_OPTIONS.map((unit): SelectOption => ({ value: unit, content: unit }));
 
   /** Предзаполнить название (например, тем, что пользователь ввёл и не нашёл). */
   const setInitialName = (value: string) => setDraft((current) => ({ ...current, name: value }));
@@ -43,12 +52,14 @@ export function useProductForm(initial?: Product | null, resetKey?: string) {
         onUpdate={(value) => patch('name', value)}
         autoFocus
       />
-      <TextInput
+      <Select
         size="l"
         label="Единица закупки:"
         placeholder="кг, л, шт"
-        value={draft.unit}
-        onUpdate={(value) => patch('unit', value)}
+        value={draft.unit ? [draft.unit] : []}
+        onUpdate={(value) => patch('unit', value[0] ?? '')}
+        filterable
+        options={unitOptions}
       />
     </Flex>
   );

@@ -30,6 +30,7 @@ export type PortionsView = 'organizations' | 'dishes';
 export interface DishDistributionRow {
   dishName: string;
   mealType: string;
+  objectName: string;
   subObjectName: string;
   departmentName: string;
   tableName: string;

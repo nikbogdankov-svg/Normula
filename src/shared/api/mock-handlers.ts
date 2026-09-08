@@ -2272,6 +2272,7 @@ function buildDishDistribution(date: string, objectId: string | null): DishDistr
             rows.push({
               dishName: dish.name,
               mealType: dish.mealType,
+              objectName: unit.name,
               subObjectName: subObject.name,
               departmentName: department.name,
               tableName: table.name,

@@ -449,7 +449,9 @@ export function CreateReceiptDrawer({
                     <div style={{ flex: 2 }}>
                       <ProductPicker
                         value={row.productId}
+                        valueLabel={row.productName}
                         placeholder="Название товара"
+                        size="l"
                         onChange={(product) =>
                           updateItem(index, {
                             productId: product?.id ?? '',

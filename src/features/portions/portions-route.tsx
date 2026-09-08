@@ -98,13 +98,19 @@ export function PortionsRoute() {
   }
 
   const subObjects = objects.data.objects.flatMap((unit) => unit.subObjects);
-  const filteredFacilities = searchQuery
-    ? subObjects.filter((f) => f.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : subObjects;
-  const showAll = selectedId === ALL_SUBOBJECTS;
-  const selected = showAll
-    ? null
-    : (subObjects.find((subObject) => subObject.id === selectedId) ?? subObjects[0] ?? null);
+  const query = searchQuery.trim().toLowerCase();
+  const objectOptions = objects.data.objects
+    .filter((unit) => !query || unit.name.toLowerCase().includes(query))
+    .map((unit) => ({ value: `object:${unit.id}`, content: unit.name }));
+  const selectedUnit = selectedId.startsWith('object:')
+    ? (objects.data.objects.find((unit) => `object:${unit.id}` === selectedId) ?? null)
+    : null;
+  const scopeSubObjects = selectedUnit ? selectedUnit.subObjects : subObjects;
+  // Подобъект → его главный объект (для подписи в таблице).
+  const parentObjectName: Record<string, string> = {};
+  for (const unit of objects.data.objects) {
+    for (const subObject of unit.subObjects) parentObjectName[subObject.id] = unit.name;
+  }
 
   const isFutureDate = date > todayIso();
   /** null — записи ещё нет (например, будущая дата): инпут показываем пустым. */
@@ -175,7 +181,7 @@ export function PortionsRoute() {
           value={view}
           onUpdate={(value) => setView(value as PortionsView)}
         >
-          <SegmentedRadioGroup.Option value="organizations" content="По подобъектам" />
+          <SegmentedRadioGroup.Option value="organizations" content="По объектам" />
           <SegmentedRadioGroup.Option value="dishes" content="По блюдам" />
         </SegmentedRadioGroup>
       </Flex>
@@ -191,7 +197,7 @@ export function PortionsRoute() {
           <Flex alignItems="center" gap={2}>
             <Icon data={Receipt} size={16} />
             <Text variant="subheader-2">
-              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по подобъектам'}
+              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по объектам'}
             </Text>
           </Flex>
           <Flex alignItems="center" gap={2}>
@@ -199,7 +205,7 @@ export function PortionsRoute() {
               <>
                 <TextInput
                   size="m"
-                  placeholder="Поиск по подобъектам..."
+                  placeholder="Поиск по объектам..."
                   value={searchQuery}
                   onUpdate={setSearchQuery}
                   hasClear
@@ -215,18 +221,12 @@ export function PortionsRoute() {
                 <Select
                   size="m"
                   width={280}
-                  label="Подобъект:"
-                  title="Подобъект:"
-                  value={[showAll ? ALL_SUBOBJECTS : (selected?.id ?? ALL_SUBOBJECTS)]}
+                  label="Объект:"
+                  title="Объект:"
+                  value={[selectedId]}
                   onUpdate={(value) => setSelectedId(value[0] ?? ALL_SUBOBJECTS)}
-                  placeholder="Выберите школу, например школа 5"
-                  options={[
-                    { value: ALL_SUBOBJECTS, content: 'Все' },
-                    ...filteredFacilities.map((subObject) => ({
-                      value: subObject.id,
-                      content: subObject.name,
-                    })),
-                  ]}
+                  placeholder="Выберите объект или подобъект"
+                  options={[{ value: ALL_SUBOBJECTS, content: 'Все' }, ...objectOptions]}
                 />
               </>
             )}
@@ -310,24 +310,14 @@ export function PortionsRoute() {
               {!portions.isPending && !portions.isError && subObjects.length === 0 && (
                 <EmptyState text="Сначала добавьте подобъекты в разделе «Объекты»" />
               )}
-              {!portions.isPending && !portions.isError && subObjects.length > 0 && showAll && (
+              {!portions.isPending && !portions.isError && subObjects.length > 0 && (
                 <SummaryPortionsTable
                   date={date}
-                  subObjects={subObjects}
+                  subObjects={scopeSubObjects}
+                  parentObjectName={parentObjectName}
                   headcountOf={headcountOf}
                 />
               )}
-              {!portions.isPending &&
-                !portions.isError &&
-                subObjects.length > 0 &&
-                !showAll &&
-                selected && (
-                  <DepartmentPortionsTable
-                    date={date}
-                    subObject={selected}
-                    headcountOf={headcountOf}
-                  />
-                )}
             </>
           )}
 
@@ -350,135 +340,6 @@ export function PortionsRoute() {
         </div>
       </Card>
     </Flex>
-  );
-}
-
-function DepartmentPortionsTable({
-  date,
-  subObject,
-  headcountOf,
-}: {
-  date: string;
-  subObject: SubObject;
-  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null;
-}) {
-  const update = useUpdatePortionHeadcount();
-  const toaster = useToaster();
-
-  const commit = (departmentId: string, tableId: string, headcount: number) => {
-    update.mutate(
-      {
-        date,
-        subObjectId: subObject.id,
-        departmentId,
-        tableId,
-        headcount,
-      },
-      {
-        onError: (e) =>
-          toaster.add({
-            name: 'portions-headcount',
-            title: 'Не удалось сохранить',
-            content: e.message,
-            theme: 'danger',
-          }),
-      }
-    );
-  };
-
-  const rows = useMemo(() => {
-    const flat = subObject.departments.flatMap((department) =>
-      department.tables.map((table) => ({
-        id: table.id,
-        departmentId: department.id,
-        departmentName: department.name,
-        tableName: table.name,
-        headcount: headcountOf(subObject.id, department.id, table.id),
-        defaultHeadcount: table.headcount,
-        isTotal: false as boolean,
-      }))
-    );
-    const dataRows = flat.map((row, index) => ({
-      ...row,
-      showDepartment: index === 0 || flat[index - 1].departmentId !== row.departmentId,
-      isLastInDepartment:
-        index === flat.length - 1 || flat[index + 1].departmentId !== row.departmentId,
-      isLastRow: index === flat.length - 1,
-    }));
-    const total = dataRows.reduce((sum, row) => sum + (row.headcount ?? 0), 0);
-    if (dataRows.length === 0) return dataRows;
-    return [
-      ...dataRows,
-      {
-        id: '__total',
-        departmentId: '__total',
-        departmentName: 'Всего',
-        tableName: '',
-        headcount: total,
-        defaultHeadcount: 0,
-        isTotal: true,
-        isLastRow: false,
-        showDepartment: true,
-        isLastInDepartment: true,
-      },
-    ];
-  }, [subObject, headcountOf]);
-
-  if (rows.length === 0) {
-    return <EmptyState text="В этом подобъекте нет групп" />;
-  }
-
-  return (
-    <div className="admin-table-wrap">
-      <Table
-        width="max"
-        className="admin-table portions-group-table"
-        data={rows}
-        getRowClassNames={(row) => {
-          const classes: string[] = [];
-          if (row.isTotal) return classes;
-          if (row.isLastRow) classes.push('portions-row_before-total');
-          if (!row.isLastInDepartment) {
-            classes.push('objects-group-row_no-divider');
-            if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          }
-          return classes;
-        }}
-        columns={[
-          {
-            id: 'departmentName',
-            name: 'Отделение',
-            width: '40%',
-            template: (row) =>
-              row.isTotal ? 'Всего' : row.showDepartment ? row.departmentName : null,
-            placeholder: () => null,
-          },
-          {
-            id: 'tableName',
-            name: 'Стол',
-            width: '35%',
-            template: (row) => (row.isTotal ? null : row.tableName),
-            placeholder: () => null,
-          },
-          {
-            id: 'headcount',
-            name: 'Человек',
-            width: '25%',
-            align: 'end',
-            template: (row) =>
-              row.isTotal ? (
-                <span className="portions-total-headcount">{row.headcount}</span>
-              ) : (
-                <HeadcountInput
-                  value={row.headcount}
-                  defaultHeadcount={row.defaultHeadcount}
-                  onCommit={(headcount) => commit(row.departmentId, row.id, headcount)}
-                />
-              ),
-          },
-        ]}
-      />
-    </div>
   );
 }
 
@@ -527,10 +388,12 @@ function HeadcountInput({
 function SummaryPortionsTable({
   date,
   subObjects,
+  parentObjectName,
   headcountOf,
 }: {
   date: string;
   subObjects: SubObject[];
+  parentObjectName: Record<string, string>;
   headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null;
 }) {
   const update = useUpdatePortionHeadcount();
@@ -684,9 +547,14 @@ function SummaryPortionsTable({
                   Всего
                 </Text>
               ) : row.showSubObject ? (
-                <Text variant="body-2" style={{ fontWeight: 600 }}>
-                  {row.subObjectName}
-                </Text>
+                <Flex direction="column">
+                  <Text variant="body-2" style={{ fontWeight: 600 }}>
+                    {row.subObjectName}
+                  </Text>
+                  <Text variant="body-1" color="secondary">
+                    {parentObjectName[row.subObjectId]}
+                  </Text>
+                </Flex>
               ) : null,
             placeholder: () => null,
           },
@@ -831,6 +699,7 @@ function DishesDistributionTable({
         id: `__dish-total-${dishName}`,
         dishName,
         mealType: '',
+        objectName: '',
         subObjectName: '',
         departmentName: '',
         tableName: '',
@@ -852,6 +721,7 @@ function DishesDistributionTable({
         id: '__grand-total',
         dishName: 'Общее количество всех блюд',
         mealType: '',
+        objectName: '',
         subObjectName: '',
         departmentName: '',
         tableName: '',
@@ -945,9 +815,14 @@ function DishesDistributionTable({
             width: '20%',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal ? null : row.showSubObject ? (
-                <Text variant="body-2" style={{ fontWeight: 400 }}>
-                  {row.subObjectName}
-                </Text>
+                <Flex direction="column">
+                  <Text variant="body-2" style={{ fontWeight: 400 }}>
+                    {row.subObjectName}
+                  </Text>
+                  <Text variant="body-1" color="secondary">
+                    {row.objectName}
+                  </Text>
+                </Flex>
               ) : null,
             placeholder: () => null,
           },
