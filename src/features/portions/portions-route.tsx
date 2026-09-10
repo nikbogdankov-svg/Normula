@@ -522,17 +522,21 @@ function SummaryPortionsTable({
     <div className="admin-table-wrap">
       <Table
         width="max"
-        className="admin-table portions-group-table"
+        className="admin-table portions-group-table portions-summary-table"
         data={rows}
         getRowClassNames={(row) => {
           const classes: string[] = [];
           if (row.isTotal) return classes;
           if (row.isLastRow) classes.push('portions-row_before-total');
-          if (!row.isLastInDepartment) {
-            classes.push('objects-group-row_no-divider');
-            if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInSubObject) {
-            classes.push('objects-group-row_facility-divider');
+          classes.push('objects-group-row_no-divider');
+          // Первая строка отделения — больше отступ сверху.
+          if (row.showDepartment) classes.push('objects-group-row_department-start');
+          // Граница отделения/подобъекта — линия под последней строкой группы.
+          if (row.isLastInDepartment && !row.isLastRow) {
+            classes.push('objects-group-row_divider');
+            // Между отделениями линия начинается от «Отделение»; между
+            // подобъектами — на всю ширину (без модификатора «отделение»).
+            if (!row.isLastInSubObject) classes.push('objects-group-row_department-divider');
           }
           return classes;
         }}
@@ -551,9 +555,11 @@ function SummaryPortionsTable({
                   <Text variant="body-2" style={{ fontWeight: 600 }}>
                     {row.subObjectName}
                   </Text>
-                  <Text variant="body-1" color="secondary">
-                    {parentObjectName[row.subObjectId]}
-                  </Text>
+                  {row.subObjectName !== parentObjectName[row.subObjectId] && (
+                    <Text variant="body-1" color="secondary">
+                      подобъект {parentObjectName[row.subObjectId]}
+                    </Text>
+                  )}
                 </Flex>
               ) : null,
             placeholder: () => null,
@@ -759,7 +765,7 @@ function DishesDistributionTable({
     <div className="admin-table-wrap">
       <Table
         width="max"
-        className="admin-table portions-group-table"
+        className="admin-table portions-group-table portions-dishes-table"
         data={tableRows}
         getRowClassNames={(row) => {
           const classes: string[] = [];
@@ -768,15 +774,19 @@ function DishesDistributionTable({
             if (row.isDishTotal) classes.push('portions-row_dish-total');
             return classes;
           }
-          if (!row.isLastInDepartment) {
-            classes.push('objects-group-row_no-divider');
-            if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInSubObject) {
-            classes.push('objects-group-row_department-divider');
-          } else if (!row.isLastInDish) {
-            classes.push('objects-group-row_facility-divider');
-          } else {
-            classes.push('objects-group-row_no-divider');
+          classes.push('objects-group-row_no-divider');
+          // Первая строка отделения — больше отступ сверху.
+          if (row.showDepartment) classes.push('objects-group-row_department-start');
+          // Граница отделения/подобъекта — линия под последней строкой группы.
+          if (row.isLastInDepartment && !row.isLastInDish) {
+            classes.push('objects-group-row_divider');
+            if (!row.isLastInSubObject) {
+              // Между отделениями линия начинается от «Отделение».
+              classes.push('objects-group-row_department-divider');
+            } else {
+              // Между подобъектами линия начинается от «Подобъект» (без «Блюдо»).
+              classes.push('objects-group-row_facility-divider');
+            }
           }
           return classes;
         }}
@@ -796,22 +806,16 @@ function DishesDistributionTable({
               if (row.isDishTotal) return 'Всего';
               if (!row.showDish) return null;
               return (
-                <>
-                  <Text variant="body-2" style={{ fontWeight: 600 }}>
-                    {row.dishName}
-                  </Text>
-                  <br />
-                  <Text variant="body-1" color="secondary">
-                    {row.mealType}
-                  </Text>
-                </>
+                <Text variant="body-2" style={{ fontWeight: 600 }}>
+                  {row.dishName}
+                </Text>
               );
             },
             placeholder: () => null,
           },
           {
             id: 'subObjectName',
-            name: 'Подобъект',
+            name: 'Объект',
             width: '20%',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal ? null : row.showSubObject ? (
@@ -819,9 +823,11 @@ function DishesDistributionTable({
                   <Text variant="body-2" style={{ fontWeight: 400 }}>
                     {row.subObjectName}
                   </Text>
-                  <Text variant="body-1" color="secondary">
-                    {row.objectName}
-                  </Text>
+                  {row.subObjectName !== row.objectName && (
+                    <Text variant="body-1" color="secondary">
+                      подобъект {row.objectName}
+                    </Text>
+                  )}
                 </Flex>
               ) : null,
             placeholder: () => null,
@@ -840,7 +846,7 @@ function DishesDistributionTable({
           },
           {
             id: 'tableName',
-            name: 'Стол',
+            name: 'Рацион',
             width: '15%',
             template: (row) => (row.isDishTotal || row.isGrandTotal ? null : row.tableName),
             placeholder: () => null,
