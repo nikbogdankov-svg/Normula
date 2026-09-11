@@ -1,5 +1,128 @@
+/* Страница «Остатки»: тулбар и шапка фиксированы, скроллится только список. */
 .warehouse-balances-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  gap: 8px;
+}
+
+.warehouse-balances-page__toolbar {
+  flex-shrink: 0;
+  margin: 0 0 8px;
+}
+
+/* Карточка таблицы: без обводки; шапка фиксируется, скроллится только список. */
+.warehouse-balances-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
+}
+
+.warehouse-balances-table__header {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Шапка-строка: как thead отдельной таблицы, со скруглением внешних углов.
+   Колонки дублируют summary карточек, чтобы они совпадали. */
+.warehouse-balances-table__header .warehouse-balances-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  background: var(--onemore-card-bg);
+  border-radius: 6px;
+}
+
+.warehouse-balances-header-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warehouse-balances-header-row__price {
+  text-align: right;
+}
+
+.warehouse-balances-header-row__rest,
+.warehouse-balances-card__rest {
+  width: 100px;
+  min-width: 100px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Гуттер шеврона карточки (стрелка + внутренний отступ триггера), чтобы
+   колонка «Остаток» шапки совпадала с колонкой карточек. */
+.warehouse-balances-header-row__arrow {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+/* Список строк — единственная скроллируемая область. */
+.warehouse-balances-table__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 8px 0;
+  margin: 0;
+}
+
+.warehouse-balances-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+/* Строка-карточка: кнопка на всю ширину, контент справа налево как колонки
+   шапки. Карточка расширяется вниз, когда открыты партии. */
+.warehouse-balances-card {
+  background: var(--onemore-card-bg);
+  border-radius: 8px;
+}
+
+.warehouse-balances-card__summary {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.12s ease;
+}
+
+.warehouse-balances-card__summary:hover {
+  background-color: var(--g-color-base-generic-hover);
+}
+
+.warehouse-balances-card__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.warehouse-balances-card__price {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.warehouse-balances-card__detail {
+  padding: 4px 0 8px;
+  border-top: 1px solid var(--g-color-line-generic);
 }
 
 .admin-table-wrap {
