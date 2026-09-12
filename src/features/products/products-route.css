@@ -1,0 +1,183 @@
+/* Страница «Продукты»: тулбар закреплён, скроллится только таблица.
+   Стили таблицы повторяют раздел «Диеты» (как в ТТК). */
+.products-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  gap: 8px;
+}
+
+.products-page__toolbar {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Карточка таблицы: без обводки и внешних отступов; шапка фиксируется,
+   скроллится только список строк. Серый фон без закругления. */
+.products-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
+}
+
+.products-page__scroll .products-page__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+}
+
+.products-page__scroll .admin-table-wrap .g-table,
+.products-page__scroll .admin-table-wrap .g-table__scroll-container {
+  overflow: visible;
+}
+
+/* Шапка вне прокручиваемого контейнера — всегда сверху. */
+.products-page__header .admin-table .g-table__head,
+.products-page__header .admin-table .g-table__head .g-table__cell {
+  background: var(--onemore-card-bg);
+}
+
+.products-page__header .admin-table .g-table__body {
+  display: none;
+}
+
+.products-page__scroll .products-page__table-body .g-table__head {
+  display: none;
+}
+
+/* Строки-карточки: вертикальные зазоры между строками. */
+.products-page__scroll .products-page__list .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: 0;
+}
+
+/* Линии ячеек больше не нужны — их место заняли зазоры. */
+.products-page__scroll .products-page__list .admin-table .g-table__cell {
+  border-block-end: none;
+}
+
+/* Фиксированная шапка со скруглением внешних углов и боковыми отступами. */
+.products-page__header .admin-table .g-table__head .g-table__cell:first-child {
+  border-radius: 6px 0 0 6px;
+  background-clip: padding-box;
+  padding-inline-start: 12px;
+}
+
+.products-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  border-radius: 0 6px 6px 0;
+  background-clip: padding-box;
+  padding-inline-end: 12px;
+}
+
+.products-page__header {
+  flex-shrink: 0;
+  margin-block-end: 0;
+}
+
+.products-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+
+/* Белые карточки-строки со скруглением углов. */
+.products-page__scroll
+  .products-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell {
+  background: var(--onemore-card-bg);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.products-page__scroll
+  .products-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:first-child {
+  border-radius: 8px 0 0 8px;
+  background-clip: padding-box;
+}
+
+.products-page__scroll
+  .products-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:last-child {
+  border-radius: 0 8px 8px 0;
+  background-clip: padding-box;
+}
+
+.products-page__scroll .admin-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 0 0 8px;
+  margin: 0;
+}
+
+.products-page__scroll .admin-table {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+}
+
+.products-page__scroll .products-page__table-body {
+  margin-top: -8px;
+}
+
+.products-page__scroll .admin-table .g-table__table,
+.products-page__scroll .admin-table .g-table__table_width_max {
+  height: auto;
+}
+
+/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело). */
+.products-page__header .admin-table .g-table__table,
+.products-page__scroll .products-page__table-body .g-table__table {
+  table-layout: fixed;
+}
+
+/* Фиксированная высота карточек строк. */
+.products-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell {
+  height: 24px;
+  max-height: 40px;
+}
+
+/* Раскладка колонок (шапка и тело): название 70%, единица измерения —
+   остаток от 30% после места под кнопки, действия 88px. */
+.products-page__header .admin-table .g-table__head .g-table__cell:nth-child(1),
+.products-page__scroll .admin-table .g-table__cell:nth-child(1) {
+  width: 70%;
+  min-width: 220px;
+}
+
+.products-page__header .admin-table .g-table__head .g-table__cell:nth-child(2),
+.products-page__scroll .admin-table .g-table__cell:nth-child(2) {
+  width: calc(30% - 88px);
+  min-width: 120px;
+}
+
+.products-page__header .admin-table .g-table__head .g-table__cell:nth-child(3),
+.products-page__scroll .products-page__table-body .g-table__cell:nth-child(3) {
+  width: 88px;
+  min-width: 88px;
+}

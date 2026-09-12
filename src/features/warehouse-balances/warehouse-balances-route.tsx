@@ -1,20 +1,45 @@
-import { useEffect, useState } from 'react';
-import { Button, Card, Flex, Icon, Select, Text, TextInput } from '@gravity-ui/uikit';
-import { Magnifier } from '@gravity-ui/icons';
+import { useEffect, useMemo, useState } from 'react';
+import { Card, Flex, Icon, Select, Text, TextInput } from '@gravity-ui/uikit';
+import { ChevronDown, ChevronUp, Magnifier } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { useApi } from '@/shared/api/use-api';
 import { useCateringObjects } from '@/features/objects/api';
 import { useBalances } from './api';
-import type { WarehouseBalance } from './types';
 import './warehouse-balances-route.css';
+
+interface ProductBalanceCard {
+  productName: string;
+  unit: string;
+  batches: Array<{
+    batchId: string;
+    batchNumber: string;
+    date: string;
+    remaining: number;
+    price: number;
+  }>;
+  avgPrice: number;
+  totalRemaining: number;
+}
 
 export function WarehouseBalancesRoute() {
   const api = useApi();
   const objects = useCateringObjects();
   const [warehouseId, setWarehouseId] = useState('');
   const [search, setSearch] = useState('');
-  const [opened, setOpened] = useState<WarehouseBalance | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (productName: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(productName)) {
+        next.delete(productName);
+      } else {
+        next.add(productName);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const first = objects.data?.objects[0];
@@ -22,6 +47,54 @@ export function WarehouseBalancesRoute() {
   }, [objects.data]);
 
   const { data, isLoading, error } = useBalances(warehouseId);
+
+  const cards = useMemo(() => {
+    if (!data?.balances.length) return [];
+    const query = search.trim().toLowerCase();
+    const byProduct = new Map<string, ProductBalanceCard>();
+
+    for (const balance of data.balances) {
+      for (const item of balance.items) {
+        let card = byProduct.get(item.productName);
+        if (!card) {
+          card = {
+            productName: item.productName,
+            unit: item.unit,
+            batches: [],
+            avgPrice: 0,
+            totalRemaining: 0,
+          };
+          byProduct.set(item.productName, card);
+        }
+        for (const batch of item.batches) {
+          if (
+            query &&
+            !item.productName.toLowerCase().includes(query) &&
+            !batch.batchNumber.toLowerCase().includes(query)
+          ) {
+            continue;
+          }
+          card.batches.push({
+            batchId: batch.batchId,
+            batchNumber: batch.batchNumber,
+            date: balance.date,
+            remaining: batch.remaining,
+            price: batch.price,
+          });
+        }
+      }
+    }
+
+    const result: ProductBalanceCard[] = [];
+    for (const card of byProduct.values()) {
+      const weighted = card.batches.reduce((sum, batch) => sum + batch.price * batch.remaining, 0);
+      card.totalRemaining = card.batches.reduce((sum, batch) => sum + batch.remaining, 0);
+      card.avgPrice =
+        card.totalRemaining > 0 ? Math.round((weighted / card.totalRemaining) * 100) / 100 : 0;
+      if (card.batches.length > 0) result.push(card);
+    }
+    return result;
+  }, [data, search]);
 
   if (api.organizationId === null) {
     return (
@@ -75,192 +148,159 @@ export function WarehouseBalancesRoute() {
     );
   }
 
-  const rows = data.balances.flatMap((balance) =>
-    balance.items.flatMap((item) =>
-      item.batches.map((batch, batchIndex) => ({
-        id: batch.batchId,
-        date: balance.date,
-        productName: item.productName,
-        batchNumber: batch.batchNumber,
-        remaining: batch.remaining,
-        price: batch.price,
-        unit: item.unit,
-        isFirstBatchOfProduct: batchIndex === 0,
-        isLastBatchOfProduct: batchIndex === item.batches.length - 1,
-      }))
-    )
-  );
-
-  const filteredRows = rows.filter((row) => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return (
-      row.productName.toLowerCase().includes(query) || row.batchNumber.toLowerCase().includes(query)
-    );
-  });
-
-  const avgPriceByProduct: Record<string, number> = {};
-  for (const balance of data.balances) {
-    for (const item of balance.items) {
-      const totalQty = item.batches.reduce((sum, batch) => sum + batch.remaining, 0);
-      const weighted = item.batches.reduce((sum, batch) => sum + batch.price * batch.remaining, 0);
-      avgPriceByProduct[item.productName] =
-        totalQty > 0 ? Math.round((weighted / totalQty) * 100) / 100 : 0;
-    }
-  }
-
   return (
     <div className="warehouse-balances-page">
-      <Flex
-        alignItems="center"
-        justifyContent="space-between"
-        gap={4}
-        wrap
-        style={{ padding: '16px 16px 0' }}
-      >
-        <Flex alignItems="center" gap={4} wrap>
-          <Select
-            size="l"
-            width={220}
-            label="Объект:"
-            placeholder="Выберите объект"
-            value={[warehouseId]}
-            onUpdate={(value) => setWarehouseId(value[0] ?? '')}
-            options={
-              objects.data?.objects.length
-                ? objects.data.objects.map((object) => ({
-                    value: object.id,
-                    content: object.name,
-                  }))
-                : []
-            }
-          />
-        </Flex>
-        <Flex alignItems="center" gap={4} wrap>
-          <TextInput
-            size="l"
-            placeholder="Поиск по товару или партии"
-            value={search}
-            onUpdate={setSearch}
-            hasClear
-            startContent={
-              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
-                <Icon data={Magnifier} size={16} />
-              </span>
-            }
-            style={{ width: 320 }}
-          />
-        </Flex>
+      <Flex justifyContent="space-between" gap={8} className="warehouse-balances-page__toolbar">
+        <Select
+          size="l"
+          width={220}
+          label="Объект:"
+          placeholder="Выберите объект"
+          value={[warehouseId]}
+          onUpdate={(value) => setWarehouseId(value[0] ?? '')}
+          options={
+            objects.data?.objects.length
+              ? objects.data.objects.map((object) => ({
+                  value: object.id,
+                  content: object.name,
+                }))
+              : []
+          }
+        />
+        <TextInput
+          size="l"
+          placeholder="Поиск по товару или партии"
+          value={search}
+          onUpdate={setSearch}
+          hasClear
+          startContent={
+            <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+              <Icon data={Magnifier} size={16} />
+            </span>
+          }
+          style={{ width: 320 }}
+        />
       </Flex>
 
-      <Card view="filled" style={{ padding: 0, margin: 16 }}>
-        <div style={{ paddingTop: 4, paddingBottom: 8 }}>
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Товар</th>
-                  <th>Партия</th>
-                  <th style={{ width: 100 }}>Дата</th>
-                  <th style={{ width: 120 }}>Цена</th>
-                  <th style={{ width: 140 }}>Остаток</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.flatMap((row, index) => {
-                  const isEnd = index === filteredRows.length - 1;
-                  const main = (
-                    <tr key={row.id} className="admin-table__row_no-border">
-                      <td>
-                        {row.isFirstBatchOfProduct ? (
-                          <HighlightText text={row.productName} query={search} />
-                        ) : (
-                          ''
-                        )}
-                      </td>
-                      <td>
-                        <HighlightText text={row.batchNumber} query={search} />
-                      </td>
-                      <td>{new Date(row.date).toLocaleDateString('ru-RU')}</td>
-                      <td>{row.price} ₽</td>
-                      <td>
-                        {row.remaining} {row.unit}
-                      </td>
-                    </tr>
-                  );
-                  if (!row.isLastBatchOfProduct) return [main];
-                  return [
-                    main,
-                    <tr key={`avg-${row.id}`} className={isEnd ? 'admin-table__row_last' : ''}>
-                      <td colSpan={3} />
-                      <td>
-                        <span
-                          style={{
-                            color: 'var(--g-color-text-primary)',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Средняя цена {avgPriceByProduct[row.productName]} ₽
-                        </span>
-                      </td>
-                      <td />
-                    </tr>,
-                  ];
-                })}
-              </tbody>
-            </table>
+      <div className="warehouse-balances-table">
+        <div className="warehouse-balances-table__header">
+          <div className="warehouse-balances-header-row">
+            <Text
+              variant="body-2"
+              color="secondary"
+              className="warehouse-balances-header-row__name"
+            >
+              Товар
+            </Text>
+            <Text
+              variant="body-2"
+              color="secondary"
+              className="warehouse-balances-header-row__price"
+            >
+              Средняя цена
+            </Text>
+            <Text
+              variant="body-2"
+              color="secondary"
+              className="warehouse-balances-header-row__rest"
+            >
+              Остаток
+            </Text>
+            <div className="warehouse-balances-header-row__arrow" />
           </div>
         </div>
-      </Card>
 
-      {opened && (
-        <Card view="filled" style={{ marginTop: 16, padding: 16 }}>
-          <Flex direction="column" gap={3}>
-            <Flex justifyContent="space-between" alignItems="center">
-              <Text variant="subheader-2">Детали баланса</Text>
-              <Button onClick={() => setOpened(null)} view="flat">
-                Закрыть
-              </Button>
-            </Flex>
+        <div className="warehouse-balances-table__scroll">
+          <div className="warehouse-balances-list">
+            {cards.map((card) => {
+              const open = expanded.has(card.productName);
+              return (
+                <div key={card.productName} className="warehouse-balances-card">
+                  <div
+                    className="warehouse-balances-card__summary"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => toggleExpanded(card.productName)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        toggleExpanded(card.productName);
+                      }
+                    }}
+                    title={open ? 'Свернуть' : 'Раскрыть'}
+                    aria-label={open ? 'Свернуть товар' : 'Раскрыть товар'}
+                    aria-expanded={open}
+                  >
+                    <Text variant="body-2" ellipsis className="warehouse-balances-card__name">
+                      <HighlightText text={card.productName} query={search} />
+                    </Text>
+                    <Text variant="body-2" className="warehouse-balances-card__price">
+                      {card.avgPrice} ₽
+                    </Text>
+                    <Text variant="body-2" className="warehouse-balances-card__rest">
+                      {card.totalRemaining} {card.unit}
+                    </Text>
+                    <Icon data={open ? ChevronUp : ChevronDown} size={16} />
+                  </div>
 
-            <Text variant="body-2" color="secondary">
-              Дата: <strong>{new Date(opened.date).toLocaleDateString('ru-RU')}</strong>
-            </Text>
+                  {open && (
+                    <div className="warehouse-balances-card__detail">
+                      {card.batches.length === 0 ? (
+                        <Text
+                          variant="body-2"
+                          color="secondary"
+                          style={{ display: 'block', padding: '12px 16px' }}
+                        >
+                          Нет партий по запросу
+                        </Text>
+                      ) : (
+                        <div className="admin-table-wrap">
+                          <table className="admin-table">
+                            <thead>
+                              <tr>
+                                <th>Партия</th>
+                                <th>Дата</th>
+                                <th style={{ width: 80, textAlign: 'right' }}>Цена</th>
+                                <th style={{ width: 96, textAlign: 'right' }}>Остаток</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {card.batches.map((batch, index) => (
+                                <tr
+                                  key={batch.batchId}
+                                  className={
+                                    index === card.batches.length - 1 ? 'admin-table__row_last' : ''
+                                  }
+                                >
+                                  <td>
+                                    <HighlightText text={batch.batchNumber} query={search} />
+                                  </td>
+                                  <td>{new Date(batch.date).toLocaleDateString('ru-RU')}</td>
+                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    {batch.price} ₽
+                                  </td>
+                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    {batch.remaining} {card.unit}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--g-color-line-generic)' }}>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Товар</th>
-                  <th style={{ textAlign: 'left', padding: 8 }}>Партия</th>
-                  <th style={{ textAlign: 'right', width: 120, padding: 8 }}>Остаток</th>
-                  <th style={{ textAlign: 'center', width: 80, padding: 8 }}>Ед.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {opened.items.map((item) =>
-                  item.batches.map((batch, batchIndex) => (
-                    <tr
-                      key={batch.batchId}
-                      style={{ borderBottom: '1px solid var(--g-color-line-generic)' }}
-                    >
-                      <td style={{ padding: 8, fontWeight: batchIndex === 0 ? 600 : 400 }}>
-                        {batchIndex === 0 ? item.productName : ''}
-                      </td>
-                      <td style={{ padding: 8 }}>{batch.batchNumber}</td>
-                      <td style={{ textAlign: 'right', padding: 8, fontWeight: 600 }}>
-                        {batch.remaining}
-                      </td>
-                      <td style={{ textAlign: 'center', padding: 8 }}>
-                        {batchIndex === 0 ? item.unit : ''}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </Flex>
-        </Card>
-      )}
+            {cards.length === 0 && (
+              <Text variant="body-1" color="secondary" style={{ display: 'block', padding: 16 }}>
+                {search.trim() ? 'Ничего не найдено по запросу' : 'Нет остатков'}
+              </Text>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

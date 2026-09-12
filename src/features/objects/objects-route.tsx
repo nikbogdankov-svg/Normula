@@ -11,44 +11,21 @@ import {
 import { useCateringObjects } from './api';
 import { ObjectDrawer, SubObjectsDrawer } from './objects-dialog';
 import { type CateringObject, type SubObject } from './types';
-import { MEALS, type MealId } from '@/features/menu/types';
 import './objects-route.css';
-
-/** Приёмы пищи: пустой список означает «все» (наследуется от объекта/подобъекта). */
-function mealIdsOrDefault(mealIds: MealId[]): MealId[] {
-  return mealIds.length > 0 ? mealIds : MEALS.map((meal) => meal.id);
-}
-
-/** Теги приёмов пищи. */
-function MealsTags({ mealIds }: { mealIds: MealId[] }) {
-  const ids = mealIdsOrDefault(mealIds);
-  return (
-    <Flex gap={1} wrap>
-      {ids.map((id) => (
-        <span key={id} className="objects-meal-tag">
-          {MEALS.find((meal) => meal.id === id)?.label ?? id}
-        </span>
-      ))}
-    </Flex>
-  );
-}
 
 function groupRowClassNames(row: {
   isLastInDepartment: boolean;
+  showDepartment: boolean;
   isLastInSubObject: boolean;
-  nextShowDepartment: boolean;
-  nextShowSubObject: boolean;
 }): string[] {
-  const classes: string[] = [];
-  // Внутри одного отделения — без линий.
-  if (!row.isLastInDepartment) classes.push('objects-group-row_no-divider');
-  // Последняя строка отделения, следующее — в том же подобъекте → линия от «Отделение».
-  if (row.isLastInDepartment && row.nextShowDepartment && !row.nextShowSubObject) {
-    classes.push('objects-group-row_department-divider');
-  }
-  // Последняя строка подобъекта → полная линия (все колонки).
-  if (row.isLastInSubObject) {
-    classes.push('objects-group-row_facility-divider');
+  const classes: string[] = ['objects-group-row_no-divider'];
+  // Первая строка отделения — больше отступ сверху.
+  if (row.showDepartment) classes.push('objects-group-row_department-start');
+  if (row.isLastInDepartment) {
+    classes.push('objects-group-row_divider');
+    // Между отделениями линия начинается от «Группа / класс»; между
+    // подобъектами — на всю ширину (без модификатора «отделение»).
+    if (!row.isLastInSubObject) classes.push('objects-group-row_department-divider');
   }
   return classes;
 }
@@ -88,7 +65,10 @@ export function ObjectsRoute() {
   }
 
   const objectList = objects.data.objects;
-  const activeObjectId = selectedObjectId ?? objectList[0]?.id ?? null;
+  const activeObjectId =
+    selectedObjectId && objectList.some((o) => o.id === selectedObjectId)
+      ? selectedObjectId
+      : (objectList[0]?.id ?? null);
   const subObjects = activeObjectId
     ? (objectList.find((o) => o.id === activeObjectId)?.subObjects ?? [])
     : objectList.flatMap((o) => o.subObjects);
@@ -124,22 +104,15 @@ function SubObjectsCard({
 
   /** Строки первой таблицы: группы/классы самого объекта. */
   const objectRows = useMemo(() => {
-    const objectMeals =
-      selectedObject?.mealIds && selectedObject.mealIds.length > 0
-        ? selectedObject.mealIds
-        : MEALS.map((meal) => meal.id);
     const result: Array<{
       id: string;
       departmentId: string;
       departmentName: string;
       tableName: string;
-      mealIds: MealId[];
       showDepartment: boolean;
       isLastInDepartment: boolean;
     }> = [];
     for (const department of selectedObject?.departments ?? []) {
-      const effectiveMeals =
-        department.mealIds && department.mealIds.length > 0 ? department.mealIds : objectMeals;
       for (const table of department.tables) {
         const prevRow = result[result.length - 1];
         const showDepartment = !prevRow || prevRow.departmentId !== department.id;
@@ -148,7 +121,6 @@ function SubObjectsCard({
           departmentId: department.id,
           departmentName: department.name,
           tableName: table.name,
-          mealIds: effectiveMeals,
           showDepartment,
           isLastInDepartment: false,
         });
@@ -163,10 +135,6 @@ function SubObjectsCard({
 
   /** Строки второй таблицы: группы/классы подобъектов. */
   const subObjectRows = useMemo(() => {
-    const objectMeals =
-      selectedObject?.mealIds && selectedObject.mealIds.length > 0
-        ? selectedObject.mealIds
-        : MEALS.map((meal) => meal.id);
     const result: Array<{
       id: string;
       subObjectId: string;
@@ -174,7 +142,6 @@ function SubObjectsCard({
       departmentId: string;
       departmentName: string;
       tableName: string;
-      mealIds: MealId[];
       showSubObject: boolean;
       showDepartment: boolean;
       isLastInDepartment: boolean;
@@ -184,12 +151,6 @@ function SubObjectsCard({
     }> = [];
     for (const subObject of subObjects) {
       for (const department of subObject.departments) {
-        const effectiveMeals =
-          department.mealIds && department.mealIds.length > 0
-            ? department.mealIds
-            : subObject.mealIds && subObject.mealIds.length > 0
-              ? subObject.mealIds
-              : objectMeals;
         for (const table of department.tables) {
           const prevRow = result[result.length - 1];
           const showSubObject = !prevRow || prevRow.subObjectId !== subObject.id;
@@ -202,7 +163,6 @@ function SubObjectsCard({
             departmentId: department.id,
             departmentName: department.name,
             tableName: table.name,
-            mealIds: effectiveMeals,
             showSubObject,
             showDepartment,
             isLastInDepartment: false,
@@ -223,7 +183,7 @@ function SubObjectsCard({
       row.nextShowSubObject = next?.showSubObject ?? false;
     }
     return result;
-  }, [subObjects, selectedObject]);
+  }, [subObjects]);
 
   return (
     <>
@@ -288,26 +248,26 @@ function SubObjectsCard({
                 className="admin-table objects-group-table objects-facility-tables"
                 data={objectRows}
                 getRowClassNames={(row) =>
-                  row.isLastInDepartment ? [] : ['objects-group-row_no-divider']
+                  groupRowClassNames({
+                    isLastInDepartment: row.isLastInDepartment,
+                    showDepartment: row.showDepartment,
+                    // У таблицы групп самого объекта колонка «Группа / класс»
+                    // стоит первой, поэтому разделители на всю ширину.
+                    isLastInSubObject: true,
+                  })
                 }
                 columns={[
                   {
                     id: 'departmentName',
                     name: 'Группа / класс',
-                    width: '34%',
+                    width: '60%',
                     template: (row) => (row.showDepartment ? row.departmentName : null),
                     placeholder: () => null,
                   },
                   {
                     id: 'tableName',
                     name: 'Рацион',
-                    width: '33%',
-                  },
-                  {
-                    id: 'mealIds',
-                    name: 'Приёмы пищи',
-                    width: '33%',
-                    template: (row) => <MealsTags mealIds={row.mealIds} />,
+                    width: '40%',
                   },
                 ]}
               />
@@ -354,41 +314,34 @@ function SubObjectsCard({
             <div className="admin-table-wrap">
               <Table
                 width="max"
-                className="admin-table objects-group-table objects-facility-tables"
+                className="admin-table objects-group-table objects-facility-tables objects-subobjects-table"
                 data={subObjectRows}
                 getRowClassNames={(row) =>
                   groupRowClassNames({
                     isLastInDepartment: row.isLastInDepartment,
+                    showDepartment: row.showDepartment,
                     isLastInSubObject: row.isLastInSubObject,
-                    nextShowDepartment: row.nextShowDepartment,
-                    nextShowSubObject: row.nextShowSubObject,
                   })
                 }
                 columns={[
                   {
                     id: 'subObjectName',
                     name: 'Подобъект',
-                    width: '26%',
+                    width: '34%',
                     template: (row) => (row.showSubObject ? row.subObjectName : null),
                     placeholder: () => null,
                   },
                   {
                     id: 'departmentName',
                     name: 'Группа / класс',
-                    width: '26%',
+                    width: '33%',
                     template: (row) => (row.showDepartment ? row.departmentName : null),
                     placeholder: () => null,
                   },
                   {
                     id: 'tableName',
                     name: 'Рацион',
-                    width: '24%',
-                  },
-                  {
-                    id: 'mealIds',
-                    name: 'Приёмы пищи',
-                    width: '24%',
-                    template: (row) => <MealsTags mealIds={row.mealIds} />,
+                    width: '33%',
                   },
                 ]}
               />

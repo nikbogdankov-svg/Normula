@@ -16,20 +16,37 @@
   text-align: end;
 }
 
+/* Все строки группы порционника — один и тот же вертикальный отступ;
+   линии между строками внутри группы убраны. */
 .portions-group-table .objects-group-row_no-divider .g-table__cell {
   border-block-end-color: transparent;
-  padding-block-end: 4px;
+  padding-block: 4px;
 }
 
-.portions-group-table .objects-group-row_continuation .g-table__cell {
-  padding-block-start: 4px;
+/* Первая строка отделения — больше отступ сверху. */
+.portions-group-table .objects-group-row_department-start .g-table__cell {
+  padding-block-start: 12px;
 }
 
-.portions-group-table .objects-group-row_facility-divider .g-table__cell:first-child {
+/* Граница отделения/подобъекта — линия под последней строкой группы. */
+.portions-group-table .objects-group-row_divider .g-table__cell {
+  border-block-end-color: var(--g-color-line-generic);
+  padding-block-end: 12px;
+}
+
+/* Линия между отделениями начинается от «Отделение», а не от «Подобъект»;
+   между подобъектами дивидер остаётся на всю ширину. */
+.portions-summary-table .objects-group-row_department-divider .g-table__cell:first-child {
   border-block-end-color: transparent;
 }
 
-.portions-group-table .objects-group-row_department-divider .g-table__cell:nth-child(-n + 2) {
+/* В таблице «По блюдам» перед отделением ещё колонка «Блюдо». */
+.portions-dishes-table .objects-group-row_department-divider .g-table__cell:nth-child(-n + 2) {
+  border-block-end-color: transparent;
+}
+
+/* Между подобъектами линия начинается от «Подобъект» (без «Блюдо»). */
+.portions-dishes-table .objects-group-row_facility-divider .g-table__cell:first-child {
   border-block-end-color: transparent;
 }
 

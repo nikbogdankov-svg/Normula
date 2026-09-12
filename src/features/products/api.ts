@@ -4,6 +4,7 @@ import type {
   CreateProductRequest,
   ListProductsResponse,
   Product,
+  ProductDeleteMode,
   UpdateProductRequest,
 } from './types';
 
@@ -66,8 +67,8 @@ export function useDeleteProduct() {
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: (id: string) =>
-      api.request<void>(`/v1/products/${id}?mode=immediate`, { method: 'DELETE' }),
+    mutationFn: ({ id, mode }: { id: string; mode: ProductDeleteMode }) =>
+      api.request<void>(`/v1/products/${id}?mode=${mode}`, { method: 'DELETE' }),
     onSuccess: invalidate,
   });
 }

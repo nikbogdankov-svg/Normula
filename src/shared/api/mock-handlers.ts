@@ -490,6 +490,9 @@ const mockedDiets: Diet[] = [
 // Soft-удалённые диеты: скрыты из справочника, но остаются в объектах/меню.
 const deletedDietIds = new Set<string>();
 
+/** Object ids в отложенном удалении: скрыты из справочника до конца периода. */
+const deletedObjectIds = new Set<string>();
+
 function emptySlots(cycleDays: number): CycleMenu['slots'] {
   const slots: CycleMenu['slots'] = [];
   for (let day = 1; day <= cycleDays; day += 1) {
@@ -1486,12 +1489,14 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
   // --- Объекты (объект → подобъект → отделения) ---
   if (route === '/v1/objects' && method === 'GET') {
-    return { objects } as T;
+    const visibleObjects = objects.filter((obj) => !deletedObjectIds.has(obj.id));
+    return { objects: visibleObjects } as T;
   }
 
   if (route === '/v1/objects' && method === 'POST') {
     const body = options.body as {
       name: string;
+      type: string;
       menuId?: string;
       mealIds?: MealId[];
       departments: Array<{
@@ -1504,6 +1509,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const newObject: CateringObject = {
       id: `object-${Date.now()}`,
       name: body.name.trim(),
+      type: isFacilityType(body.type) ? body.type : 'school',
       menuId: body.menuId ?? undefined,
       mealIds: body.mealIds ?? ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
       departments: (body.departments ?? []).map((department) => ({
@@ -1552,7 +1558,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         }
       }
     }
-    return { objects } as T;
+    return { objects: visibleObjects() } as T;
   }
 
   if (route === '/v1/objects/tables/headcount' && method === 'PATCH') {
@@ -1571,7 +1577,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     if (!table) throw new Error('mock: рацион не найден');
     table.headcount = Math.max(0, body.headcount);
     rebuildDistribution();
-    return { objects } as T;
+    return { objects: visibleObjects() } as T;
   }
 
   // --- Обновление объекта (name/menuId/mealIds/departments) ---
@@ -1579,6 +1585,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   if (objectRoute && method === 'PATCH') {
     const body = options.body as {
       name: string;
+      type: string;
       menuId?: string;
       mealIds?: MealId[];
       departments: Array<{
@@ -1592,6 +1599,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     if (!obj) throw new Error('mock: объект не найден');
     const oldDepartments = obj.departments;
     obj.name = body.name.trim();
+    if (body.type) obj.type = isFacilityType(body.type) ? body.type : obj.type;
     if (body.menuId !== undefined) obj.menuId = body.menuId;
     if (body.mealIds) obj.mealIds = body.mealIds;
     obj.departments = body.departments.map((department) => {
@@ -1612,7 +1620,24 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     });
     prunePortionEntries();
     rebuildDistribution();
-    return { objects } as T;
+    return { objects: visibleObjects() } as T;
+  }
+
+  // --- Удаление объекта: 'immediate' — сразу, 'soft' — скрыт до конца периода. ---
+  if (objectRoute && method === 'DELETE') {
+    const obj = objects.find((item) => item.id === objectRoute.id);
+    if (!obj) throw new Error('mock: объект не найден');
+
+    const mode = params.get('mode') ?? 'soft';
+    if (mode === 'immediate') {
+      objects.splice(objects.indexOf(obj), 1);
+      deletedObjectIds.delete(objectRoute.id);
+    } else {
+      deletedObjectIds.add(objectRoute.id);
+    }
+    prunePortionEntries();
+    rebuildDistribution();
+    return { objects: visibleObjects() } as T;
   }
 
   const createSubObjectRoute = match('/v1/objects/:objectId/sub-objects', route);
@@ -1630,7 +1655,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       departments: [],
     };
     obj.subObjects.push(subObject);
-    return { objects } as T;
+    return { objects: visibleObjects() } as T;
   }
 
   const subObjectRoute = match('/v1/objects/sub-objects/:id', route);
@@ -1646,7 +1671,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       departments: Array<{
         id: string;
         name: string;
-        mealIds: MealId[];
+        mealIds?: MealId[];
         tables: Array<{ id: string; name: string }>;
       }>;
     };
@@ -1660,13 +1685,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     subObject.kettleNumber = Math.max(1, body.kettleNumber);
     subObject.menuSource = body.menuSource === 'own' ? 'own' : 'object';
     subObject.menuId = subObject.menuSource === 'own' ? body.menuId : undefined;
-    subObject.mealIds = body.mealIds;
+    if (body.mealIds) subObject.mealIds = body.mealIds;
     subObject.departments = body.departments.map((department) => {
       const oldDepartment = oldDepartments.find((item) => item.id === department.id);
       return {
         id: department.id,
         name: department.name.trim(),
-        mealIds: department.mealIds ?? [],
+        mealIds: department.mealIds ?? oldDepartment?.mealIds ?? [],
         tables: department.tables.map((table) => {
           const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
           return {
@@ -1680,7 +1705,21 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
     prunePortionEntries();
     rebuildDistribution();
-    return { objects } as T;
+    return { objects: visibleObjects() } as T;
+  }
+
+  // --- Удаление подобъекта: 'soft' оставляет записи до конца периода,
+  // 'immediate' — убирает сразу; в mock оба режима скрывают из справочника. ---
+  if (subObjectRoute && method === 'DELETE') {
+    for (const obj of objects) {
+      const index = obj.subObjects.findIndex((item) => item.id === subObjectRoute.id);
+      if (index === -1) continue;
+      obj.subObjects.splice(index, 1);
+      prunePortionEntries();
+      rebuildDistribution();
+      return { objects: visibleObjects() } as T;
+    }
+    throw new Error('mock: подобъект не найден');
   }
 
   // --- Порционник (численность на дату + раздача по блюдам) ---
@@ -1963,6 +2002,7 @@ const objects: CateringObject[] = [
   {
     id: 'object-1',
     name: 'Больница №1',
+    type: 'hospital',
     menuId: 'menu-1',
     mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
     departments: [
@@ -2031,6 +2071,7 @@ const objects: CateringObject[] = [
   {
     id: 'object-2',
     name: 'Объект №2',
+    type: 'school',
     mealIds: ['breakfast', 'lunch'],
     departments: [
       {
@@ -2095,6 +2136,7 @@ const objects: CateringObject[] = [
   {
     id: 'object-3',
     name: 'Объект №3',
+    type: 'hospital',
     mealIds: ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
     departments: [
       {
@@ -2167,6 +2209,11 @@ function findSubObject(subObjectId: string): SubObject | null {
     if (subObject) return subObject;
   }
   return null;
+}
+
+/** Объекты видимые в справочнике: без отложенно удалённых. */
+function visibleObjects(): CateringObject[] {
+  return objects.filter((obj) => !deletedObjectIds.has(obj.id));
 }
 
 let distributionRows: DistributionRow[] = [];

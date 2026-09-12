@@ -124,3 +124,32 @@ export function useUpdateObjectMenu() {
     onSuccess: invalidate,
   });
 }
+
+/** Как удалять объект/подобъект: 'soft' — остаётся по конец периода, 'immediate' — сразу. */
+export type ObjectDeleteMode = 'soft' | 'immediate';
+
+export function useDeleteObject() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: ObjectDeleteMode }) =>
+      api.request<CateringObjectsResponse>(`/v1/objects/${id}?mode=${mode}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteSubObject() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: ObjectDeleteMode }) =>
+      api.request<CateringObjectsResponse>(`/v1/objects/sub-objects/${id}?mode=${mode}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: invalidate,
+  });
+}

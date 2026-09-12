@@ -31,6 +31,7 @@ import {
 } from '@/shared/ui/states';
 import { useCateringObjects } from '@/features/objects/api';
 import type { SubObject } from '@/features/objects/types';
+import { useInfiniteRecipes } from '@/features/ttk/api';
 import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
@@ -38,6 +39,17 @@ import './portions-route.css';
 const ALL_SUBOBJECTS = '__all';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Вес одной порции (граммы) из ТТК: берём первое число из «выхода», «90/50» → 90. */
+function portionGramsOf(portionYield: string): number | null {
+  const grams = Number((portionYield.split('/')[0] ?? '').trim());
+  return Number.isFinite(grams) && grams > 0 ? grams : null;
+}
+
+/** Килограммы на строку: порции × вес порции из ТТК. */
+function kilogramsOf(portions: number, grams: number | null): number | null {
+  return grams === null ? null : (portions * grams) / 1000;
+}
 
 /**
  * «Порционник»: численность на дату и раздачу по блюдам.
@@ -72,6 +84,22 @@ export function PortionsRoute() {
   const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
 
   const dishes = useDishDistribution(date, activeObjectId);
+
+  // Веса порций блюд из ТТК — для килограммов в раздаче. Отдаём всё одной
+  // выгрузкой; ключ кэша совпадает с ТТК, поэтому повторных запросов нет.
+  const recipes = useInfiniteRecipes({ search: '', collectionId: '', sort: 'name', pageSize: 100 });
+  const weightGramsByDish = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const page of recipes.data?.pages ?? []) {
+      for (const recipe of page.recipes) {
+        const grams = portionGramsOf(recipe.portionYield);
+        if (grams === null) continue;
+        const current = map.get(recipe.name);
+        if (current === undefined || grams > current) map.set(recipe.name, grams);
+      }
+    }
+    return map;
+  }, [recipes.data]);
 
   if (current === null) {
     return (
@@ -335,6 +363,7 @@ export function PortionsRoute() {
                   : (dishes.data?.rows ?? [])
               }
               totalPortions={dishes.data?.totalPortions ?? 0}
+              weightGramsByDish={weightGramsByDish}
             />
           )}
         </div>
@@ -522,17 +551,21 @@ function SummaryPortionsTable({
     <div className="admin-table-wrap">
       <Table
         width="max"
-        className="admin-table portions-group-table"
+        className="admin-table portions-group-table portions-summary-table"
         data={rows}
         getRowClassNames={(row) => {
           const classes: string[] = [];
           if (row.isTotal) return classes;
           if (row.isLastRow) classes.push('portions-row_before-total');
-          if (!row.isLastInDepartment) {
-            classes.push('objects-group-row_no-divider');
-            if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInSubObject) {
-            classes.push('objects-group-row_facility-divider');
+          classes.push('objects-group-row_no-divider');
+          // Первая строка отделения — больше отступ сверху.
+          if (row.showDepartment) classes.push('objects-group-row_department-start');
+          // Граница отделения/подобъекта — линия под последней строкой группы.
+          if (row.isLastInDepartment && !row.isLastRow) {
+            classes.push('objects-group-row_divider');
+            // Между отделениями линия начинается от «Отделение»; между
+            // подобъектами — на всю ширину (без модификатора «отделение»).
+            if (!row.isLastInSubObject) classes.push('objects-group-row_department-divider');
           }
           return classes;
         }}
@@ -551,9 +584,11 @@ function SummaryPortionsTable({
                   <Text variant="body-2" style={{ fontWeight: 600 }}>
                     {row.subObjectName}
                   </Text>
-                  <Text variant="body-1" color="secondary">
-                    {parentObjectName[row.subObjectId]}
-                  </Text>
+                  {row.subObjectName !== parentObjectName[row.subObjectId] && (
+                    <Text variant="body-1" color="secondary">
+                      подобъект {parentObjectName[row.subObjectId]}
+                    </Text>
+                  )}
                 </Flex>
               ) : null,
             placeholder: () => null,
@@ -637,6 +672,7 @@ function DishesDistributionTable({
   onFill,
   rows,
   totalPortions,
+  weightGramsByDish,
 }: {
   loading: boolean;
   error: Error | null;
@@ -644,6 +680,8 @@ function DishesDistributionTable({
   onFill: () => void;
   rows: DishDistributionRow[];
   totalPortions: number;
+  /** Вес порции блюда (граммы) из ТТК по имени блюда. */
+  weightGramsByDish: ReadonlyMap<string, number>;
 }) {
   const tableRows = useMemo(() => {
     type DistRow = DishDistributionRow & {
@@ -658,16 +696,22 @@ function DishesDistributionTable({
       isLastInSubObject: boolean;
       isLastInDepartment: boolean;
       isBeforeTotal?: boolean;
+      /** Килограммы строки/итога; null — вес порции не найден в ТТК. */
+      weightKg: number | null;
     };
 
     const result: DistRow[] = [];
     let index = 0;
+    let grandKg = 0;
+    let grandHasWeight = false;
     while (index < rows.length) {
       const dishName = rows[index].dishName;
       const dishStart = index;
       while (index < rows.length && rows[index].dishName === dishName) index += 1;
       const dishRows = rows.slice(dishStart, index);
       let dishPortions = 0;
+      let dishKg = 0;
+      let dishHasWeight = false;
 
       for (let i = 0; i < dishRows.length; i += 1) {
         const row = dishRows[i];
@@ -679,7 +723,12 @@ function DishesDistributionTable({
         const sameSubObjectAsNext = next !== null && next.subObjectName === row.subObjectName;
         const sameDepartmentAsNext =
           sameSubObjectAsNext && next !== null && next.departmentName === row.departmentName;
+        const weightKg = kilogramsOf(row.portions, weightGramsByDish.get(row.dishName) ?? null);
         dishPortions += row.portions;
+        if (weightKg !== null) {
+          dishKg += weightKg;
+          dishHasWeight = true;
+        }
         result.push({
           ...row,
           id: String(dishStart + i),
@@ -692,7 +741,13 @@ function DishesDistributionTable({
           isLastInDish: next === null,
           isLastInSubObject: !sameSubObjectAsNext,
           isLastInDepartment: !sameDepartmentAsNext,
+          weightKg,
         });
+      }
+
+      if (dishHasWeight) {
+        grandKg += dishKg;
+        grandHasWeight = true;
       }
 
       result.push({
@@ -713,6 +768,7 @@ function DishesDistributionTable({
         isLastInDish: true,
         isLastInSubObject: true,
         isLastInDepartment: true,
+        weightKg: dishHasWeight ? dishKg : null,
       });
     }
 
@@ -735,6 +791,7 @@ function DishesDistributionTable({
         isLastInDish: true,
         isLastInSubObject: true,
         isLastInDepartment: true,
+        weightKg: grandHasWeight ? grandKg : null,
       });
     }
 
@@ -747,7 +804,7 @@ function DishesDistributionTable({
     }
 
     return result;
-  }, [rows, totalPortions]);
+  }, [rows, totalPortions, weightGramsByDish]);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
@@ -759,7 +816,7 @@ function DishesDistributionTable({
     <div className="admin-table-wrap">
       <Table
         width="max"
-        className="admin-table portions-group-table"
+        className="admin-table portions-group-table portions-dishes-table"
         data={tableRows}
         getRowClassNames={(row) => {
           const classes: string[] = [];
@@ -768,15 +825,19 @@ function DishesDistributionTable({
             if (row.isDishTotal) classes.push('portions-row_dish-total');
             return classes;
           }
-          if (!row.isLastInDepartment) {
-            classes.push('objects-group-row_no-divider');
-            if (!row.showDepartment) classes.push('objects-group-row_continuation');
-          } else if (!row.isLastInSubObject) {
-            classes.push('objects-group-row_department-divider');
-          } else if (!row.isLastInDish) {
-            classes.push('objects-group-row_facility-divider');
-          } else {
-            classes.push('objects-group-row_no-divider');
+          classes.push('objects-group-row_no-divider');
+          // Первая строка отделения — больше отступ сверху.
+          if (row.showDepartment) classes.push('objects-group-row_department-start');
+          // Граница отделения/подобъекта — линия под последней строкой группы.
+          if (row.isLastInDepartment && !row.isLastInDish) {
+            classes.push('objects-group-row_divider');
+            if (!row.isLastInSubObject) {
+              // Между отделениями линия начинается от «Отделение».
+              classes.push('objects-group-row_department-divider');
+            } else {
+              // Между подобъектами линия начинается от «Подобъект» (без «Блюдо»).
+              classes.push('objects-group-row_facility-divider');
+            }
           }
           return classes;
         }}
@@ -796,22 +857,16 @@ function DishesDistributionTable({
               if (row.isDishTotal) return 'Всего';
               if (!row.showDish) return null;
               return (
-                <>
-                  <Text variant="body-2" style={{ fontWeight: 600 }}>
-                    {row.dishName}
-                  </Text>
-                  <br />
-                  <Text variant="body-1" color="secondary">
-                    {row.mealType}
-                  </Text>
-                </>
+                <Text variant="body-2" style={{ fontWeight: 600 }}>
+                  {row.dishName}
+                </Text>
               );
             },
             placeholder: () => null,
           },
           {
             id: 'subObjectName',
-            name: 'Подобъект',
+            name: 'Объект',
             width: '20%',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal ? null : row.showSubObject ? (
@@ -819,9 +874,11 @@ function DishesDistributionTable({
                   <Text variant="body-2" style={{ fontWeight: 400 }}>
                     {row.subObjectName}
                   </Text>
-                  <Text variant="body-1" color="secondary">
-                    {row.objectName}
-                  </Text>
+                  {row.subObjectName !== row.objectName && (
+                    <Text variant="body-1" color="secondary">
+                      подобъект {row.objectName}
+                    </Text>
+                  )}
                 </Flex>
               ) : null,
             placeholder: () => null,
@@ -840,7 +897,7 @@ function DishesDistributionTable({
           },
           {
             id: 'tableName',
-            name: 'Стол',
+            name: 'Рацион',
             width: '15%',
             template: (row) => (row.isDishTotal || row.isGrandTotal ? null : row.tableName),
             placeholder: () => null,
@@ -848,11 +905,20 @@ function DishesDistributionTable({
           {
             id: 'portions',
             name: 'Порций',
-            width: '10%',
+            width: '16%',
             align: 'end',
             template: (row) => (
               <Text variant={row.isDishTotal || row.isGrandTotal ? 'subheader-2' : 'body-2'}>
                 {row.portions}
+                {row.weightKg !== null && (
+                  <Text
+                    variant="body-2"
+                    color="secondary"
+                    style={{ marginLeft: 6, fontWeight: 'normal' }}
+                  >
+                    ({row.weightKg.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} кг)
+                  </Text>
+                )}
               </Text>
             ),
           },
