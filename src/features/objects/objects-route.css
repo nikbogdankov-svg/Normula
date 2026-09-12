@@ -5,15 +5,22 @@
 
 .objects-group-table .objects-group-row_no-divider .g-table__cell {
   border-block-end-color: transparent;
-  padding-block-end: 8px;
+  padding-block: 8px;
 }
 
-.objects-group-table .objects-group-row_continuation .g-table__cell {
-  padding-block-start: 8px;
+/* Первая строка отделения — больше отступ сверху. */
+.objects-group-table .objects-group-row_department-start .g-table__cell {
+  padding-block-start: 12px;
 }
 
-/* Линия между отделениями в одном ЛПУ — начинается от «Отделение», «Организация» пропущена. */
-.objects-group-table .objects-group-row_department-divider .g-table__cell:first-child {
+.objects-group-table .objects-group-row_divider .g-table__cell {
+  border-block-end-color: var(--g-color-line-generic);
+  padding-block-end: 12px;
+}
+
+/* Линия между отделениями начинается от «Группа / класс», а не от «Подобъект»;
+   между подобъектами дивидер остаётся на всю ширину. */
+.objects-subobjects-table .objects-group-row_department-divider .g-table__cell:first-child {
   border-block-end-color: transparent;
 }
 
@@ -29,18 +36,4 @@
 .g-root .objects-group-table .g-table__cell {
   font-size: var(--g-text-body-2-font-size);
   vertical-align: top;
-}
-
-/* Теги приёмов пищи в таблицах объектов. */
-.objects-meal-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: var(--g-text-body-short-font-size);
-  line-height: var(--g-text-body-short-line-height);
-  background: var(--g-color-base-generic);
-  color: var(--g-color-text-primary);
-  white-space: nowrap;
 }

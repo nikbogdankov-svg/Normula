@@ -1,11 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Button, Drawer, Icon, Select, Text, TextInput, useToaster } from '@gravity-ui/uikit';
+import {
+  Button,
+  Dialog,
+  Drawer,
+  Icon,
+  Select,
+  Text,
+  TextInput,
+  useToaster,
+} from '@gravity-ui/uikit';
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
-import { useCreateObject, useUpdateObject, useUpdateSubObject } from './api';
-import { MEALS, type MealId } from '@/features/menu/types';
+import {
+  useCreateObject,
+  useDeleteObject,
+  useDeleteSubObject,
+  useUpdateObject,
+  useUpdateSubObject,
+  type ObjectDeleteMode,
+} from './api';
 import {
   DIET_CATALOG,
   type CateringObject,
+  type CreateObjectRequest,
   type DietTypeId,
   type FacilityType,
   type SubObject,
@@ -19,7 +35,6 @@ type DepartmentForm = {
   name: string;
   selectedTypes: DietTypeId[];
   tableIds: Partial<Record<DietTypeId, string>>;
-  mealIds: MealId[];
 };
 
 type SubObjectForm = {
@@ -31,8 +46,8 @@ type SubObjectForm = {
 
 type ObjectForm = {
   name: string;
+  type: FacilityType;
   menuId?: string;
-  mealIds: MealId[];
   departments: DepartmentForm[];
 };
 
@@ -46,17 +61,11 @@ function tableNameToTypeId(name: string): DietTypeId | null {
   return match?.id ?? null;
 }
 
-/** Пустой mealIds в контракте означает «все» — в форме приводим к явному списку. */
-function normalizeMealIds(mealIds?: MealId[]): MealId[] {
-  return mealIds && mealIds.length > 0 ? [...mealIds] : MEALS.map((meal) => meal.id);
-}
-
 const emptyDepartment = (): DepartmentForm => ({
   id: `dep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: '',
   selectedTypes: ['main'],
   tableIds: {},
-  mealIds: normalizeMealIds(),
 });
 
 const emptySubObject = (): SubObjectForm => ({
@@ -89,7 +98,6 @@ function departmentsToForm(departments: CateringObject['departments']): Departme
       name: department.name,
       selectedTypes,
       tableIds,
-      mealIds: normalizeMealIds(department.mealIds),
     };
   });
 }
@@ -106,8 +114,8 @@ function subObjectToForm(subObject: SubObject): SubObjectForm {
 function objectToForm(object: CateringObject): ObjectForm {
   return {
     name: object.name,
+    type: object.type,
     menuId: object.menuId,
-    mealIds: object.mealIds ? [...object.mealIds] : [],
     departments: departmentsToForm(object.departments),
   };
 }
@@ -124,11 +132,6 @@ function departmentsFormHasChanges(
     if (!origDept) return true;
     if (formDept.name.trim() !== origDept.name) return true;
     if (formDept.selectedTypes.length !== origDept.tables.length) return true;
-    if (
-      JSON.stringify(normalizeMealIds(formDept.mealIds)) !==
-      JSON.stringify(normalizeMealIds(origDept.mealIds))
-    )
-      return true;
   }
 
   return false;
@@ -142,11 +145,9 @@ function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateS
     kettleNumber: original.kettleNumber,
     menuSource: original.menuSource,
     menuId: original.menuId,
-    mealIds: original.mealIds ?? [],
     departments: form.departments.map((department) => ({
       id: department.id,
       name: department.name.trim(),
-      mealIds: department.mealIds,
       tables: department.selectedTypes.map((typeId) => {
         const type = DIET_CATALOG.find((item) => item.id === typeId)!;
         return {
@@ -163,10 +164,7 @@ function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateS
 function isObjectFormReady(form: ObjectForm): boolean {
   if (!form.name.trim()) return false;
   return form.departments.every(
-    (department) =>
-      department.name.trim() !== '' &&
-      department.selectedTypes.length > 0 &&
-      department.mealIds.length > 0
+    (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
   );
 }
 
@@ -176,17 +174,14 @@ function isSubObjectsFormReady(subObjects: SubObjectForm[]): boolean {
       subObject.name.trim() !== '' &&
       subObject.departments.length > 0 &&
       subObject.departments.every(
-        (department) =>
-          department.name.trim() !== '' &&
-          department.selectedTypes.length > 0 &&
-          department.mealIds.length > 0
+        (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
       )
   );
 }
 
 function hasObjectChanges(form: ObjectForm, original: CateringObject): boolean {
   if (form.name.trim() !== original.name) return true;
-  if (JSON.stringify(form.mealIds) !== JSON.stringify(original.mealIds ?? [])) return true;
+  if (form.type !== original.type) return true;
   return departmentsFormHasChanges(form.departments, original.departments);
 }
 
@@ -207,36 +202,10 @@ function hasSubObjectsChanges(subObjects: SubObjectForm[], original: CateringObj
       if (!deptOrig) return true;
       if (deptForm.name.trim() !== deptOrig.name) return true;
       if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
-      if (
-        JSON.stringify(normalizeMealIds(deptForm.mealIds)) !==
-        JSON.stringify(normalizeMealIds(deptOrig.mealIds))
-      )
-        return true;
     }
   }
 
   return false;
-}
-
-function MealChip({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`objects-meal-chip${selected ? ' objects-meal-chip_selected' : ''}`}
-      onClick={onClick}
-    >
-      {selected && <Icon data={Check} size={14} />}
-      {label}
-    </button>
-  );
 }
 
 function DepartmentBlock({
@@ -286,22 +255,6 @@ function DepartmentBlock({
     });
   };
 
-  const toggleMeal = (meal: MealId) => {
-    const selected = department.mealIds.includes(meal);
-
-    if (selected) {
-      if (department.mealIds.length <= 1) return;
-      onUpdate(index, {
-        mealIds: department.mealIds.filter((item) => item !== meal),
-      });
-      return;
-    }
-
-    onUpdate(index, {
-      mealIds: [...department.mealIds, meal],
-    });
-  };
-
   return (
     <Flex key={department.id} direction="column" gap={2} className="kitchen-drawer__department">
       <Flex gap={2} alignItems="flex-end">
@@ -345,21 +298,6 @@ function DepartmentBlock({
             {department.selectedTypes.includes(type.id) && <Icon data={Check} size={14} />}
             {type.label}
           </button>
-        ))}
-      </Flex>
-
-      <Text variant="body-1" className="kitchen-drawer__table-hint">
-        Приёмы пищи группы (минимум один)
-      </Text>
-
-      <Flex gap={2} wrap>
-        {MEALS.map((meal) => (
-          <MealChip
-            key={meal.id}
-            label={meal.label}
-            selected={department.mealIds.includes(meal.id)}
-            onClick={() => toggleMeal(meal.id)}
-          />
         ))}
       </Flex>
     </Flex>
@@ -512,6 +450,58 @@ function Flex({
   );
 }
 
+/** Попап подтверждения удаления: отложенно / сразу / отмена. */
+function DeleteConfirmDialog({
+  open,
+  title,
+  description,
+  afterPeriodHint,
+  onAfterPeriod,
+  onImmediate,
+  onCancel,
+  pending,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  afterPeriodHint: string;
+  onAfterPeriod: () => void;
+  onImmediate: () => void;
+  onCancel: () => void;
+  pending: boolean;
+}) {
+  return (
+    <Dialog open={open} onClose={onCancel} size="s">
+      <Dialog.Header caption={title} />
+      <Dialog.Divider />
+      <Dialog.Body>
+        <Flex direction="column" gap={3}>
+          <Text variant="body-2">{description}</Text>
+          <Flex direction="column" gap={2}>
+            <Button view="outlined-danger" size="l" onClick={onAfterPeriod} loading={pending}>
+              Удалить после конца периода
+            </Button>
+            <Text variant="body-1" color="secondary">
+              {afterPeriodHint}
+            </Text>
+          </Flex>
+          <Flex direction="column" gap={2}>
+            <Button view="outlined" size="l" onClick={onImmediate} loading={pending}>
+              Удалить сейчас
+            </Button>
+            <Text variant="body-1" color="secondary">
+              Будет убран из всех разделов немедленно
+            </Text>
+          </Flex>
+          <Button view="flat" size="l" onClick={onCancel} disabled={pending}>
+            Отмена
+          </Button>
+        </Flex>
+      </Dialog.Body>
+    </Dialog>
+  );
+}
+
 /** Drawer редактирования / создания объекта (название, собственные группы/отделения). */
 export function ObjectDrawer({
   object,
@@ -525,10 +515,12 @@ export function ObjectDrawer({
   const height = useDrawerHeight();
   const create = useCreateObject();
   const update = useUpdateObject();
+  const removeObject = useDeleteObject();
   const toaster = useToaster();
   const [form, setForm] = useState<ObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (mode === 'edit' && !object) {
@@ -536,10 +528,16 @@ export function ObjectDrawer({
       return;
     }
     if (mode === 'create') {
-      setForm({ name: '', menuId: undefined, mealIds: [], departments: [emptyDepartment()] });
+      setForm({
+        name: '',
+        type: 'school',
+        menuId: undefined,
+        departments: [emptyDepartment()],
+      });
     } else if (object) {
       setForm(objectToForm(object));
     }
+    setConfirmingDelete(false);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
@@ -579,14 +577,13 @@ export function ObjectDrawer({
   const submit = () => {
     if (!form || !isObjectFormReady(form)) return;
 
-    const payload = {
+    const payload: CreateObjectRequest = {
       name: form.name.trim(),
+      type: form.type,
       menuId: form.menuId ?? undefined,
-      mealIds: form.mealIds,
       departments: form.departments.map((department) => ({
         id: department.id,
         name: department.name.trim(),
-        mealIds: department.mealIds,
         tables: department.selectedTypes.map((typeId) => {
           const type = DIET_CATALOG.find((item) => item.id === typeId)!;
           return {
@@ -645,6 +642,36 @@ export function ObjectDrawer({
   const ready = isObjectFormReady(form);
   const changed = object ? hasObjectChanges(form, object) : false;
 
+  const runDelete = (deletionMode: ObjectDeleteMode) => {
+    if (!object) return;
+
+    removeObject.mutate(
+      { id: object.id, mode: deletionMode },
+      {
+        onSuccess: () => {
+          toaster.add(
+            deletionMode === 'immediate'
+              ? { name: 'object-deleted', title: 'Объект удалён', theme: 'success' }
+              : {
+                  name: 'object-deleted',
+                  title: 'Объект удалён',
+                  content: 'Останется в порционнике и меню до конца периода',
+                  theme: 'success',
+                }
+          );
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'object-delete',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
   return (
     <Drawer
       open={visible}
@@ -672,16 +699,35 @@ export function ObjectDrawer({
 
         <div className="kitchen-drawer__body">
           <Flex direction="column" gap={3}>
-            <TextInput
-              size="l"
-              label="Название объекта:"
-              placeholder="Центральный объект"
-              value={form.name}
-              onUpdate={(value) =>
-                setForm((current) => (current ? { ...current, name: value } : current))
-              }
-              autoFocus
-            />
+            <Flex gap={2} alignItems="flex-end">
+              <TextInput
+                size="l"
+                label="Название объекта:"
+                placeholder="Центральный объект"
+                value={form.name}
+                onUpdate={(value) =>
+                  setForm((current) => (current ? { ...current, name: value } : current))
+                }
+                autoFocus
+                style={{ flex: 1 }}
+              />
+              <Flex direction="column" gap={1}>
+                <Select
+                  size="l"
+                  width={240}
+                  value={[form.type]}
+                  options={[
+                    { value: 'school', content: 'Школа' },
+                    { value: 'kindergarten', content: 'Детский сад' },
+                    { value: 'hospital', content: 'Больница' },
+                  ]}
+                  onUpdate={(newValue) => {
+                    const nextType = newValue[0] as FacilityType;
+                    setForm((current) => (current ? { ...current, type: nextType } : current));
+                  }}
+                />
+              </Flex>
+            </Flex>
 
             {form.departments.map((department, departmentIndex) => (
               <DepartmentBlock
@@ -714,28 +760,47 @@ export function ObjectDrawer({
         </div>
 
         <div className="kitchen-drawer__footer">
-          <div className="kitchen-drawer__footer-inner">
-            <Button view="outlined" size="l" onClick={requestClose}>
-              Отмена
-            </Button>
-            <Button
-              view="action"
-              size="l"
-              loading={mode === 'create' ? create.isPending : update.isPending}
-              disabled={!ready || (mode === 'edit' && !changed)}
-              onClick={submit}
-            >
-              <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
-              {mode === 'create' ? 'Создать' : 'Сохранить'}
-            </Button>
+          <div className="kitchen-drawer__footer-inner" style={{ justifyContent: 'space-between' }}>
+            {mode === 'edit' && (
+              <Button view="outlined-danger" size="l" onClick={() => setConfirmingDelete(true)}>
+                <Icon data={TrashBin} size={16} />
+                Удалить
+              </Button>
+            )}
+            <Flex gap={2}>
+              <Button view="outlined" size="l" onClick={requestClose}>
+                Отмена
+              </Button>
+              <Button
+                view="action"
+                size="l"
+                loading={mode === 'create' ? create.isPending : update.isPending}
+                disabled={!ready || (mode === 'edit' && !changed)}
+                onClick={submit}
+              >
+                <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
+                {mode === 'create' ? 'Создать' : 'Сохранить'}
+              </Button>
+            </Flex>
           </div>
         </div>
       </div>
+
+      <DeleteConfirmDialog
+        open={confirmingDelete}
+        title={`Удалить «${object?.name ?? ''}»?`}
+        description="Объект используется в порционнике и меню. Выберите, как его удалить."
+        afterPeriodHint="До конца периода объект останется в порционнике и меню"
+        onAfterPeriod={() => runDelete('soft')}
+        onImmediate={() => runDelete('immediate')}
+        onCancel={() => setConfirmingDelete(false)}
+        pending={removeObject.isPending}
+      />
     </Drawer>
   );
 }
 
-/** Drawer редактирования подобъектов: название, тип, группы/отделения с рационами и приёмами. */
+/** Drawer редактирования подобъектов: название, тип, группы/отделения с рационами. */
 export function SubObjectsDrawer({
   object,
   onClose,
@@ -745,10 +810,12 @@ export function SubObjectsDrawer({
 }) {
   const height = useDrawerHeight();
   const update = useUpdateSubObject();
+  const deleteSubObject = useDeleteSubObject();
   const toaster = useToaster();
   const [form, setForm] = useState<SubObjectsForm | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [confirmingSubObjectId, setConfirmingSubObjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!object) {
@@ -756,6 +823,7 @@ export function SubObjectsDrawer({
       return;
     }
     setForm({ subObjects: object.subObjects.map(subObjectToForm) });
+    setConfirmingSubObjectId(null);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
@@ -791,6 +859,52 @@ export function SubObjectsDrawer({
       };
     });
   };
+
+  /** Корзина подобъекта: сохранённый на сервере — в подтверждение, новый — из формы. */
+  const requestRemoveSubObject = (index: number) => {
+    if (!form || !object) return;
+    const target = form.subObjects[index];
+    const original = object.subObjects.find((s) => s.id === target.id);
+    if (!original) {
+      removeSubObject(index);
+      return;
+    }
+    setConfirmingSubObjectId(original.id);
+  };
+
+  const runDeleteSubObject = (deletionMode: ObjectDeleteMode) => {
+    if (!object || !confirmingSubObjectId) return;
+
+    deleteSubObject.mutate(
+      { id: confirmingSubObjectId, mode: deletionMode },
+      {
+        onSuccess: () => {
+          const index = form?.subObjects.findIndex((s) => s.id === confirmingSubObjectId);
+          if (index !== undefined && index >= 0) removeSubObject(index);
+          setConfirmingSubObjectId(null);
+          toaster.add(
+            deletionMode === 'immediate'
+              ? { name: 'subobject-deleted', title: 'Подобъект удалён', theme: 'success' }
+              : {
+                  name: 'subobject-deleted',
+                  title: 'Подобъект удалён',
+                  content: 'Останется в порционнике и меню до конца периода',
+                  theme: 'success',
+                }
+          );
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'subobject-delete',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
+  const confirmingSubObject = form?.subObjects.find((s) => s.id === confirmingSubObjectId) ?? null;
 
   const submit = () => {
     if (!form || !object || !isSubObjectsFormReady(form.subObjects)) return;
@@ -863,8 +977,8 @@ export function SubObjectsDrawer({
                 subObject={subObject}
                 subObjectIndex={subObjectIndex}
                 onUpdate={updateSubObject}
-                onRemove={removeSubObject}
-                canRemove={form.subObjects.length > 1}
+                onRemove={requestRemoveSubObject}
+                canRemove
               />
             ))}
 
@@ -904,6 +1018,17 @@ export function SubObjectsDrawer({
           </div>
         </div>
       </div>
+
+      <DeleteConfirmDialog
+        open={confirmingSubObject !== null}
+        title={confirmingSubObject ? `Удалить «${confirmingSubObject.name}»?` : ''}
+        description="Подобъект используется в порционнике и меню. Выберите, как его удалить."
+        afterPeriodHint="До конца периода подобъект останется в порционнике и меню"
+        onAfterPeriod={() => runDeleteSubObject('soft')}
+        onImmediate={() => runDeleteSubObject('immediate')}
+        onCancel={() => setConfirmingSubObjectId(null)}
+        pending={deleteSubObject.isPending}
+      />
     </Drawer>
   );
 }

@@ -103,6 +103,8 @@ export interface SubObject {
 export interface CateringObject {
   id: string;
   name: string;
+  /** Тип объекта: школа / детский сад / больница. */
+  type: FacilityType;
   /** Приёмы пищи объекта (например, у школ меньше). */
   mealIds: MealId[];
   /** Своё меню объекта (id из справочника меню). */
@@ -136,7 +138,7 @@ export interface UpdateSubObjectRequest {
   departments: Array<{
     id: string;
     name: string;
-    mealIds: MealId[];
+    mealIds?: MealId[];
     tables: Array<{
       id: string;
       name: string;
@@ -156,18 +158,20 @@ export interface UpdateObjectMenuRequest {
 export interface ObjectDepartmentRequest {
   id: string;
   name: string;
-  mealIds: MealId[];
   tables: Array<{
     id: string;
     name: string;
   }>;
 }
 
-/** Создание объекта: название + своё меню + приёмы пищи + группы/рационы. */
+/** Создание объекта: название + тип + своё меню + группы/рационы.
+ *
+ * Приёмы пищи задаются в диетах, а не у объекта — объекту они не передаются. */
 export interface CreateObjectRequest {
   name: string;
+  /** Тип объекта: школа / детский сад / больница. */
+  type: FacilityType;
   menuId?: string;
-  mealIds: MealId[];
   departments: ObjectDepartmentRequest[];
 }
 
