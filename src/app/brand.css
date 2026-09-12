@@ -42,6 +42,9 @@ body,
   /* Карточки в макете белые на сером фоне; Gravity filled по умолчанию серый. */
   --onemore-card-bg: #ffffff;
   --onemore-sidebar-active-bg: #e7f5e9;
+
+  /* Все линии-разделители сайта заметнее дефолтных (25% вместо 15%). */
+  --g-color-line-generic: var(--g-color-private-black-250);
 }
 
 .g-root_theme_dark {
@@ -60,6 +63,8 @@ body,
 
   --onemore-card-bg: var(--g-color-base-float);
   --onemore-sidebar-active-bg: rgba(47, 168, 74, 0.22);
+
+  --g-color-line-generic: var(--g-color-private-white-250);
 }
 
 /* Белые (в светлой теме) поверхности карточек поверх серой рабочей области.

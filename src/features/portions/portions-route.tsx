@@ -31,6 +31,7 @@ import {
 } from '@/shared/ui/states';
 import { useCateringObjects } from '@/features/objects/api';
 import type { SubObject } from '@/features/objects/types';
+import { useInfiniteRecipes } from '@/features/ttk/api';
 import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
@@ -38,6 +39,17 @@ import './portions-route.css';
 const ALL_SUBOBJECTS = '__all';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Вес одной порции (граммы) из ТТК: берём первое число из «выхода», «90/50» → 90. */
+function portionGramsOf(portionYield: string): number | null {
+  const grams = Number((portionYield.split('/')[0] ?? '').trim());
+  return Number.isFinite(grams) && grams > 0 ? grams : null;
+}
+
+/** Килограммы на строку: порции × вес порции из ТТК. */
+function kilogramsOf(portions: number, grams: number | null): number | null {
+  return grams === null ? null : (portions * grams) / 1000;
+}
 
 /**
  * «Порционник»: численность на дату и раздачу по блюдам.
@@ -72,6 +84,22 @@ export function PortionsRoute() {
   const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
 
   const dishes = useDishDistribution(date, activeObjectId);
+
+  // Веса порций блюд из ТТК — для килограммов в раздаче. Отдаём всё одной
+  // выгрузкой; ключ кэша совпадает с ТТК, поэтому повторных запросов нет.
+  const recipes = useInfiniteRecipes({ search: '', collectionId: '', sort: 'name', pageSize: 100 });
+  const weightGramsByDish = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const page of recipes.data?.pages ?? []) {
+      for (const recipe of page.recipes) {
+        const grams = portionGramsOf(recipe.portionYield);
+        if (grams === null) continue;
+        const current = map.get(recipe.name);
+        if (current === undefined || grams > current) map.set(recipe.name, grams);
+      }
+    }
+    return map;
+  }, [recipes.data]);
 
   if (current === null) {
     return (
@@ -335,6 +363,7 @@ export function PortionsRoute() {
                   : (dishes.data?.rows ?? [])
               }
               totalPortions={dishes.data?.totalPortions ?? 0}
+              weightGramsByDish={weightGramsByDish}
             />
           )}
         </div>
@@ -643,6 +672,7 @@ function DishesDistributionTable({
   onFill,
   rows,
   totalPortions,
+  weightGramsByDish,
 }: {
   loading: boolean;
   error: Error | null;
@@ -650,6 +680,8 @@ function DishesDistributionTable({
   onFill: () => void;
   rows: DishDistributionRow[];
   totalPortions: number;
+  /** Вес порции блюда (граммы) из ТТК по имени блюда. */
+  weightGramsByDish: ReadonlyMap<string, number>;
 }) {
   const tableRows = useMemo(() => {
     type DistRow = DishDistributionRow & {
@@ -664,16 +696,22 @@ function DishesDistributionTable({
       isLastInSubObject: boolean;
       isLastInDepartment: boolean;
       isBeforeTotal?: boolean;
+      /** Килограммы строки/итога; null — вес порции не найден в ТТК. */
+      weightKg: number | null;
     };
 
     const result: DistRow[] = [];
     let index = 0;
+    let grandKg = 0;
+    let grandHasWeight = false;
     while (index < rows.length) {
       const dishName = rows[index].dishName;
       const dishStart = index;
       while (index < rows.length && rows[index].dishName === dishName) index += 1;
       const dishRows = rows.slice(dishStart, index);
       let dishPortions = 0;
+      let dishKg = 0;
+      let dishHasWeight = false;
 
       for (let i = 0; i < dishRows.length; i += 1) {
         const row = dishRows[i];
@@ -685,7 +723,12 @@ function DishesDistributionTable({
         const sameSubObjectAsNext = next !== null && next.subObjectName === row.subObjectName;
         const sameDepartmentAsNext =
           sameSubObjectAsNext && next !== null && next.departmentName === row.departmentName;
+        const weightKg = kilogramsOf(row.portions, weightGramsByDish.get(row.dishName) ?? null);
         dishPortions += row.portions;
+        if (weightKg !== null) {
+          dishKg += weightKg;
+          dishHasWeight = true;
+        }
         result.push({
           ...row,
           id: String(dishStart + i),
@@ -698,7 +741,13 @@ function DishesDistributionTable({
           isLastInDish: next === null,
           isLastInSubObject: !sameSubObjectAsNext,
           isLastInDepartment: !sameDepartmentAsNext,
+          weightKg,
         });
+      }
+
+      if (dishHasWeight) {
+        grandKg += dishKg;
+        grandHasWeight = true;
       }
 
       result.push({
@@ -719,6 +768,7 @@ function DishesDistributionTable({
         isLastInDish: true,
         isLastInSubObject: true,
         isLastInDepartment: true,
+        weightKg: dishHasWeight ? dishKg : null,
       });
     }
 
@@ -741,6 +791,7 @@ function DishesDistributionTable({
         isLastInDish: true,
         isLastInSubObject: true,
         isLastInDepartment: true,
+        weightKg: grandHasWeight ? grandKg : null,
       });
     }
 
@@ -753,7 +804,7 @@ function DishesDistributionTable({
     }
 
     return result;
-  }, [rows, totalPortions]);
+  }, [rows, totalPortions, weightGramsByDish]);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
@@ -854,11 +905,20 @@ function DishesDistributionTable({
           {
             id: 'portions',
             name: 'Порций',
-            width: '10%',
+            width: '16%',
             align: 'end',
             template: (row) => (
               <Text variant={row.isDishTotal || row.isGrandTotal ? 'subheader-2' : 'body-2'}>
                 {row.portions}
+                {row.weightKg !== null && (
+                  <Text
+                    variant="body-2"
+                    color="secondary"
+                    style={{ marginLeft: 6, fontWeight: 'normal' }}
+                  >
+                    ({row.weightKg.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} кг)
+                  </Text>
+                )}
               </Text>
             ),
           },

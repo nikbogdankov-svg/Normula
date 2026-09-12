@@ -12,7 +12,7 @@ import {
 } from '@gravity-ui/uikit';
 import { Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDeleteRecipe, useUpdateRecipe } from './api';
+import { useDeleteRecipe, useCreateRecipe, useUpdateRecipe } from './api';
 import { useRecipeForm } from './recipe-form';
 import type { Recipe } from './types';
 import { useDrawerHeight } from './use-drawer-height';
@@ -46,6 +46,7 @@ export function RecipeDialog({
 }) {
   const height = useDrawerHeight();
   const update = useUpdateRecipe();
+  const create = useCreateRecipe();
   const remove = useDeleteRecipe();
   const toaster = useToaster();
   const queryClient = useQueryClient();
@@ -168,6 +169,28 @@ export function RecipeDialog({
     );
   };
 
+  /** Сохранить изменения как новую карту, оригинал не трогаем. */
+  const saveAsNew = () => {
+    if (!view) return;
+
+    create.mutate(form.getBody(), {
+      onSuccess: (data) => {
+        setView(data.recipe);
+        setMode('view');
+        setOpen(true);
+        onRecipeChange?.(data.recipe);
+        toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
+      },
+      onError: (e) =>
+        toaster.add({
+          name: 'ttk-create',
+          title: 'Ошибка',
+          content: e.message,
+          theme: 'danger',
+        }),
+    });
+  };
+
   if (!view) return null;
 
   return (
@@ -199,8 +222,8 @@ export function RecipeDialog({
             onClose();
           }
         }}
-        disableOutsideClick={mode === 'edit' || update.isPending}
-        disableEscapeKeyDown={mode === 'edit' || update.isPending}
+        disableOutsideClick={mode === 'edit' || update.isPending || create.isPending}
+        disableEscapeKeyDown={mode === 'edit' || update.isPending || create.isPending}
         placement="bottom"
         size={height}
         maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
@@ -361,15 +384,26 @@ export function RecipeDialog({
               <Button view="outlined" size="l" onClick={cancelEdit}>
                 Отмена
               </Button>
-              <Button
-                view="action"
-                size="l"
-                onClick={save}
-                disabled={!form.canSubmit}
-                loading={update.isPending}
-              >
-                Сохранить
-              </Button>
+              <Flex gap={2}>
+                <Button
+                  view="normal"
+                  size="l"
+                  onClick={save}
+                  disabled={!form.canSubmit}
+                  loading={update.isPending}
+                >
+                  Сохранить в текущей
+                </Button>
+                <Button
+                  view="action"
+                  size="l"
+                  onClick={saveAsNew}
+                  disabled={!form.canSubmit}
+                  loading={create.isPending}
+                >
+                  Сохранить в новой
+                </Button>
+              </Flex>
             </div>
           </div>
         </div>

@@ -29,6 +29,13 @@ export interface CreateProductRequest {
 /** Тело обновления продукта — те же поля, что и при создании. */
 export type UpdateProductRequest = CreateProductRequest;
 
+/**
+ * Режим удаления продукта: immediate — убрать из справочника сразу,
+ * soft — пометить удалённым, из списков исчезнет после конца периода
+ * (пока он ещё нужен ТТК и закупкам, чтобы остатки не зависли).
+ */
+export type ProductDeleteMode = 'immediate' | 'soft';
+
 export interface ListProductsResponse {
   products: Product[];
   total: number;
