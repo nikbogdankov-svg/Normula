@@ -103,11 +103,6 @@
   text-align: left;
   cursor: pointer;
   border-radius: 8px;
-  transition: background-color 0.12s ease;
-}
-
-.warehouse-balances-card__summary:hover {
-  background-color: var(--g-color-base-generic-hover);
 }
 
 .warehouse-balances-card__name {
@@ -155,6 +150,12 @@
 }
 
 .admin-table tbody .admin-table__row_last {
+  border-bottom: none;
+}
+
+/* Последняя строка раскрытой партии — без нижнего разделителя
+   (перебивает общий border-bottom по tr для этой страницы). */
+.warehouse-balances-page .admin-table tbody tr.admin-table__row_last {
   border-bottom: none;
 }
 

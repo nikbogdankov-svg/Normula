@@ -91,13 +91,11 @@ export function WriteOffDrawer({
           <Flex direction="column" gap={3}>
             <Flex direction="column" gap={1}>
               <Text variant="body-2" color="secondary">
-                Причина: <strong>{view.reason}</strong>
-              </Text>
-              <Text variant="body-2" color="secondary">
                 Дата: <strong>{new Date(view.date).toLocaleDateString('ru-RU')}</strong>
               </Text>
               <Text variant="body-2" color="secondary">
-                Тип: <strong>{view.type === 'exceptional' ? 'Исключительное' : 'Обычное'}</strong>
+                Тип:{' '}
+                <strong>{view.type === 'exceptional' ? 'Исключительное' : 'Автоматическое'}</strong>
               </Text>
             </Flex>
 

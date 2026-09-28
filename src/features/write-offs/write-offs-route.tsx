@@ -1,19 +1,11 @@
 import { useState } from 'react';
-import {
-  Button,
-  Card,
-  Flex,
-  Icon,
-  SegmentedRadioGroup,
-  Text,
-  TextInput,
-  useToaster,
-} from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, SegmentedRadioGroup, Text, TextInput } from '@gravity-ui/uikit';
 import { Plus, Magnifier, ArrowLeftFromLine } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
 import { useWriteOffs } from './api';
 import { WriteOffDrawer } from './write-off-drawer';
+import { CreateWriteOffDialog } from './create-write-off-dialog';
 import type { WriteOff, WriteOffType } from './types';
 import './write-offs-route.css';
 
@@ -21,20 +13,12 @@ const MOCK_WAREHOUSE_ID = 'warehouse-central'; // пока захардкоди�
 
 export function WriteOffsRoute() {
   const api = useApi();
-  const toaster = useToaster();
   const [search, setSearch] = useState('');
   const [opened, setOpened] = useState<WriteOff | null>(null);
   const [type, setType] = useState<WriteOffType>('exceptional');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading, error } = useWriteOffs(MOCK_WAREHOUSE_ID, type);
-
-  const onCreateWriteOff = () => {
-    toaster.add({
-      name: 'write-off-create',
-      title: 'Функция пока в разработке',
-      theme: 'info',
-    });
-  };
 
   if (api.organizationId === null) {
     return (
@@ -78,6 +62,32 @@ export function WriteOffsRoute() {
 
   return (
     <div className="write-offs-page">
+      <Flex
+        alignItems="center"
+        justifyContent="space-between"
+        gap={4}
+        wrap
+        style={{ padding: '16px 16px 0' }}
+      >
+        <TextInput
+          size="l"
+          placeholder="Поиск по причине"
+          value={search}
+          onUpdate={setSearch}
+          hasClear
+          startContent={
+            <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+              <Icon data={Magnifier} size={16} />
+            </span>
+          }
+          style={{ width: 320 }}
+        />
+        <Button onClick={() => setCreateOpen(true)} size="l">
+          <Icon data={Plus} size={16} />
+          Списание
+        </Button>
+      </Flex>
+
       <Card view="filled" style={{ padding: 0, margin: 16 }}>
         <Flex
           alignItems="center"
@@ -89,35 +99,14 @@ export function WriteOffsRoute() {
             <Icon data={ArrowLeftFromLine} size={16} />
             <Text variant="subheader-2">Списания</Text>
           </Flex>
-          <Flex alignItems="center" gap={2} wrap>
-            <SegmentedRadioGroup
-              size="m"
-              value={type}
-              onUpdate={(value) => setType(value as WriteOffType)}
-            >
-              <SegmentedRadioGroup.Option value="exceptional" content="Исключительные" />
-              <SegmentedRadioGroup.Option value="daily" content="Обычные" />
-            </SegmentedRadioGroup>
-            <TextInput
-              size="m"
-              placeholder="Поиск по причине"
-              value={search}
-              onUpdate={setSearch}
-              hasClear
-              startContent={
-                <span
-                  style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}
-                >
-                  <Icon data={Magnifier} size={16} />
-                </span>
-              }
-              style={{ width: 280 }}
-            />
-            <Button onClick={onCreateWriteOff} size="m">
-              <Icon data={Plus} size={16} />
-              Списание
-            </Button>
-          </Flex>
+          <SegmentedRadioGroup
+            size="m"
+            value={type}
+            onUpdate={(value) => setType(value as WriteOffType)}
+          >
+            <SegmentedRadioGroup.Option value="exceptional" content="Исключительные" />
+            <SegmentedRadioGroup.Option value="daily" content="Автоматические" />
+          </SegmentedRadioGroup>
         </Flex>
 
         <div
@@ -141,7 +130,7 @@ export function WriteOffsRoute() {
                       Причина
                     </Text>
                   </th>
-                  <th>
+                  <th style={{ width: 170 }}>
                     <Text variant="body-1" color="secondary">
                       Кол-во товаров
                     </Text>
@@ -185,6 +174,11 @@ export function WriteOffsRoute() {
       </Card>
 
       <WriteOffDrawer writeOff={opened} onClose={() => setOpened(null)} />
+      <CreateWriteOffDialog
+        open={createOpen}
+        warehouseId={MOCK_WAREHOUSE_ID}
+        onClose={() => setCreateOpen(false)}
+      />
     </div>
   );
 }
