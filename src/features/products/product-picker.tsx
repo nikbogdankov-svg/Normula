@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Flex, Icon, Select, type SelectOption } from '@gravity-ui/uikit';
 import { Plus } from '@gravity-ui/icons';
-import { useProducts } from './api';
+import { filterProducts, useProducts } from './api';
 import type { Product } from './types';
 import { CreateProductDialog } from './create-product-dialog';
 import './product-picker.css';
@@ -30,17 +30,13 @@ export function ProductPicker({
   size?: 's' | 'm' | 'l' | 'xl';
   onChange: (product: Product | null) => void;
 }) {
-  const { data, isPending } = useProducts({ pageSize: 100 });
+  const { data, isPending } = useProducts();
   const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
   const products = useMemo(() => data?.products ?? [], [data]);
 
-  const filtered = useMemo(() => {
-    const query = filter.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) => product.name.toLowerCase().includes(query));
-  }, [products, filter]);
+  const filtered = useMemo(() => filterProducts(products, filter), [products, filter]);
 
   const selected = useMemo(
     () => value && products.find((product) => product.id === value),

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   Flex,
@@ -17,7 +17,7 @@ import {
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
-import { useProducts } from './api';
+import { filterProducts, useProducts } from './api';
 import type { Product } from './types';
 import { CreateProductDialog } from './create-product-dialog';
 import { DeleteProductDialog, EditProductDialog } from './products-dialogs';
@@ -31,12 +31,10 @@ export function ProductsRoute() {
   const [toEdit, setToEdit] = useState<Product | null>(null);
   const [toDelete, setToDelete] = useState<Product | null>(null);
 
-  const { data, isPending, isError, error, refetch } = useProducts({
-    search: search.trim(),
-    pageSize: 100,
-  });
+  const { data, isPending, isError, error, refetch } = useProducts();
 
-  const products = data?.products ?? [];
+  // Справочник приходит целиком, поиск — по нему на клиенте.
+  const products = useMemo(() => filterProducts(data?.products ?? [], search), [data, search]);
   const hasQuery = search.trim() !== '';
 
   return (
@@ -63,7 +61,7 @@ export function ProductsRoute() {
         />
         {data && (
           <Text variant="body-1" color="secondary">
-            {hasQuery ? `Найдено: ${data.total}` : `Всего продуктов: ${data.total}`}
+            {hasQuery ? `Найдено: ${products.length}` : `Всего продуктов: ${data.total}`}
           </Text>
         )}
       </Flex>

@@ -83,16 +83,9 @@ export function DeleteProductDialog({
       { id: product.id, mode: deletionMode },
       {
         onSuccess: () => {
-          toaster.add(
-            deletionMode === 'immediate'
-              ? { name: 'product-deleted', title: 'Продукт удалён', theme: 'success' }
-              : {
-                  name: 'product-deleted',
-                  title: 'Продукт удалён',
-                  content: 'Останется в ТТК и приходных до конца периода',
-                  theme: 'success',
-                }
-          );
+          // Режим уходит на бэкенд, но пока не различается: периодов ещё нет,
+          // и в обоих случаях продукт пропадает из справочника сразу.
+          toaster.add({ name: 'product-deleted', title: 'Продукт удалён', theme: 'success' });
           onClose();
         },
         onError: (e) =>
