@@ -8,7 +8,6 @@ import type {
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
-import type { Product } from '@/features/products/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
@@ -47,7 +46,6 @@ export const MOCKED_PREFIXES = [
   '/v1/portions',
   '/v1/warehouse',
   '/v1/write-offs',
-  '/v1/products',
   '/v1/diets',
 ];
 
@@ -368,55 +366,7 @@ const sampleRecipe = (index: number): Recipe => {
 
 const recipes: Recipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
 
-// --- Продукты (общий справочник SKU: имя + единица) ---
-
-const PRODUCT_NAMES = [
-  'Мука пшеничная',
-  'Сахар-песок',
-  'Масло растительное',
-  'Молоко 3,2%',
-  'Яйцо куриное',
-  'Говядина',
-  'Курица',
-  'Рыба',
-  'Картофель',
-  'Морковь',
-  'Лук репчатый',
-  'Сметана',
-  'Творог 9%',
-  'Соль',
-  'Хлеб пшеничный',
-  'Рис',
-  'Гречка',
-  'Макароны',
-  'Сыр твёрдый',
-  'Яблоки',
-];
-
-// Единица закупки по умолчанию для справочных названий.
-const PRODUCT_UNIT: Record<string, string> = {
-  'Молоко 3,2%': 'л',
-  'Масло растительное': 'л',
-  'Яйцо куриное': 'шт',
-  Яблоки: 'кг',
-};
-
-const sampleProduct = (index: number): Product => {
-  const name = PRODUCT_NAMES[(index - 1) % PRODUCT_NAMES.length];
-
-  return {
-    id: `p-${index}`,
-    name,
-    unit: PRODUCT_UNIT[name] ?? 'кг',
-  };
-};
-
-const products: Product[] = Array.from({ length: 20 }, (_, index) => sampleProduct(index + 1));
-
-// Soft-удалённые продукты: ушли из справочника, но остаются привязаны к ТТК
-// и приходным до конца периода, поэтому из products не вырезаются.
-const deletedProductIds = new Set<string>();
-// Soft-удалённые ТТК: аналогично продуктам — остаются в меню до конца периода.
+// Soft-удалённые ТТК: остаются в меню до конца периода.
 const deletedRecipeIds = new Set<string>();
 
 const mockedDiets: Diet[] = [
@@ -803,29 +753,6 @@ const warehouseBalances = [
   },
 ];
 
-// У остальных товаров справочника добавляется хотя бы одна партия — иначе
-// селект серий в диалоге списания будет пустым для большинства товаров.
-{
-  const covered = new Set(warehouseBalances.flatMap((b) => b.items.map((i) => i.productId)));
-  const latest = warehouseBalances[warehouseBalances.length - 1];
-  for (const product of products) {
-    if (covered.has(product.id)) continue;
-    latest.items.push({
-      productId: product.id,
-      productName: product.name,
-      unit: product.unit,
-      batches: [
-        {
-          batchId: `batch-${product.id}-1`,
-          batchNumber: 'НАК-2025-007',
-          remaining: 10,
-          price: 50,
-        },
-      ],
-    });
-  }
-}
-
 const writeOffs = [
   {
     id: 'wo-1',
@@ -1075,62 +1002,6 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       recipes.splice(index, 1);
     } else {
       deletedRecipeIds.add(ttkRecipe.id);
-    }
-
-    return {} as T;
-  }
-
-  // Продукты (общий справочник SKU)
-  if (route === '/v1/products' && method === 'GET') {
-    const query = (params.get('search') ?? '').trim().toLowerCase();
-
-    let found = products.filter((p) => !deletedProductIds.has(p.id));
-    if (query) found = found.filter((p) => p.name.toLowerCase().includes(query));
-
-    const pageSize = Math.max(1, Number(params.get('pageSize')) || 100);
-    const total = found.length;
-    const pageProducts = found.slice(0, pageSize);
-
-    return { products: pageProducts, total } as T;
-  }
-
-  if (route === '/v1/products' && method === 'POST') {
-    const body = options.body as { name: string; unit: string };
-    const product: Product = {
-      id: `p-${Date.now()}`,
-      name: body.name.trim(),
-      unit: body.unit?.trim() || 'шт',
-    };
-    products.unshift(product);
-
-    return { product } as T;
-  }
-
-  const productId = match('/v1/products/:id', route);
-  if (productId && method === 'PATCH') {
-    const found = products.find((p) => p.id === productId.id);
-    if (!found) throw new Error('mock: продукт не найден');
-
-    const body = options.body as { name: string; unit: string };
-
-    Object.assign(found, {
-      name: body.name.trim() || found.name,
-      unit: body.unit?.trim() || found.unit,
-    });
-
-    return { product: found } as T;
-  }
-
-  if (productId && method === 'DELETE') {
-    const found = products.find((p) => p.id === productId.id);
-    if (!found) throw new Error('mock: продукт не найден');
-
-    const mode = params.get('mode') ?? 'soft';
-    if (mode === 'immediate') {
-      const index = products.indexOf(found);
-      products.splice(index, 1);
-    } else {
-      deletedProductIds.add(productId.id);
     }
 
     return {} as T;
