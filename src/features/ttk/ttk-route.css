@@ -54,6 +54,11 @@
   background: var(--ttk-thead-bg, var(--onemore-card-bg));
 }
 
+.ttk-page__header .admin-table .g-table__head .g-table__cell {
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
 .ttk-page__header .admin-table .g-table__body {
   display: none;
 }
@@ -64,14 +69,15 @@
 }
 
 /* Строки-карточки: вертикальные зазоры между строками. */
-.ttk-page__scroll .ttk-page__list .admin-table .g-table__table {
+.ttk-page__scroll .ttk-page__list .ttk-page__table-body .g-table__table {
   border-collapse: separate;
   border-spacing: 0 8px;
   margin: 0;
 }
 
-/* Линии ячеек больше не нужны — их место заняли зазоры. */
-.ttk-page__scroll .ttk-page__list .admin-table .g-table__cell {
+/* Линии ячеек больше не нужны — их место заняли зазоры.
+   Только для body-таблицы: шапка живёт отдельным блоком и ей нужна нижняя линия. */
+.ttk-page__scroll .ttk-page__list .ttk-page__table-body .g-table__cell {
   border-block-end: none;
 }
 
@@ -84,6 +90,7 @@
   border-radius: 6px 0 0 6px;
   background-clip: padding-box;
   padding-inline-start: 12px;
+  border-left: 1px solid var(--g-color-line-generic);
 }
 /* Сборнику — больше места, чтобы название входило целиком. */
 .ttk-page__header .admin-table .g-table__head .g-table__cell:nth-child(2) {
@@ -95,6 +102,7 @@
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
   padding-inline-end: 12px;
+  border-right: 1px solid var(--g-color-line-generic);
 }
 
 .ttk-page__header {
@@ -113,6 +121,8 @@
   background: var(--onemore-card-bg);
   padding-left: 12px;
   padding-right: 12px;
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: 1px solid var(--g-color-line-generic);
 }
 
 .ttk-page__scroll
@@ -123,6 +133,7 @@
   .g-table__cell:first-child {
   border-radius: 8px 0 0 8px;
   background-clip: padding-box;
+  border-left: 1px solid var(--g-color-line-generic);
 }
 
 .ttk-page__scroll
@@ -133,6 +144,7 @@
   .g-table__cell:last-child {
   border-radius: 0 8px 8px 0;
   background-clip: padding-box;
+  border-right: 1px solid var(--g-color-line-generic);
 }
 
 /* Hover строки-карточки: переопределяем глобальный стиль brand.css,
@@ -143,7 +155,7 @@
   .g-table__body
   .g-table__row_interactive:hover
   > .g-table__cell {
-  background-color: var(--g-color-base-simple-hover);
+  background-color: var(--g-color-base-generic);
 }
 
 .ttk-page__scroll .admin-table-wrap {
@@ -162,9 +174,10 @@
   margin: 0;
 }
 
-/* Убираем только верхний зазор body-таблицы под фиксированным header. */
+/* Верхний зазор между шапкой и первой строкой даёт border-spacing: 0 8px
+   body-таблицы — margin-top: -8px больше не сдвигаем. */
 .ttk-page__scroll .ttk-page__table-body {
-  margin-top: -8px;
+  margin-top: 0;
 }
 
 .ttk-page__scroll .admin-table .g-table__table,
