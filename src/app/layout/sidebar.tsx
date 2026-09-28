@@ -122,14 +122,28 @@ export function Sidebar({
             <Text variant="body-1" ellipsis>
               {current ? current.name : 'Без организации'}
             </Text>
-            <Text variant="caption-2" color="secondary" ellipsis>
-              Администратор
-            </Text>
+            {current && roleCaption(scopes) && (
+              <Text variant="caption-2" color="secondary" ellipsis>
+                {roleCaption(scopes)}
+              </Text>
+            )}
           </Flex>
         )}
       </div>
     </aside>
   );
+}
+
+/**
+ * Подпись под названием организации — кто человек в ней, по скоупам токена.
+ * null, пока скоупы не прочитаны: лучше без подписи, чем с неверной.
+ */
+function roleCaption(scopes: string[] | null): string | null {
+  if (!scopes) return null;
+  if (scopes.includes('manage:platform')) return 'Администратор платформы';
+  if (scopes.includes('manage:organization')) return 'Администратор';
+
+  return 'Сотрудник';
 }
 
 /** Пункт меню. В свёрнутом виде остаётся только иконка с подсказкой. */

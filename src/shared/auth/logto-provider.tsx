@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { LogtoProvider, ReservedScope, useLogto, UserScope, type LogtoConfig } from '@logto/react';
+import {
+  LogtoClientError,
+  LogtoProvider,
+  LogtoRequestError,
+  ReservedScope,
+  useLogto,
+  UserScope,
+  type LogtoConfig,
+} from '@logto/react';
 import { config, type LogtoSettings } from '@/shared/config';
 import {
   AuthContext,
@@ -73,6 +81,34 @@ const ORGANIZATION_SCOPES = [
 export const signInRedirectUri = `${window.location.origin}/callback`;
 export const postSignOutRedirectUri = `${window.location.origin}/`;
 
+/**
+ * Ошибка SDK, после которой сессию не восстановить без нового входа:
+ * refresh-токен истёк или отозван, либо его нет вовсе.
+ *
+ * Сетевые сбои (TypeError из fetch) сюда намеренно не попадают — ради
+ * пропавшего интернета отправлять человека на страницу входа незачем.
+ */
+function isSessionLost(error: Error): boolean {
+  if (error instanceof LogtoClientError) {
+    return error.code === 'not_authenticated' || error.code === 'fetch_user_info_failed';
+  }
+
+  if (error instanceof LogtoRequestError) {
+    return error.code === 'oidc.invalid_grant' || error.code === 'oidc.invalid_token';
+  }
+
+  return false;
+}
+
+/** Когда в последний раз уводили на вход из-за потерянной сессии. */
+const RELOGIN_AT_KEY = 'onemore.reloginAt';
+/**
+ * Не чаще раза в минуту: если сразу после входа сессия снова «теряется»
+ * (например, приложению в Logto не выдан ресурс), без этого ограничения
+ * страница бесконечно прыгала бы между собой и Logto.
+ */
+const RELOGIN_COOLDOWN_MS = 60_000;
+
 function LogtoAuthBridge({ children }: { children: ReactNode }) {
   const logto = useLogto();
   const {
@@ -86,6 +122,31 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
   } = logto;
   const apiResource = requireLogtoSettings().apiResource;
   const [user, setUser] = useState<AuthUser | null>(null);
+
+  // Методы useLogto не бросают исключений: SDK ловит ошибку, кладёт её в
+  // logto.error и возвращает undefined. Поэтому протухшая сессия не видна ни
+  // одному вызывающему — isAuthenticated держится на ID-токене в
+  // localStorage, а данные молча не приходят: ни вошёл, ни вышел. Ловим
+  // такую ошибку здесь, в одном месте, и честно отправляем на вход.
+  const { error: logtoError, isAuthenticated: logtoAuthenticated } = logto;
+  useEffect(() => {
+    if (!logtoError || !logtoAuthenticated || !isSessionLost(logtoError)) return;
+
+    const lastAttempt = Number(sessionStorage.getItem(RELOGIN_AT_KEY) ?? 0);
+    if (Date.now() - lastAttempt < RELOGIN_COOLDOWN_MS) {
+      console.warn(
+        'Сессия Logto потеряна повторно сразу после входа — не зацикливаемся',
+        logtoError
+      );
+      return;
+    }
+
+    sessionStorage.setItem(RELOGIN_AT_KEY, String(Date.now()));
+
+    // Токены чистим до ухода: если человек не завершит вход и вернётся
+    // позже, мёртвый ID-токен снова изображал бы вошедшего пользователя.
+    void clearAllTokens().then(() => signIn(signInRedirectUri));
+  }, [logtoError, logtoAuthenticated, clearAllTokens, signIn]);
 
   const getApiToken = useCallback(async () => {
     const token = await getAccessToken(apiResource);
@@ -121,7 +182,14 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     // userinfo при scope Organizations содержит organization_data:
     // [{ id, name, description }]. Типы SDK это поле знают не во всех версиях,
     // поэтому читаем защищённо.
-    const info = (await fetchUserInfo()) as {
+    const response = await fetchUserInfo();
+    // undefined — SDK проглотил ошибку (см. эффект выше). Пустой список здесь
+    // выдавал бы сбой за «у вас нет организаций».
+    if (!response) {
+      throw new Error('Не удалось получить организации: сессия Logto недоступна');
+    }
+
+    const info = response as {
       organization_data?: { id: string; name: string }[];
       organizations?: string[];
     };
@@ -142,6 +210,11 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     fetchUserInfo()
       .then((info) => {
         if (cancelled) return;
+        // undefined — SDK проглотил ошибку; ей занимается эффект потери сессии.
+        if (!info) {
+          setUser(null);
+          return;
+        }
         const record = info as {
           sub?: string;
           name?: string;

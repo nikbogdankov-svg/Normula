@@ -13,25 +13,28 @@ import type {
 const KEY = 'products';
 
 /**
- * Подбор продуктов по поисковому запросу. Без параметров возвращает весь
- * справочник — используется автокомплитами в ТТК и приходных склада.
+ * Весь справочник продуктов организации одним запросом.
+ *
+ * Бэкенд отдаёт его целиком, без страниц и поиска: ищут по нему на клиенте —
+ * раздел «Продукты» и автокомплиты в ТТК и складе (см. filterProducts).
+ * Один ключ запроса на всех, поэтому справочник грузится один раз.
  */
-export function useProducts(params: { search?: string; pageSize?: number } = {}) {
+export function useProducts() {
   const api = useApi();
-  const pageSize = params.pageSize ?? 100;
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, { search: params.search ?? '', pageSize }],
-    queryFn: () => {
-      const query = new URLSearchParams({
-        search: params.search ?? '',
-        pageSize: String(pageSize),
-      });
-
-      return api.request<ListProductsResponse>(`/v1/products?${query.toString()}`);
-    },
+    queryKey: [KEY, api.organizationId],
+    queryFn: () => api.request<ListProductsResponse>('/v1/products'),
     enabled: api.organizationId !== null,
   });
+}
+
+/** Продукты, в названии которых есть query (без учёта регистра и пробелов по краям). */
+export function filterProducts(products: Product[], query: string): Product[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return products;
+
+  return products.filter((product) => product.name.toLowerCase().includes(needle));
 }
 
 function useInvalidate() {

@@ -35,7 +35,7 @@ src/
     config.ts            runtime-конфиг из window.__APP_CONFIG__ — НЕ import.meta.env
     api/client.ts        apiFetch + ApiError; в mock-режиме отвечает mock-handlers
     api/use-api.ts       useApi(): авторизованные запросы, сам подставляет токен
-    api/mock-handlers.ts in-memory обработчики для mock-режима
+    api/mock-handlers.ts in-memory обработчики разделов, у которых ещё нет бэкенда
     auth/                Logto + mock реализации одного AuthContext; OrgProvider
     ui/                  Page, LoadingState/ErrorState/EmptyState, FullPageLoader
   features/
@@ -62,8 +62,11 @@ src/
 5. **queryKey организационного запроса всегда включает api.organizationId** —
    иначе при смене организации покажутся чужие данные из кэша. Для запросов
    с tokenKind='api' (как /hello) organizationId в ключе не нужен.
-6. **Каждый эндпоинт фичи дублируется в mock-handlers.ts**, чтобы npm run dev:mock
-   работал без бэка.
+6. **Моки — только для разделов, у которых ещё нет бэкенда.** Пока ручки нет,
+   её эндпоинты живут в mock-handlers.ts, а префикс — в MOCKED_PREFIXES. Как
+   только ручка появилась на сервере, её моки удаляются целиком (обработчики,
+   сид-данные, префикс) — фича ходит только в бэк. Из-за этого в
+   npm run dev:mock такие разделы не работают, и это ожидаемо.
 7. Тексты интерфейса — на русском. Код и идентификаторы — на английском.
 
 ## Рецепт: добавить фичу «X» (страница со списком/формой)
@@ -75,7 +78,8 @@ src/
 3. `src/features/x/x-route.tsx` — страница: Page → Loading/Error/Empty → контент.
 4. Роут в `src/app/router.tsx` (children раздела /app) + пункт в NAV
    в `src/app/layout/app-layout.tsx`.
-5. Обработчики эндпоинтов в `src/shared/api/mock-handlers.ts`.
+5. Если бэкенда ещё нет — обработчики в `src/shared/api/mock-handlers.ts` и
+   префикс в MOCKED_PREFIXES (см. инвариант 6); если есть — моков не пишем.
 6. `npm run check`.
 
 ## Gravity UI: справка
