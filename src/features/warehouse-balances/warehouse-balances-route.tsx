@@ -184,114 +184,132 @@ export function WarehouseBalancesRoute() {
 
       <div className="warehouse-balances-table">
         <div className="warehouse-balances-table__header">
-          <div className="warehouse-balances-header-row">
-            <Text
-              variant="body-2"
-              color="secondary"
-              className="warehouse-balances-header-row__name"
-            >
-              Товар
-            </Text>
-            <Text
-              variant="body-2"
-              color="secondary"
-              className="warehouse-balances-header-row__price"
-            >
-              Средняя цена
-            </Text>
-            <Text
-              variant="body-2"
-              color="secondary"
-              className="warehouse-balances-header-row__rest"
-            >
-              Остаток
-            </Text>
-            <div className="warehouse-balances-header-row__arrow" />
-          </div>
+          <table className="admin-table">
+            <colgroup>
+              <col />
+              <col className="warehouse-balances-col-price" />
+              <col className="warehouse-balances-col-rest" />
+              <col className="warehouse-balances-col-chevron" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Товар</th>
+                <th className="warehouse-balances-col-price">Средняя цена</th>
+                <th className="warehouse-balances-col-rest">Остаток</th>
+                <th className="warehouse-balances-col-chevron" />
+              </tr>
+            </thead>
+          </table>
         </div>
 
         <div className="warehouse-balances-table__scroll">
-          <div className="warehouse-balances-list">
-            {cards.map((card) => {
-              const open = expanded.has(card.productName);
-              return (
-                <div key={card.productName} className="warehouse-balances-card">
-                  <div
-                    className="warehouse-balances-card__summary"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => toggleExpanded(card.productName)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        toggleExpanded(card.productName);
+          <div className="admin-table-wrap">
+            <table className="admin-table warehouse-balances-table__body">
+              <tbody>
+                {cards.map((card) => {
+                  const open = expanded.has(card.productName);
+                  return (
+                    <tr
+                      key={card.productName}
+                      className={
+                        open ? 'warehouse-balances-card is-open' : 'warehouse-balances-card'
                       }
-                    }}
-                    title={open ? 'Свернуть' : 'Раскрыть'}
-                    aria-label={open ? 'Свернуть товар' : 'Раскрыть товар'}
-                    aria-expanded={open}
-                  >
-                    <Text variant="body-2" ellipsis className="warehouse-balances-card__name">
-                      <HighlightText text={card.productName} query={search} />
-                    </Text>
-                    <Text variant="body-2" className="warehouse-balances-card__price">
-                      {card.avgPrice} ₽
-                    </Text>
-                    <Text variant="body-2" className="warehouse-balances-card__rest">
-                      {card.totalRemaining} {card.unit}
-                    </Text>
-                    <Icon data={open ? ChevronUp : ChevronDown} size={16} />
-                  </div>
-
-                  {open && (
-                    <div className="warehouse-balances-card__detail">
-                      {card.batches.length === 0 ? (
-                        <Text
-                          variant="body-2"
-                          color="secondary"
-                          style={{ display: 'block', padding: '12px 16px' }}
-                        >
-                          Нет партий по запросу
-                        </Text>
-                      ) : (
-                        <div className="admin-table-wrap">
-                          <table className="admin-table">
-                            <thead>
-                              <tr>
-                                <th>Партия</th>
-                                <th>Дата</th>
-                                <th style={{ width: 80, textAlign: 'right' }}>Цена</th>
-                                <th style={{ width: 96, textAlign: 'right' }}>Остаток</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {card.batches.map((batch, index) => (
-                                <tr
-                                  key={batch.batchId}
-                                  className={
-                                    index === card.batches.length - 1 ? 'admin-table__row_last' : ''
-                                  }
-                                >
-                                  <td>
-                                    <HighlightText text={batch.batchNumber} query={search} />
-                                  </td>
-                                  <td>{new Date(batch.date).toLocaleDateString('ru-RU')}</td>
-                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                    {batch.price} ₽
-                                  </td>
-                                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                    {batch.remaining} {card.unit}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (!open) {
+                          toggleExpanded(card.productName);
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if ((event.key === 'Enter' || event.key === ' ') && !open) {
+                          toggleExpanded(card.productName);
+                        }
+                      }}
+                      title={open ? 'Свернуть' : 'Раскрыть'}
+                      aria-label={open ? 'Свернуть товар' : 'Раскрыть товар'}
+                      aria-expanded={open}
+                    >
+                      <td colSpan={4}>
+                        <div className="warehouse-balances-card__summary">
+                          <div className="warehouse-balances-card__name">
+                            <Text variant="body-2" ellipsis>
+                              <HighlightText text={card.productName} query={search} />
+                            </Text>
+                          </div>
+                          <div className="warehouse-balances-card__price">
+                            <Text variant="body-2">{card.avgPrice} ₽</Text>
+                          </div>
+                          <div className="warehouse-balances-card__rest">
+                            <Text variant="body-2">
+                              {card.totalRemaining} {card.unit}
+                            </Text>
+                          </div>
+                          <div
+                            className="warehouse-balances-card__chevron"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleExpanded(card.productName);
+                            }}
+                            title={open ? 'Свернуть' : 'Раскрыть'}
+                          >
+                            <Icon data={open ? ChevronUp : ChevronDown} size={16} />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+
+                        {open && (
+                          <div className="warehouse-balances-card__batches">
+                            {card.batches.length === 0 ? (
+                              <Text
+                                variant="body-2"
+                                color="secondary"
+                                style={{ display: 'block', padding: '4px 16px 8px' }}
+                              >
+                                Нет партий по запросу
+                              </Text>
+                            ) : (
+                              <table className="warehouse-balances-batches">
+                                <thead>
+                                  <tr>
+                                    <th>Партия</th>
+                                    <th>Дата</th>
+                                    <th style={{ textAlign: 'right' }}>Цена</th>
+                                    <th style={{ textAlign: 'right' }}>Остаток</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {card.batches.map((batch, index) => (
+                                    <tr
+                                      key={batch.batchId}
+                                      className={
+                                        index === card.batches.length - 1
+                                          ? 'admin-table__row_last'
+                                          : ''
+                                      }
+                                    >
+                                      <td>
+                                        <HighlightText text={batch.batchNumber} query={search} />
+                                      </td>
+                                      <td>{new Date(batch.date).toLocaleDateString('ru-RU')}</td>
+                                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        {batch.price} ₽
+                                      </td>
+                                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        {batch.remaining} {card.unit}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
 
             {cards.length === 0 && (
               <Text variant="body-1" color="secondary" style={{ display: 'block', padding: 16 }}>

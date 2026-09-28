@@ -753,7 +753,7 @@ const warehouseBalances = [
     warehouseId: 'warehouse-central',
     items: [
       {
-        productId: 'prod-1',
+        productId: 'p-1',
         productName: 'Мука пшеничная',
         unit: 'кг',
         batches: [
@@ -762,8 +762,8 @@ const warehouseBalances = [
         ],
       },
       {
-        productId: 'prod-2',
-        productName: 'Масло подсолнечное',
+        productId: 'p-3',
+        productName: 'Масло растительное',
         unit: 'л',
         batches: [
           { batchId: 'batch-2-1', batchNumber: 'НАК-2025-001', remaining: 30, price: 120 },
@@ -780,16 +780,16 @@ const warehouseBalances = [
     warehouseId: 'warehouse-central',
     items: [
       {
-        productId: 'prod-3',
-        productName: 'Молоко коровье',
+        productId: 'p-4',
+        productName: 'Молоко 3,2%',
         unit: 'л',
         batches: [
-          { batchId: 'batch-3-1', batchNumber: 'НАК-2025-002', remaining: 80, price: 65 },
-          { batchId: 'batch-3-2', batchNumber: 'НАК-2025-005', remaining: 40, price: 68 },
+          { batchId: 'batch-3-1', batchNumber: 'НАК-2025-002', remaining: 200, price: 65 },
+          { batchId: 'batch-3-2', batchNumber: 'НАК-2025-005', remaining: 100, price: 68 },
         ],
       },
       {
-        productId: 'prod-4',
+        productId: 'p-5',
         productName: 'Яйцо куриное',
         unit: 'шт',
         batches: [
@@ -803,6 +803,29 @@ const warehouseBalances = [
   },
 ];
 
+// У остальных товаров справочника добавляется хотя бы одна партия — иначе
+// селект серий в диалоге списания будет пустым для большинства товаров.
+{
+  const covered = new Set(warehouseBalances.flatMap((b) => b.items.map((i) => i.productId)));
+  const latest = warehouseBalances[warehouseBalances.length - 1];
+  for (const product of products) {
+    if (covered.has(product.id)) continue;
+    latest.items.push({
+      productId: product.id,
+      productName: product.name,
+      unit: product.unit,
+      batches: [
+        {
+          batchId: `batch-${product.id}-1`,
+          batchNumber: 'НАК-2025-007',
+          remaining: 10,
+          price: 50,
+        },
+      ],
+    });
+  }
+}
+
 const writeOffs = [
   {
     id: 'wo-1',
@@ -813,8 +836,8 @@ const writeOffs = [
     items: [
       {
         id: 'wo-1-item-1',
-        productId: 'prod-3',
-        productName: 'Молоко коровье',
+        productId: 'p-4',
+        productName: 'Молоко 3,2%',
         quantity: 12,
         unit: 'л',
         unitPrice: 65,
@@ -822,7 +845,7 @@ const writeOffs = [
       },
       {
         id: 'wo-1-item-2',
-        productId: 'prod-4',
+        productId: 'p-5',
         productName: 'Яйцо куриное',
         quantity: 40,
         unit: 'шт',
@@ -842,8 +865,8 @@ const writeOffs = [
     items: [
       {
         id: 'wo-2-item-1',
-        productId: 'prod-2',
-        productName: 'Масло подсолнечное',
+        productId: 'p-3',
+        productName: 'Масло растительное',
         quantity: 3,
         unit: 'л',
         unitPrice: 120,
@@ -862,7 +885,7 @@ const writeOffs = [
     items: [
       {
         id: 'wo-3-item-1',
-        productId: 'prod-1',
+        productId: 'p-1',
         productName: 'Мука пшеничная',
         quantity: 5,
         unit: 'кг',
@@ -871,8 +894,8 @@ const writeOffs = [
       },
       {
         id: 'wo-3-item-2',
-        productId: 'prod-3',
-        productName: 'Молоко коровье',
+        productId: 'p-4',
+        productName: 'Молоко 3,2%',
         quantity: 8,
         unit: 'л',
         unitPrice: 65,
@@ -891,7 +914,7 @@ const writeOffs = [
     items: [
       {
         id: 'wo-4-item-1',
-        productId: 'prod-4',
+        productId: 'p-5',
         productName: 'Яйцо куриное',
         quantity: 60,
         unit: 'шт',
@@ -1796,16 +1819,18 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       }>;
     };
     const productMap: Record<string, string> = {
-      'prod-1': 'Мука пшеничная',
-      'prod-2': 'Масло подсолнечное',
-      'prod-3': 'Молоко коровье',
-      'prod-4': 'Яйцо куриное',
+      'p-1': 'Мука пшеничная',
+      'p-2': 'Сахар-песок',
+      'p-3': 'Масло растительное',
+      'p-4': 'Молоко 3,2%',
+      'p-5': 'Яйцо куриное',
     };
     const unitMap: Record<string, string> = {
-      'prod-1': 'кг',
-      'prod-2': 'л',
-      'prod-3': 'л',
-      'prod-4': 'шт',
+      'p-1': 'кг',
+      'p-2': 'кг',
+      'p-3': 'л',
+      'p-4': 'л',
+      'p-5': 'шт',
     };
     const receipt = {
       id: `rec-${Date.now()}`,
@@ -1911,16 +1936,18 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       items: Array<{ productId: string; endingBalance: number }>;
     };
     const productMap: Record<string, string> = {
-      'prod-1': 'Мука пшеничная',
-      'prod-2': 'Масло подсолнечное',
-      'prod-3': 'Молоко коровье',
-      'prod-4': 'Яйцо куриное',
+      'p-1': 'Мука пшеничная',
+      'p-2': 'Сахар-песок',
+      'p-3': 'Масло растительное',
+      'p-4': 'Молоко 3,2%',
+      'p-5': 'Яйцо куриное',
     };
     const unitMap: Record<string, string> = {
-      'prod-1': 'кг',
-      'prod-2': 'л',
-      'prod-3': 'л',
-      'prod-4': 'шт',
+      'p-1': 'кг',
+      'p-2': 'кг',
+      'p-3': 'л',
+      'p-4': 'л',
+      'p-5': 'шт',
     };
     const balance = {
       id: `bal-${Date.now()}`,
@@ -1959,19 +1986,26 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       date: string;
       warehouseId: string;
       reason: string;
-      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
+      items: Array<{
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        series?: string;
+      }>;
     };
     const productMap: Record<string, string> = {
-      'prod-1': 'Мука пшеничная',
-      'prod-2': 'Масло подсолнечное',
-      'prod-3': 'Молоко коровье',
-      'prod-4': 'Яйцо куриное',
+      'p-1': 'Мука пшеничная',
+      'p-2': 'Сахар-песок',
+      'p-3': 'Масло растительное',
+      'p-4': 'Молоко 3,2%',
+      'p-5': 'Яйцо куриное',
     };
     const unitMap: Record<string, string> = {
-      'prod-1': 'кг',
-      'prod-2': 'л',
-      'prod-3': 'л',
-      'prod-4': 'шт',
+      'p-1': 'кг',
+      'p-2': 'кг',
+      'p-3': 'л',
+      'p-4': 'л',
+      'p-5': 'шт',
     };
     const writeOff = {
       id: `wo-${Date.now()}`,
@@ -1987,6 +2021,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         unit: unitMap[item.productId] || 'шт',
         unitPrice: item.unitPrice,
         totalPrice: item.quantity * item.unitPrice,
+        series: item.series,
       })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
