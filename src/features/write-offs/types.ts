@@ -22,6 +22,8 @@ export interface WriteOffItem {
   unit: string; // "кг", "л", "шт"
   unitPrice: number;
   totalPrice: number;
+  /** Серия (номер партии), из которой списали. */
+  series?: string;
 }
 
 /** Запрос создания списания. */
@@ -34,6 +36,7 @@ export interface CreateWriteOffRequest {
     productId: string;
     quantity: number;
     unitPrice: number;
+    series?: string;
   }>;
 }
 
