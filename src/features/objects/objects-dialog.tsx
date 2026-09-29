@@ -137,6 +137,7 @@ function DepartmentBlock({
   variant,
   department,
   diets,
+  dietsLoaded,
   index,
   onUpdate,
   onRemove,
@@ -145,6 +146,7 @@ function DepartmentBlock({
   variant: FacilityType | 'object';
   department: DepartmentForm;
   diets: DietOption[];
+  dietsLoaded: boolean;
   index: number;
   onUpdate: (index: number, patch: Partial<DepartmentForm>) => void;
   onRemove: (index: number) => void;
@@ -217,6 +219,12 @@ function DepartmentBlock({
         Рацион (должен быть выбран хотя бы один)
       </Text>
 
+      {dietsLoaded && visibleDiets.length === 0 && (
+        <Text variant="body-1" color="secondary">
+          Диет нет — добавьте их на вкладке «Диеты».
+        </Text>
+      )}
+
       <Flex gap={2} wrap>
         {visibleDiets.map((diet) => (
           <button
@@ -240,6 +248,7 @@ function SubObjectBlock({
   subObject,
   subObjectIndex,
   diets,
+  dietsLoaded,
   onUpdate,
   onRemove,
   canRemove,
@@ -247,6 +256,7 @@ function SubObjectBlock({
   subObject: SubObjectForm;
   subObjectIndex: number;
   diets: DietOption[];
+  dietsLoaded: boolean;
   onUpdate: (index: number, patch: Partial<SubObjectForm>) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
@@ -317,6 +327,7 @@ function SubObjectBlock({
           variant={subObject.type}
           department={department}
           diets={diets}
+          dietsLoaded={dietsLoaded}
           index={deptIndex}
           onUpdate={updateDepartment}
           onRemove={removeDepartment}
@@ -439,10 +450,13 @@ export function ObjectDrawer({
   object,
   mode = 'edit',
   onClose,
+  onCreated,
 }: {
   object: ObjectItem | null;
   mode?: 'edit' | 'create';
   onClose: () => void;
+  /** Вызывается с id созданного объекта — чтобы страница сразу его открыла. */
+  onCreated?: (id: string) => void;
 }) {
   const height = useDrawerHeight();
   const create = useCreateObject();
@@ -518,8 +532,9 @@ export function ObjectDrawer({
 
     if (mode === 'create') {
       create.mutate(payload, {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toaster.add({ name: 'object-created', title: 'Объект создан', theme: 'success' });
+          onCreated?.(data.id);
           requestClose();
         },
         onError: (e) =>
@@ -647,6 +662,7 @@ export function ObjectDrawer({
                 variant="object"
                 department={department}
                 diets={diets}
+                dietsLoaded={dietsQuery.data !== undefined}
                 index={departmentIndex}
                 onUpdate={updateDepartment}
                 onRemove={removeDepartment}
@@ -889,6 +905,7 @@ export function SubObjectDrawer({
               subObject={form}
               subObjectIndex={0}
               diets={diets}
+              dietsLoaded={dietsQuery.data !== undefined}
               onUpdate={updateSubObject}
               onRemove={removeDepartment}
               canRemove={!isCreate}
