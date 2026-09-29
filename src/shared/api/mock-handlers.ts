@@ -2317,16 +2317,14 @@ function roundKg(value: number): number {
 
 /**
  * Ссылка на продукт справочника по имени ингредиента ТТК.
- * Мок-ТТК пока не связывают ингредиенты с productId: подтягиваем по имени,
- * а чего нет в справочнике — считаем безымянным (килограммы).
+ * Мок-ТТК пока не связывают ингредиенты с productId, а справочник продуктов
+ * живёт на бэке: id строим из имени, единица — килограммы.
  */
 function resolveIngredientProduct(name: string): {
   id: string;
   name: string;
   unit: string;
 } {
-  const found = products.find((product) => product.name === name);
-  if (found) return { id: found.id, name: found.name, unit: found.unit };
   return { id: `ing-${name}`, name, unit: 'кг' };
 }
 
