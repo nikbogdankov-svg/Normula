@@ -1,11 +1,9 @@
 /**
- * Контракт раздела «Объекты» (ОБЪЕКТ-01…04).
- * Один объект (CateringObject) → несколько подобъектов → группы/классы → рационы/численность.
+ * Контракт раздела «Объекты» — objects.v1.ObjectsService в onemore-admin.
  *
- * Объект имеет своё меню. Подобъект может либо использовать меню объекта
- * (menuSource = 'object'), либо иметь собственное меню (menuSource = 'own').
- * Количество приёмов пищи у объекта/подобъекта может отличаться
- * (например, у школ приёмов меньше, чем в больницах).
+ * Объект и подобъект — одна структура (ObjectItem): у подобъекта заполнен
+ * parentObjectId. У каждого есть группы, у группы — рационы (диеты из
+ * справочника «Диеты»).
  */
 import type { MealId } from '@/features/menu/types';
 
@@ -13,51 +11,55 @@ import type { MealId } from '@/features/menu/types';
 export const FACILITY_TYPES = ['school', 'kindergarten', 'hospital'] as const;
 export type FacilityType = (typeof FACILITY_TYPES)[number];
 
-export function isFacilityType(value: string): value is FacilityType {
-  return (FACILITY_TYPES as readonly string[]).includes(value);
+/** Диета, выбранная рационом группы. */
+export interface GroupDiet {
+  id: string;
+  name: string;
 }
 
-/** Каталог рационов (диет) питания. */
-export const DIET_CATALOG = [
-  {
-    id: 'main',
-    label: 'Основной',
-    storageName: 'Основная',
-    appliesTo: ['school', 'kindergarten', 'hospital'],
-  },
-  {
-    id: 'gentle',
-    label: 'Щадящий',
-    storageName: 'Щадящая',
-    appliesTo: ['school', 'kindergarten', 'hospital'],
-  },
-  {
-    id: 'glutenFree',
-    label: 'Безглютеновый',
-    storageName: 'Безглютеновая',
-    appliesTo: ['school', 'kindergarten', 'hospital'],
-  },
-  {
-    id: 'lactoseFree',
-    label: 'Безлактозный',
-    storageName: 'Безлактозная',
-    appliesTo: ['school', 'kindergarten', 'hospital'],
-  },
-  {
-    id: 'diabetic',
-    label: 'Диабетический',
-    storageName: 'Диабетическая',
-    appliesTo: ['school', 'kindergarten', 'hospital'],
-  },
-  {
-    id: 'vegetarian',
-    label: 'Вегетарианский',
-    storageName: 'Вегетарианская',
-    appliesTo: ['school', 'kindergarten'],
-  },
-] as const;
+/** Группа/класс объекта. */
+export interface ObjectGroup {
+  id: string;
+  name: string;
+  diets: GroupDiet[];
+}
 
-export type DietTypeId = (typeof DIET_CATALOG)[number]['id'];
+/** Объект или подобъект: у подобъекта заполнен parentObjectId, у объекта — пусто. */
+export interface ObjectItem {
+  id: string;
+  parentObjectId: string;
+  name: string;
+  type: FacilityType;
+  groups: ObjectGroup[];
+}
+
+export interface ListObjectsResponse {
+  objects: ObjectItem[];
+}
+
+/** Группа в запросе сохранения: группы заменяются целиком. */
+export interface ObjectGroupInput {
+  name: string;
+  dietIds: string[];
+}
+
+/** Тело PATCH /v1/objects/:id. */
+export interface UpdateObjectRequest {
+  name: string;
+  type: FacilityType;
+  groups: ObjectGroupInput[];
+}
+
+/** Тело POST /v1/objects; с parentObjectId создаётся подобъект. */
+export interface CreateObjectRequest extends UpdateObjectRequest {
+  parentObjectId?: string;
+}
+
+/*
+ * Ниже — форма мок-объектов для разделов, которые ещё на моках (меню,
+ * порционник, склад, раскладка продуктов): см. useMockCateringObjects.
+ * Удаляется вместе с их моками.
+ */
 
 /** Источник меню подобъекта: меню объекта или собственное. */
 export type MenuSource = 'object' | 'own';
@@ -116,84 +118,4 @@ export interface CateringObject {
 
 export interface CateringObjectsResponse {
   objects: CateringObject[];
-}
-
-export interface UpdateTableHeadcountRequest {
-  objectId: string;
-  subObjectId: string;
-  departmentId: string;
-  tableId: string;
-  headcount: number;
-}
-
-/** Тело PATCH /v1/objects/sub-objects/:id — структура подобъекта без численности. */
-export interface UpdateSubObjectRequest {
-  name: string;
-  address: string;
-  type: FacilityType;
-  kettleNumber: number;
-  menuSource: MenuSource;
-  menuId?: string;
-  mealIds?: MealId[];
-  departments: Array<{
-    id: string;
-    name: string;
-    mealIds?: MealId[];
-    tables: Array<{
-      id: string;
-      name: string;
-    }>;
-  }>;
-}
-
-/** Обновление меню/приёмов объекта или подобъекта. */
-export interface UpdateObjectMenuRequest {
-  objectId?: string;
-  subObjectId?: string;
-  menuId?: string;
-  mealIds: MealId[];
-}
-
-/** Группа/класс с рационами при создании/обновлении объекта. */
-export interface ObjectDepartmentRequest {
-  id: string;
-  name: string;
-  tables: Array<{
-    id: string;
-    name: string;
-  }>;
-}
-
-/** Создание объекта: название + тип + своё меню + группы/рационы.
- *
- * Приёмы пищи задаются в диетах, а не у объекта — объекту они не передаются. */
-export interface CreateObjectRequest {
-  name: string;
-  /** Тип объекта: школа / детский сад / больница. */
-  type: FacilityType;
-  menuId?: string;
-  departments: ObjectDepartmentRequest[];
-}
-
-/** Обновление объекта. */
-export type UpdateObjectRequest = CreateObjectRequest;
-
-/** Строка выхода на раздачу (ОБЪЕКТ-04). */
-export interface DistributionRow {
-  dishName: string;
-  objectName: string;
-  subObjectName: string;
-  departmentName: string;
-  tableName: string;
-  kettleLabel: string;
-  portions: number;
-}
-
-export interface DistributionPreviewResponse {
-  rows: DistributionRow[];
-  totalPortions: number;
-}
-
-export function formatKettle(kettleNumber: number): string {
-  return `Котел ${kettleNumber}`;
 }

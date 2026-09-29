@@ -132,16 +132,8 @@ export function DietDialog({
       { id: view.id, mode: deletionMode },
       {
         onSuccess: () => {
-          toaster.add(
-            deletionMode === 'immediate'
-              ? { name: 'diet-deleted', title: 'Диета удалена', theme: 'success' }
-              : {
-                  name: 'diet-deleted',
-                  title: 'Диета удалена',
-                  content: 'Останется в объектах и меню до конца периода',
-                  theme: 'success',
-                }
-          );
+          // Режим уходит на бэкенд, но пока не различается.
+          toaster.add({ name: 'diet-deleted', title: 'Диета удалена', theme: 'success' });
           requestClose();
         },
         onError: (e) =>

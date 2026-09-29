@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, Magnifier } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { useApi } from '@/shared/api/use-api';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import { useBalances } from './api';
 import './warehouse-balances-route.css';
 
@@ -24,7 +24,7 @@ interface ProductBalanceCard {
 
 export function WarehouseBalancesRoute() {
   const api = useApi();
-  const objects = useCateringObjects();
+  const objects = useMockCateringObjects();
   const [warehouseId, setWarehouseId] = useState('');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());

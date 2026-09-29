@@ -10,36 +10,26 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
+import { useDiets } from '@/features/diets/api';
+import type { Diet } from '@/features/diets/types';
+import { useCreateObject, useDeleteObject, useUpdateObject, type ObjectDeleteMode } from './api';
 import {
-  useCreateObject,
-  useCreateSubObject,
-  useDeleteObject,
-  useDeleteSubObject,
-  useUpdateObject,
-  useUpdateSubObject,
-  type ObjectDeleteMode,
-} from './api';
-import {
-  DIET_CATALOG,
-  type CateringObject,
-  type CreateObjectRequest,
-  type DietTypeId,
   type FacilityType,
-  type SubObject,
-  type UpdateSubObjectRequest,
+  type ObjectGroup,
+  type ObjectGroupInput,
+  type ObjectItem,
 } from './types';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './kitchen-drawer.css';
 
 type DepartmentForm = {
-  id: string;
+  /** Ключ для React: id группы или временный для новой. */
+  key: string;
   name: string;
-  selectedTypes: DietTypeId[];
-  tableIds: Partial<Record<DietTypeId, string>>;
+  dietIds: string[];
 };
 
 type SubObjectForm = {
-  id: string;
   type: FacilityType;
   name: string;
   departments: DepartmentForm[];
@@ -48,159 +38,105 @@ type SubObjectForm = {
 type ObjectForm = {
   name: string;
   type: FacilityType;
-  menuId?: string;
   departments: DepartmentForm[];
 };
 
-function tableNameToTypeId(name: string): DietTypeId | null {
-  const normalized = name.toLowerCase();
-  const match = DIET_CATALOG.find((item) => normalized.includes(item.storageName.toLowerCase()));
-  return match?.id ?? null;
+/** Диета для выбора рационом: из справочника или уже выбранная в группе. */
+type DietOption = {
+  id: string;
+  name: string;
+  /** Для каких учреждений доступна; null — диеты уже нет в справочнике. */
+  appliesTo: FacilityType[] | null;
+};
+
+/**
+ * Диеты справочника плюс выбранные в группах объекта, которых в справочнике
+ * уже нет: иначе такой рацион не был бы виден в форме.
+ */
+function dietOptions(diets: Diet[], groups: ObjectGroup[]): DietOption[] {
+  const options: DietOption[] = diets.map((diet) => ({
+    id: diet.id,
+    name: diet.name,
+    appliesTo: diet.appliesTo,
+  }));
+  for (const diet of groups.flatMap((group) => group.diets)) {
+    if (!options.some((option) => option.id === diet.id)) {
+      options.push({ id: diet.id, name: diet.name, appliesTo: null });
+    }
+  }
+  return options;
 }
 
 const emptyDepartment = (): DepartmentForm => ({
-  id: `dep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  key: `dep-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   name: '',
-  selectedTypes: ['main'],
-  tableIds: {},
+  dietIds: [],
 });
 
 const emptySubObject = (): SubObjectForm => ({
-  id: `sobj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   type: 'school',
   name: '',
   departments: [emptyDepartment()],
 });
 
-function departmentsToForm(departments: CateringObject['departments']): DepartmentForm[] {
-  return departments.map((department) => {
-    const tableIds: Partial<Record<DietTypeId, string>> = {};
-    const selectedTypes: DietTypeId[] = [];
-
-    for (const table of department.tables) {
-      const typeId = tableNameToTypeId(table.name);
-      if (typeId && !selectedTypes.includes(typeId)) {
-        selectedTypes.push(typeId);
-        tableIds[typeId] = table.id;
-      }
-    }
-
-    if (selectedTypes.length === 0 && department.tables.length > 0) {
-      selectedTypes.push('main');
-      tableIds.main = department.tables[0].id;
-    }
-
-    return {
-      id: department.id,
-      name: department.name,
-      selectedTypes,
-      tableIds,
-    };
-  });
+function groupsToForm(groups: ObjectGroup[]): DepartmentForm[] {
+  return groups.map((group) => ({
+    key: group.id,
+    name: group.name,
+    dietIds: group.diets.map((diet) => diet.id),
+  }));
 }
 
-function subObjectToForm(subObject: SubObject): SubObjectForm {
-  return {
-    id: subObject.id,
-    type: subObject.type,
-    name: subObject.name,
-    departments: departmentsToForm(subObject.departments),
-  };
+function formToGroups(departments: DepartmentForm[]): ObjectGroupInput[] {
+  return departments.map((department) => ({
+    name: department.name.trim(),
+    dietIds: department.dietIds,
+  }));
 }
 
-function objectToForm(object: CateringObject): ObjectForm {
+function toForm(object: ObjectItem): ObjectForm {
   return {
     name: object.name,
     type: object.type,
-    menuId: object.menuId,
-    departments: departmentsToForm(object.departments),
-  };
-}
-
-function departmentsFormHasChanges(
-  formDepartments: DepartmentForm[],
-  originalDepartments: CateringObject['departments']
-): boolean {
-  if (formDepartments.length !== originalDepartments.length) return true;
-
-  for (let i = 0; i < formDepartments.length; i++) {
-    const formDept = formDepartments[i];
-    const origDept = originalDepartments.find((d) => d.id === formDept.id);
-    if (!origDept) return true;
-    if (formDept.name.trim() !== origDept.name) return true;
-    if (formDept.selectedTypes.length !== origDept.tables.length) return true;
-  }
-
-  return false;
-}
-
-function subObjectFormToPatch(form: SubObjectForm, original: SubObject): UpdateSubObjectRequest {
-  return {
-    name: form.name.trim(),
-    address: original.address,
-    type: form.type,
-    kettleNumber: original.kettleNumber,
-    menuSource: original.menuSource,
-    menuId: original.menuId,
-    departments: form.departments.map((department) => ({
-      id: department.id,
-      name: department.name.trim(),
-      tables: department.selectedTypes.map((typeId) => {
-        const type = DIET_CATALOG.find((item) => item.id === typeId)!;
-        return {
-          id:
-            department.tableIds[typeId] ??
-            `tbl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          name: type.storageName,
-        };
-      }),
-    })),
+    departments: groupsToForm(object.groups),
   };
 }
 
 function isObjectFormReady(form: ObjectForm): boolean {
   if (!form.name.trim()) return false;
   return form.departments.every(
-    (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
+    (department) => department.name.trim() !== '' && department.dietIds.length > 0
   );
 }
 
-function isSubObjectsFormReady(subObjects: SubObjectForm[]): boolean {
-  return subObjects.every(
-    (subObject) =>
-      subObject.name.trim() !== '' &&
-      subObject.departments.length > 0 &&
-      subObject.departments.every(
-        (department) => department.name.trim() !== '' && department.selectedTypes.length > 0
-      )
-  );
+function isSubObjectFormReady(form: SubObjectForm): boolean {
+  return form.departments.length > 0 && isObjectFormReady(form);
 }
 
-function hasObjectChanges(form: ObjectForm, original: CateringObject): boolean {
-  if (form.name.trim() !== original.name) return true;
-  if (form.type !== original.type) return true;
-  return departmentsFormHasChanges(form.departments, original.departments);
+/** Одинаковые ли группы: порядок диет в группе значения не имеет. */
+function sameGroups(form: DepartmentForm[], original: ObjectGroup[]): boolean {
+  if (form.length !== original.length) return false;
+  return form.every((department, i) => {
+    const group = original[i];
+    const formDiets = [...department.dietIds].sort().join();
+    const groupDiets = group.diets
+      .map((diet) => diet.id)
+      .sort()
+      .join();
+    return department.name.trim() === group.name && formDiets === groupDiets;
+  });
 }
 
-function hasSubObjectChanges(form: SubObjectForm, original: SubObject): boolean {
+function hasChanges(form: ObjectForm, original: ObjectItem): boolean {
   if (form.name.trim() !== original.name) return true;
   if (form.type !== original.type) return true;
-  if (form.departments.length !== original.departments.length) return true;
-
-  for (let j = 0; j < form.departments.length; j++) {
-    const deptForm = form.departments[j];
-    const deptOrig = original.departments.find((d) => d.id === deptForm.id);
-    if (!deptOrig) return true;
-    if (deptForm.name.trim() !== deptOrig.name) return true;
-    if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
-  }
-
-  return false;
+  return !sameGroups(form.departments, original.groups);
 }
 
 function DepartmentBlock({
   variant,
   department,
+  diets,
   index,
   onUpdate,
   onRemove,
@@ -208,6 +144,7 @@ function DepartmentBlock({
 }: {
   variant: FacilityType | 'object';
   department: DepartmentForm;
+  diets: DietOption[];
   index: number;
   onUpdate: (index: number, patch: Partial<DepartmentForm>) => void;
   onRemove: (index: number) => void;
@@ -229,24 +166,31 @@ function DepartmentBlock({
         ? 'Старшая группа'
         : 'Терапия';
 
-  const toggleTableType = (typeId: DietTypeId) => {
-    const selected = department.selectedTypes.includes(typeId);
+  // Выбранные видны всегда; невыбранные — только подходящие типу учреждения.
+  const visibleDiets = diets.filter(
+    (diet) =>
+      department.dietIds.includes(diet.id) ||
+      (diet.appliesTo !== null && (isObject || diet.appliesTo.includes(variant)))
+  );
+
+  const toggleDiet = (dietId: string) => {
+    const selected = department.dietIds.includes(dietId);
 
     if (selected) {
-      if (department.selectedTypes.length <= 1) return;
+      if (department.dietIds.length <= 1) return;
       onUpdate(index, {
-        selectedTypes: department.selectedTypes.filter((item) => item !== typeId),
+        dietIds: department.dietIds.filter((item) => item !== dietId),
       });
       return;
     }
 
     onUpdate(index, {
-      selectedTypes: [...department.selectedTypes, typeId],
+      dietIds: [...department.dietIds, dietId],
     });
   };
 
   return (
-    <Flex key={department.id} direction="column" gap={2} className="kitchen-drawer__department">
+    <Flex key={department.key} direction="column" gap={2} className="kitchen-drawer__department">
       <Flex gap={2} alignItems="flex-end">
         <TextInput
           size="l"
@@ -274,19 +218,17 @@ function DepartmentBlock({
       </Text>
 
       <Flex gap={2} wrap>
-        {DIET_CATALOG.filter((item) =>
-          isObject ? true : (item.appliesTo as readonly string[]).includes(variant)
-        ).map((type) => (
+        {visibleDiets.map((diet) => (
           <button
-            key={type.id}
+            key={diet.id}
             type="button"
             className={`objects-table-chip${
-              department.selectedTypes.includes(type.id) ? ' objects-table-chip_selected' : ''
+              department.dietIds.includes(diet.id) ? ' objects-table-chip_selected' : ''
             }`}
-            onClick={() => toggleTableType(type.id)}
+            onClick={() => toggleDiet(diet.id)}
           >
-            {department.selectedTypes.includes(type.id) && <Icon data={Check} size={14} />}
-            {type.label}
+            {department.dietIds.includes(diet.id) && <Icon data={Check} size={14} />}
+            {diet.name}
           </button>
         ))}
       </Flex>
@@ -297,12 +239,14 @@ function DepartmentBlock({
 function SubObjectBlock({
   subObject,
   subObjectIndex,
+  diets,
   onUpdate,
   onRemove,
   canRemove,
 }: {
   subObject: SubObjectForm;
   subObjectIndex: number;
+  diets: DietOption[];
   onUpdate: (index: number, patch: Partial<SubObjectForm>) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
@@ -346,11 +290,8 @@ function SubObjectBlock({
                 type: nextType,
                 departments: subObject.departments.map((department) => ({
                   ...department,
-                  selectedTypes: department.selectedTypes.filter((id) =>
-                    (
-                      DIET_CATALOG.find((item) => item.id === id)?.appliesTo as
-                        readonly string[] | undefined
-                    )?.includes(nextType)
+                  dietIds: department.dietIds.filter((id) =>
+                    diets.find((item) => item.id === id)?.appliesTo?.includes(nextType)
                   ),
                 })),
               });
@@ -372,9 +313,10 @@ function SubObjectBlock({
 
       {subObject.departments.map((department, deptIndex) => (
         <DepartmentBlock
-          key={department.id}
+          key={department.key}
           variant={subObject.type}
           department={department}
+          diets={diets}
           index={deptIndex}
           onUpdate={updateDepartment}
           onRemove={removeDepartment}
@@ -498,7 +440,7 @@ export function ObjectDrawer({
   mode = 'edit',
   onClose,
 }: {
-  object: CateringObject | null;
+  object: ObjectItem | null;
   mode?: 'edit' | 'create';
   onClose: () => void;
 }) {
@@ -506,6 +448,8 @@ export function ObjectDrawer({
   const create = useCreateObject();
   const update = useUpdateObject();
   const removeObject = useDeleteObject();
+  const dietsQuery = useDiets();
+  const diets = dietOptions(dietsQuery.data?.diets ?? [], object?.groups ?? []);
   const toaster = useToaster();
   const [form, setForm] = useState<ObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
@@ -521,11 +465,10 @@ export function ObjectDrawer({
       setForm({
         name: '',
         type: 'school',
-        menuId: undefined,
         departments: [emptyDepartment()],
       });
     } else if (object) {
-      setForm(objectToForm(object));
+      setForm(toForm(object));
     }
     setConfirmingDelete(false);
     setMounted(true);
@@ -567,23 +510,10 @@ export function ObjectDrawer({
   const submit = () => {
     if (!form || !isObjectFormReady(form)) return;
 
-    const payload: CreateObjectRequest = {
+    const payload = {
       name: form.name.trim(),
       type: form.type,
-      menuId: form.menuId ?? undefined,
-      departments: form.departments.map((department) => ({
-        id: department.id,
-        name: department.name.trim(),
-        tables: department.selectedTypes.map((typeId) => {
-          const type = DIET_CATALOG.find((item) => item.id === typeId)!;
-          return {
-            id:
-              department.tableIds[typeId] ??
-              `tbl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: type.storageName,
-          };
-        }),
-      })),
+      groups: formToGroups(form.departments),
     };
 
     if (mode === 'create') {
@@ -606,7 +536,7 @@ export function ObjectDrawer({
     if (!object) return;
 
     update.mutate(
-      { id: object.id, patch: payload },
+      { id: object.id, body: payload },
       {
         onSuccess: () => {
           toaster.add({
@@ -630,7 +560,7 @@ export function ObjectDrawer({
   if (!mounted || !form) return null;
 
   const ready = isObjectFormReady(form);
-  const changed = object ? hasObjectChanges(form, object) : false;
+  const changed = object ? hasChanges(form, object) : false;
 
   const runDelete = (deletionMode: ObjectDeleteMode) => {
     if (!object) return;
@@ -639,16 +569,8 @@ export function ObjectDrawer({
       { id: object.id, mode: deletionMode },
       {
         onSuccess: () => {
-          toaster.add(
-            deletionMode === 'immediate'
-              ? { name: 'object-deleted', title: 'Объект удалён', theme: 'success' }
-              : {
-                  name: 'object-deleted',
-                  title: 'Объект удалён',
-                  content: 'Останется в порционнике и меню до конца периода',
-                  theme: 'success',
-                }
-          );
+          // Режим уходит на бэкенд, но пока не различается.
+          toaster.add({ name: 'object-deleted', title: 'Объект удалён', theme: 'success' });
           requestClose();
         },
         onError: (e) =>
@@ -721,9 +643,10 @@ export function ObjectDrawer({
 
             {form.departments.map((department, departmentIndex) => (
               <DepartmentBlock
-                key={department.id}
+                key={department.key}
                 variant="object"
                 department={department}
+                diets={diets}
                 index={departmentIndex}
                 onUpdate={updateDepartment}
                 onRemove={removeDepartment}
@@ -796,18 +719,21 @@ export function ObjectDrawer({
 /** Drawer одного подобъекта: создание по одному (имя + тип) или редактирование
  *  выбранного (название, тип, группы/отделения с рационами, удаление). */
 export function SubObjectDrawer({
-  object,
+  parent,
   subObject,
   onClose,
 }: {
-  object: CateringObject | null;
-  subObject: SubObject | null;
+  /** Объект, которому принадлежит подобъект; null — окно закрыто. */
+  parent: ObjectItem | null;
+  subObject: ObjectItem | null;
   onClose: () => void;
 }) {
   const height = useDrawerHeight();
-  const createSubObject = useCreateSubObject();
-  const update = useUpdateSubObject();
-  const deleteSubObject = useDeleteSubObject();
+  const createSubObject = useCreateObject();
+  const update = useUpdateObject();
+  const deleteSubObject = useDeleteObject();
+  const dietsQuery = useDiets();
+  const diets = dietOptions(dietsQuery.data?.diets ?? [], subObject?.groups ?? []);
   const toaster = useToaster();
   const [form, setForm] = useState<SubObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
@@ -818,16 +744,16 @@ export function SubObjectDrawer({
   const subtitle = subObject ? `Подобъект «${subObject.name}»` : 'Новый подобъект';
 
   useEffect(() => {
-    if (!object) {
+    if (!parent) {
       setVisible(false);
       return;
     }
-    setForm(subObject ? subObjectToForm(subObject) : emptySubObject());
+    setForm(subObject ? toForm(subObject) : emptySubObject());
     setConfirmingDelete(false);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, [object, subObject]);
+  }, [parent, subObject]);
 
   useEffect(() => {
     if (visible || !mounted) return;
@@ -855,9 +781,9 @@ export function SubObjectDrawer({
   };
 
   const create = () => {
-    if (!form || !object || !form.name.trim()) return;
+    if (!form || !parent || !form.name.trim()) return;
     createSubObject.mutate(
-      { objectId: object.id, name: form.name, type: form.type },
+      { parentObjectId: parent.id, name: form.name.trim(), type: form.type, groups: [] },
       {
         onSuccess: () => {
           toaster.add({ name: 'subobject-created', title: 'Подобъект добавлен', theme: 'success' });
@@ -875,10 +801,13 @@ export function SubObjectDrawer({
   };
 
   const submitEdit = () => {
-    if (!form || !subObject || !isSubObjectsFormReady([form])) return;
+    if (!form || !subObject || !isSubObjectFormReady(form)) return;
 
     update.mutate(
-      { id: subObject.id, patch: subObjectFormToPatch(form, subObject) },
+      {
+        id: subObject.id,
+        body: { name: form.name.trim(), type: form.type, groups: formToGroups(form.departments) },
+      },
       {
         onSuccess: () => {
           toaster.add({
@@ -906,16 +835,8 @@ export function SubObjectDrawer({
       { id: subObject.id, mode: deletionMode },
       {
         onSuccess: () => {
-          toaster.add(
-            deletionMode === 'immediate'
-              ? { name: 'subobject-deleted', title: 'Подобъект удалён', theme: 'success' }
-              : {
-                  name: 'subobject-deleted',
-                  title: 'Подобъект удалён',
-                  content: 'Останется в порционнике и меню до конца периода',
-                  theme: 'success',
-                }
-          );
+          // Режим уходит на бэкенд, но пока не различается.
+          toaster.add({ name: 'subobject-deleted', title: 'Подобъект удалён', theme: 'success' });
           requestClose();
         },
         onError: (e) =>
@@ -929,11 +850,11 @@ export function SubObjectDrawer({
     );
   };
 
-  if (!mounted || !form || !object) return null;
+  if (!mounted || !form || !parent) return null;
 
   const nameReady = form.name.trim() !== '';
-  const ready = isCreate ? nameReady : isSubObjectsFormReady([form]);
-  const changed = subObject ? hasSubObjectChanges(form, subObject) : false;
+  const ready = isCreate ? nameReady : isSubObjectFormReady(form);
+  const changed = subObject ? hasChanges(form, subObject) : false;
 
   return (
     <Drawer
@@ -992,6 +913,7 @@ export function SubObjectDrawer({
               <SubObjectBlock
                 subObject={form}
                 subObjectIndex={0}
+                diets={diets}
                 onUpdate={updateSubObject}
                 onRemove={removeDepartment}
                 canRemove
