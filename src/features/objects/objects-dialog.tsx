@@ -781,9 +781,14 @@ export function SubObjectDrawer({
   };
 
   const create = () => {
-    if (!form || !parent || !form.name.trim()) return;
+    if (!form || !parent || !isSubObjectFormReady(form)) return;
     createSubObject.mutate(
-      { parentObjectId: parent.id, name: form.name.trim(), type: form.type, groups: [] },
+      {
+        parentObjectId: parent.id,
+        name: form.name.trim(),
+        type: form.type,
+        groups: formToGroups(form.departments),
+      },
       {
         onSuccess: () => {
           toaster.add({ name: 'subobject-created', title: 'Подобъект добавлен', theme: 'success' });
@@ -852,8 +857,7 @@ export function SubObjectDrawer({
 
   if (!mounted || !form || !parent) return null;
 
-  const nameReady = form.name.trim() !== '';
-  const ready = isCreate ? nameReady : isSubObjectFormReady(form);
+  const ready = isSubObjectFormReady(form);
   const changed = subObject ? hasChanges(form, subObject) : false;
 
   return (
@@ -880,46 +884,16 @@ export function SubObjectDrawer({
         </div>
 
         <div className="kitchen-drawer__body">
-          {isCreate ? (
-            <Flex gap={2} alignItems="flex-end">
-              <TextInput
-                size="l"
-                label="Название подобъекта:"
-                placeholder="Школа №1"
-                value={form.name}
-                onUpdate={(value) =>
-                  setForm((current) => (current ? { ...current, name: value } : current))
-                }
-                autoFocus
-                style={{ flex: 1 }}
-              />
-              <Select
-                size="l"
-                width={200}
-                value={[form.type]}
-                options={[
-                  { value: 'school', content: 'Школа' },
-                  { value: 'kindergarten', content: 'Детский сад' },
-                  { value: 'hospital', content: 'Больница' },
-                ]}
-                onUpdate={(newValue) => {
-                  const nextType = newValue[0] as FacilityType;
-                  setForm((current) => (current ? { ...current, type: nextType } : current));
-                }}
-              />
-            </Flex>
-          ) : (
-            <Flex direction="column" gap={3}>
-              <SubObjectBlock
-                subObject={form}
-                subObjectIndex={0}
-                diets={diets}
-                onUpdate={updateSubObject}
-                onRemove={removeDepartment}
-                canRemove
-              />
-            </Flex>
-          )}
+          <Flex direction="column" gap={3}>
+            <SubObjectBlock
+              subObject={form}
+              subObjectIndex={0}
+              diets={diets}
+              onUpdate={updateSubObject}
+              onRemove={removeDepartment}
+              canRemove={!isCreate}
+            />
+          </Flex>
         </div>
 
         <div className="kitchen-drawer__footer">
