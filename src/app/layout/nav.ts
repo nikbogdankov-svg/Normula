@@ -1,13 +1,10 @@
 import {
   Archive,
   ArrowLeftFromLine,
-  ArrowRightArrowLeft,
   ArrowRightToLine,
   Box,
-  Calendar,
   Cubes3Overlap,
   BookOpen,
-  Files,
   FileText,
   Gear,
   Heart,
@@ -15,6 +12,7 @@ import {
   ListCheck,
   Person,
   Receipt,
+  ShoppingBasket,
   SquareListUl,
   Wallet,
 } from '@gravity-ui/icons';
@@ -56,19 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/app/menu', label: 'Меню', icon: SquareListUl },
       { to: '/app/portions', label: 'Порционник', icon: Receipt },
       { to: '/app/ttk', label: 'ТТК', icon: FileText },
-    ],
-  },
-  {
-    title: 'Производство',
-    items: [
-      { to: '/app/cooking-plan', label: 'План приготовления', icon: Calendar, wip: true },
-      { to: '/app/products-layout', label: 'Раскладка продуктов', icon: Box, wip: true },
-      {
-        to: '/app/dishes-distribution',
-        label: 'Распределение блюд',
-        icon: ArrowRightArrowLeft,
-        wip: true,
-      },
+      { to: '/app/products-spread', label: 'Раскладка продуктов', icon: ShoppingBasket },
     ],
   },
   {
@@ -84,11 +70,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [{ to: '/app/accounts', label: 'Счета', icon: Wallet, wip: true }],
   },
   {
-    title: 'Документы',
-    items: [
-      { to: '/app/journals', label: 'Журналы', icon: BookOpen },
-      { to: '/app/documents', label: 'Документы', icon: Files, wip: true },
-    ],
+    title: 'Журналы',
+    items: [{ to: '/app/journals', label: 'Журналы', icon: BookOpen }],
   },
   {
     title: 'Справочники',

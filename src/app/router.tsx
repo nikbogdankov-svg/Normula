@@ -21,6 +21,7 @@ import { JournalsRoute } from '@/features/journals/journals-route';
 import { WarehouseReceiptsRoute } from '@/features/warehouse-receipts/warehouse-receipts-route';
 import { WarehouseBalancesRoute } from '@/features/warehouse-balances/warehouse-balances-route';
 import { WriteOffsRoute } from '@/features/write-offs/write-offs-route';
+import { ProductsSpreadRoute } from '@/features/products-spread/products-spread-route';
 import { AccountsRoute } from '@/features/accounts/accounts-route';
 import { ProductsRoute } from '@/features/products/products-route';
 
@@ -44,6 +45,7 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
   '/app/warehouse-receipts': <WarehouseReceiptsRoute />,
   '/app/warehouse-balances': <WarehouseBalancesRoute />,
   '/app/write-offs': <WriteOffsRoute />,
+  '/app/products-spread': <ProductsSpreadRoute />,
   '/app/accounts': <AccountsRoute />,
   '/app/products': <ProductsRoute />,
 };
