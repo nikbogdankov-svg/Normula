@@ -16,9 +16,9 @@ import { useApi } from '@/shared/api/use-api';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import type { CateringObject } from '@/features/objects/types';
-import { useDiets } from '@/features/diets/api';
+import { useMockDiets } from '@/features/diets/api';
 import type { Diet } from '@/features/diets/types';
 import {
   formatDateRange,
@@ -186,8 +186,8 @@ function MenuByDates({
   const { data, isPending, isError, error, refetch } = useMenu(menuId);
   const updateMenu = useUpdateMenu(menuId);
   const updateSlot = useUpdateMenuSlot(menuId);
-  const diets = useDiets();
-  const objects = useCateringObjects();
+  const diets = useMockDiets();
+  const objects = useMockCateringObjects();
   const toaster = useToaster();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
   const [objectId, setObjectId] = useState<string | null>(null);

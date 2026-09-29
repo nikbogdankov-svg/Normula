@@ -29,7 +29,7 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import type { SubObject } from '@/features/objects/types';
 import { useInfiniteRecipes } from '@/features/ttk/api';
 import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
@@ -57,7 +57,7 @@ function kilogramsOf(portions: number, grams: number | null): number | null {
  */
 export function PortionsRoute() {
   const { current } = useOrganizations();
-  const objects = useCateringObjects();
+  const objects = useMockCateringObjects();
   // Дата живёт в адресе страницы: перезагрузка или редирект (например,
   // обновление токена Logto) не сбрасывают выбор на сегодня.
   const [searchParams, setSearchParams] = useSearchParams();

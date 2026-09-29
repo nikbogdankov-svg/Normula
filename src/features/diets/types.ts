@@ -6,8 +6,7 @@ import type { FacilityType } from '@/features/objects/types';
  *
  * Диеты создаются здесь и используются в других местах (объекты и меню):
  * там ссылаются на диету по id, а название берут из этого справочника.
- * Бэкенда под него пока нет — эндпоинты описаны здесь и реализованы
- * в mock-handlers, как и у других справочников.
+ * Бэкенд — diets.v1.DietsService в onemore-admin (/v1/diets).
  */
 
 /** Диета (рацион питания) организации. */
@@ -33,8 +32,6 @@ export interface Diet {
 
 export interface ListDietsResponse {
   diets: Diet[];
-  /** Используется ли диета в объектах/меню (для подсказки при удалении). */
-  usedIn: Record<string, boolean>;
 }
 
 export interface CreateDietRequest {

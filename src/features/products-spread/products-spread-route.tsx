@@ -5,7 +5,7 @@ import { dateTime } from '@gravity-ui/date-utils';
 import { Button, Dialog, Flex, Icon, Select, Text, TextInput, Table } from '@gravity-ui/uikit';
 import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, Magnifier, Printer } from '@gravity-ui/icons';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -46,7 +46,7 @@ function formatQuantity(quantity: number, unit: string): string {
 /** Раскладка продуктов на день: тулбар закреплён, скроллится таблица. */
 export function ProductsSpreadRoute() {
   const { current } = useOrganizations();
-  const objects = useCateringObjects();
+  const objects = useMockCateringObjects();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawDate = searchParams.get('date');
   const date = ISO_DATE_RE.test(rawDate ?? '') ? (rawDate as string) : todayIso();

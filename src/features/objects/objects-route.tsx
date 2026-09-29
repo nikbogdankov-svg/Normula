@@ -8,9 +8,9 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useCateringObjects } from './api';
+import { useObjects } from './api';
 import { ObjectDrawer, SubObjectDrawer } from './objects-dialog';
-import { type CateringObject, type FacilityType, type SubObject } from './types';
+import { type FacilityType, type ObjectItem } from './types';
 import './objects-route.css';
 
 const FACILITY_TYPE_LABELS: Record<FacilityType, string> = {
@@ -36,8 +36,8 @@ function groupRowClassNames(row: {
   return classes;
 }
 
-/** Строки таблицы отделений одного подобъекта. */
-function departmentRows(subObject: SubObject): Array<{
+/** Строки таблицы групп объекта или подобъекта: по строке на рацион группы. */
+function groupRows(object: ObjectItem | null): Array<{
   id: string;
   departmentId: string;
   departmentName: string;
@@ -53,15 +53,17 @@ function departmentRows(subObject: SubObject): Array<{
     showDepartment: boolean;
     isLastInDepartment: boolean;
   }> = [];
-  for (const department of subObject.departments) {
-    for (const table of department.tables) {
+  for (const group of object?.groups ?? []) {
+    // Группа без рационов — всё равно строка, иначе она пропала бы из таблицы.
+    const diets = group.diets.length > 0 ? group.diets : [{ id: '', name: '' }];
+    for (const diet of diets) {
       const prevRow = result[result.length - 1];
-      const showDepartment = !prevRow || prevRow.departmentId !== department.id;
+      const showDepartment = !prevRow || prevRow.departmentId !== group.id;
       result.push({
-        id: table.id,
-        departmentId: department.id,
-        departmentName: department.name,
-        tableName: table.name,
+        id: `${group.id}:${diet.id}`,
+        departmentId: group.id,
+        departmentName: group.name,
+        tableName: diet.name,
         showDepartment,
         isLastInDepartment: false,
       });
@@ -75,13 +77,12 @@ function departmentRows(subObject: SubObject): Array<{
 }
 
 /**
- * «Объекты»: справочник объект → подобъект → отделения → столы.
- * Численность на дату — в «Порционнике».
- * У объекта своё меню; у подобъекта — меню объекта либо собственное.
+ * «Объекты»: объект → подобъекты; у каждого свои группы с рационами.
+ * Объект и подобъект — одна структура, у подобъекта задан parentObjectId.
  */
 export function ObjectsRoute() {
   const { current } = useOrganizations();
-  const objects = useCateringObjects();
+  const objects = useObjects();
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
 
   if (current === null) {
@@ -108,14 +109,14 @@ export function ObjectsRoute() {
     );
   }
 
-  const objectList = objects.data.objects;
+  const objectList = objects.data.objects.filter((o) => !o.parentObjectId);
   const activeObjectId =
     selectedObjectId && objectList.some((o) => o.id === selectedObjectId)
       ? selectedObjectId
       : (objectList[0]?.id ?? null);
-  const subObjects = activeObjectId
-    ? (objectList.find((o) => o.id === activeObjectId)?.subObjects ?? [])
-    : objectList.flatMap((o) => o.subObjects);
+  const subObjects = objects.data.objects.filter(
+    (o) => activeObjectId !== null && o.parentObjectId === activeObjectId
+  );
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
@@ -130,8 +131,8 @@ export function ObjectsRoute() {
 }
 
 /** Секция одного подобъекта: шапка (название + тип) и таблица отделений. */
-function SubObjectSection({ subObject, onEdit }: { subObject: SubObject; onEdit: () => void }) {
-  const rows = useMemo(() => departmentRows(subObject), [subObject]);
+function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit: () => void }) {
+  const rows = useMemo(() => groupRows(subObject), [subObject]);
 
   return (
     <Card view="filled" style={{ padding: 0 }}>
@@ -206,8 +207,8 @@ function SubObjectsCard({
   selectedObjectId,
   onSelectObject,
 }: {
-  objects: CateringObject[];
-  subObjects: SubObject[];
+  objects: ObjectItem[];
+  subObjects: ObjectItem[];
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
 }) {
@@ -217,39 +218,10 @@ function SubObjectsCard({
   const [editingSubObjectId, setEditingSubObjectId] = useState<string | null>(null);
 
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? objects[0] ?? null;
-  const editingSubObject =
-    selectedObject?.subObjects.find((s) => s.id === editingSubObjectId) ?? null;
+  const editingSubObject = subObjects.find((s) => s.id === editingSubObjectId) ?? null;
 
   /** Строки первой таблицы: группы/классы самого объекта. */
-  const objectRows = useMemo(() => {
-    const result: Array<{
-      id: string;
-      departmentId: string;
-      departmentName: string;
-      tableName: string;
-      showDepartment: boolean;
-      isLastInDepartment: boolean;
-    }> = [];
-    for (const department of selectedObject?.departments ?? []) {
-      for (const table of department.tables) {
-        const prevRow = result[result.length - 1];
-        const showDepartment = !prevRow || prevRow.departmentId !== department.id;
-        result.push({
-          id: table.id,
-          departmentId: department.id,
-          departmentName: department.name,
-          tableName: table.name,
-          showDepartment,
-          isLastInDepartment: false,
-        });
-      }
-    }
-    for (let i = result.length - 1; i >= 0; i--) {
-      result[i].isLastInDepartment =
-        !result[i + 1] || result[i + 1].departmentId !== result[i].departmentId;
-    }
-    return result;
-  }, [selectedObject]);
+  const objectRows = useMemo(() => groupRows(selectedObject), [selectedObject]);
 
   return (
     <>
@@ -381,7 +353,7 @@ function SubObjectsCard({
         }}
       />
       <SubObjectDrawer
-        object={editingSubObject ? selectedObject : addingSubObject ? selectedObject : null}
+        parent={editingSubObject || addingSubObject ? selectedObject : null}
         subObject={editingSubObject}
         onClose={() => {
           setAddingSubObject(false);

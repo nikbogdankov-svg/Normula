@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import type { ReceiptItem, WarehouseReceipt } from './types';
 import './warehouse-receipt-drawer.css';
 
@@ -75,7 +75,7 @@ export function ReceiptDrawer({
   onEdit?: (receipt: WarehouseReceipt) => void;
 }) {
   const height = useDrawerHeight();
-  const objects = useCateringObjects();
+  const objects = useMockCateringObjects();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<WarehouseReceipt | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
