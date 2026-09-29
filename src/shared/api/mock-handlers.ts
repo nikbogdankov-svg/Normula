@@ -11,15 +11,9 @@ import type { Collection, Recipe } from '@/features/ttk/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
-import {
-  formatKettle,
-  isFacilityType,
-  type CateringObject,
-  type DistributionRow,
-  type FacilityType,
-  type SubObject,
-} from '@/features/objects/types';
+import type { CateringObject } from '@/features/objects/types';
 import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
+import type { ProductSpreadItem, ProductSpreadMealId } from '@/features/products-spread/types';
 import type { WarehouseReceipt } from '@/features/warehouse-receipts/types';
 
 /**
@@ -42,11 +36,14 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const MOCKED_PREFIXES = [
   '/v1/ttk',
   '/v1/menus',
-  '/v1/objects',
+  // Мок-двойники объектов и диет — для разделов, которые ещё на моках
+  // (меню, порционник, склад): см. useMockCateringObjects, useMockDiets.
+  '/v1/mock/objects',
   '/v1/portions',
   '/v1/warehouse',
   '/v1/write-offs',
-  '/v1/diets',
+  '/v1/mock/diets',
+  '/v1/products-spread',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -438,10 +435,8 @@ const mockedDiets: Diet[] = [
   },
 ];
 // Soft-удалённые диеты: скрыты из справочника, но остаются в объектах/меню.
-const deletedDietIds = new Set<string>();
 
 /** Object ids в отложенном удалении: скрыты из справочника до конца периода. */
-const deletedObjectIds = new Set<string>();
 
 function emptySlots(cycleDays: number): CycleMenu['slots'] {
   const slots: CycleMenu['slots'] = [];
@@ -1008,80 +1003,8 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   // Диеты: справочник рационов питания (см. features/diets).
-  if (route === '/v1/diets' && method === 'GET') {
-    const diets = mockedDiets.filter((diet) => !deletedDietIds.has(diet.id));
-    return { diets } as T;
-  }
-
-  if (route === '/v1/diets' && method === 'POST') {
-    const body = options.body as {
-      name: string;
-      appliesTo: FacilityType[];
-      mealIds: MealId[];
-      pricePerDay: number;
-      kcal: number;
-      protein: number;
-      fat: number;
-      carbs: number;
-    };
-    const diet: Diet = {
-      id: `diet-${Date.now()}`,
-      name: body.name,
-      appliesTo: body.appliesTo ?? [],
-      mealIds: body.mealIds ?? [],
-      pricePerDay: body.pricePerDay ?? 0,
-      kcal: body.kcal ?? 0,
-      protein: body.protein ?? 0,
-      fat: body.fat ?? 0,
-      carbs: body.carbs ?? 0,
-    };
-    mockedDiets.unshift(diet);
-
-    return { diet } as T;
-  }
-
-  const dietId = match('/v1/diets/:id', route);
-  if (dietId && method === 'PATCH') {
-    const found = mockedDiets.find((diet) => diet.id === dietId.id);
-    if (!found) throw new Error('mock: диета не найдена');
-
-    const body = options.body as {
-      name: string;
-      appliesTo: FacilityType[];
-      mealIds: MealId[];
-      pricePerDay: number;
-      kcal: number;
-      protein: number;
-      fat: number;
-      carbs: number;
-    };
-    Object.assign(found, {
-      name: body.name,
-      appliesTo: body.appliesTo ?? found.appliesTo,
-      mealIds: body.mealIds ?? found.mealIds,
-      pricePerDay: body.pricePerDay ?? found.pricePerDay,
-      kcal: body.kcal ?? found.kcal,
-      protein: body.protein ?? found.protein,
-      fat: body.fat ?? found.fat,
-      carbs: body.carbs ?? found.carbs,
-    });
-
-    return { diet: found } as T;
-  }
-
-  if (dietId && method === 'DELETE') {
-    const found = mockedDiets.find((diet) => diet.id === dietId.id);
-    if (!found) throw new Error('mock: диета не найдена');
-
-    const mode = params.get('mode') ?? 'soft';
-    if (mode === 'immediate') {
-      const index = mockedDiets.indexOf(found);
-      mockedDiets.splice(index, 1);
-    } else {
-      deletedDietIds.add(dietId.id);
-    }
-
-    return {} as T;
+  if (route === '/v1/mock/diets' && method === 'GET') {
+    return { diets: mockedDiets } as T;
   }
 
   // Администрирование: персонал и роли (staff.v1.StaffService)
@@ -1382,238 +1305,8 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   }
 
   // --- Объекты (объект → подобъект → отделения) ---
-  if (route === '/v1/objects' && method === 'GET') {
-    const visibleObjects = objects.filter((obj) => !deletedObjectIds.has(obj.id));
-    return { objects: visibleObjects } as T;
-  }
-
-  if (route === '/v1/objects' && method === 'POST') {
-    const body = options.body as {
-      name: string;
-      type: string;
-      menuId?: string;
-      mealIds?: MealId[];
-      departments: Array<{
-        id: string;
-        name: string;
-        mealIds: MealId[];
-        tables: Array<{ id: string; name: string }>;
-      }>;
-    };
-    const newObject: CateringObject = {
-      id: `object-${Date.now()}`,
-      name: body.name.trim(),
-      type: isFacilityType(body.type) ? body.type : 'school',
-      menuId: body.menuId ?? undefined,
-      mealIds: body.mealIds ?? ['breakfast', 'second_breakfast', 'lunch', 'snack', 'dinner'],
-      departments: (body.departments ?? []).map((department) => ({
-        id: department.id,
-        name: department.name.trim(),
-        mealIds: department.mealIds ?? [],
-        tables: department.tables.map((table) => ({
-          id: table.id,
-          name: table.name.trim(),
-          headcount: 0,
-        })),
-      })),
-      subObjects: [],
-    };
-    objects.push(newObject);
-    return { object: newObject } as T;
-  }
-
-  if (route === '/v1/objects/distribution' && method === 'GET') {
-    return {
-      rows: distributionRows,
-      totalPortions: distributionRows.reduce((sum, row) => sum + row.portions, 0),
-    } as T;
-  }
-
-  if (route === '/v1/objects/menu' && method === 'PATCH') {
-    const body = options.body as {
-      objectId?: string;
-      subObjectId?: string;
-      menuId?: string;
-      mealIds?: MealId[];
-    };
-    if (body.objectId) {
-      const obj = objects.find((item) => item.id === body.objectId);
-      if (!obj) throw new Error('mock: объект не найден');
-      if (body.menuId !== undefined) obj.menuId = body.menuId;
-      if (body.mealIds) obj.mealIds = body.mealIds;
-    }
-    if (body.subObjectId) {
-      for (const obj of objects) {
-        const sub = obj.subObjects.find((item) => item.id === body.subObjectId);
-        if (sub) {
-          if (body.menuId !== undefined) sub.menuId = body.menuId;
-          if (body.mealIds) sub.mealIds = body.mealIds;
-          break;
-        }
-      }
-    }
-    return { objects: visibleObjects() } as T;
-  }
-
-  if (route === '/v1/objects/tables/headcount' && method === 'PATCH') {
-    const body = options.body as {
-      objectId: string;
-      subObjectId: string;
-      departmentId: string;
-      tableId: string;
-      headcount: number;
-    };
-    const subObject = findSubObject(body.subObjectId);
-    if (!subObject) throw new Error('mock: подобъект не найден');
-    const department = subObject.departments.find((item) => item.id === body.departmentId);
-    if (!department) throw new Error('mock: группа/класс не найдены');
-    const table = department.tables.find((item) => item.id === body.tableId);
-    if (!table) throw new Error('mock: рацион не найден');
-    table.headcount = Math.max(0, body.headcount);
-    rebuildDistribution();
-    return { objects: visibleObjects() } as T;
-  }
-
-  // --- Обновление объекта (name/menuId/mealIds/departments) ---
-  const objectRoute = match('/v1/objects/:id', route);
-  if (objectRoute && method === 'PATCH') {
-    const body = options.body as {
-      name: string;
-      type: string;
-      menuId?: string;
-      mealIds?: MealId[];
-      departments: Array<{
-        id: string;
-        name: string;
-        mealIds: MealId[];
-        tables: Array<{ id: string; name: string }>;
-      }>;
-    };
-    const obj = objects.find((item) => item.id === objectRoute.id);
-    if (!obj) throw new Error('mock: объект не найден');
-    const oldDepartments = obj.departments;
-    obj.name = body.name.trim();
-    if (body.type) obj.type = isFacilityType(body.type) ? body.type : obj.type;
-    if (body.menuId !== undefined) obj.menuId = body.menuId;
-    if (body.mealIds) obj.mealIds = body.mealIds;
-    obj.departments = body.departments.map((department) => {
-      const oldDepartment = oldDepartments.find((item) => item.id === department.id);
-      return {
-        id: department.id,
-        name: department.name.trim(),
-        mealIds: department.mealIds ?? [],
-        tables: department.tables.map((table) => {
-          const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
-          return {
-            id: table.id,
-            name: table.name.trim(),
-            headcount: oldTable?.headcount ?? 0,
-          };
-        }),
-      };
-    });
-    prunePortionEntries();
-    rebuildDistribution();
-    return { objects: visibleObjects() } as T;
-  }
-
-  // --- Удаление объекта: 'immediate' — сразу, 'soft' — скрыт до конца периода. ---
-  if (objectRoute && method === 'DELETE') {
-    const obj = objects.find((item) => item.id === objectRoute.id);
-    if (!obj) throw new Error('mock: объект не найден');
-
-    const mode = params.get('mode') ?? 'soft';
-    if (mode === 'immediate') {
-      objects.splice(objects.indexOf(obj), 1);
-      deletedObjectIds.delete(objectRoute.id);
-    } else {
-      deletedObjectIds.add(objectRoute.id);
-    }
-    prunePortionEntries();
-    rebuildDistribution();
-    return { objects: visibleObjects() } as T;
-  }
-
-  const createSubObjectRoute = match('/v1/objects/:objectId/sub-objects', route);
-  if (createSubObjectRoute && method === 'POST') {
-    const body = options.body as { name?: string };
-    const obj = objects.find((item) => item.id === createSubObjectRoute.objectId);
-    if (!obj) throw new Error('mock: объект не найден');
-    const subObject: SubObject = {
-      id: `sobj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name: (body.name ?? '').trim() || 'Новый подобъект',
-      address: '',
-      type: 'school',
-      kettleNumber: 1,
-      menuSource: 'object',
-      departments: [],
-    };
-    obj.subObjects.push(subObject);
-    return { objects: visibleObjects() } as T;
-  }
-
-  const subObjectRoute = match('/v1/objects/sub-objects/:id', route);
-  if (subObjectRoute && method === 'PATCH') {
-    const body = options.body as {
-      name: string;
-      address: string;
-      type: string;
-      kettleNumber: number;
-      menuSource: string;
-      menuId?: string;
-      mealIds?: MealId[];
-      departments: Array<{
-        id: string;
-        name: string;
-        mealIds?: MealId[];
-        tables: Array<{ id: string; name: string }>;
-      }>;
-    };
-    const subObject = findSubObject(subObjectRoute.id);
-    if (!subObject) throw new Error('mock: подобъект не найден');
-
-    const oldDepartments = subObject.departments;
-    subObject.name = body.name.trim();
-    subObject.address = body.address.trim();
-    subObject.type = isFacilityType(body.type) ? body.type : subObject.type;
-    subObject.kettleNumber = Math.max(1, body.kettleNumber);
-    subObject.menuSource = body.menuSource === 'own' ? 'own' : 'object';
-    subObject.menuId = subObject.menuSource === 'own' ? body.menuId : undefined;
-    if (body.mealIds) subObject.mealIds = body.mealIds;
-    subObject.departments = body.departments.map((department) => {
-      const oldDepartment = oldDepartments.find((item) => item.id === department.id);
-      return {
-        id: department.id,
-        name: department.name.trim(),
-        mealIds: department.mealIds ?? oldDepartment?.mealIds ?? [],
-        tables: department.tables.map((table) => {
-          const oldTable = oldDepartment?.tables.find((item) => item.id === table.id);
-          return {
-            id: table.id,
-            name: table.name.trim(),
-            headcount: oldTable?.headcount ?? 0,
-          };
-        }),
-      };
-    });
-
-    prunePortionEntries();
-    rebuildDistribution();
-    return { objects: visibleObjects() } as T;
-  }
-
-  // --- Удаление подобъекта: 'soft' оставляет записи до конца периода,
-  // 'immediate' — убирает сразу; в mock оба режима скрывают из справочника. ---
-  if (subObjectRoute && method === 'DELETE') {
-    for (const obj of objects) {
-      const index = obj.subObjects.findIndex((item) => item.id === subObjectRoute.id);
-      if (index === -1) continue;
-      obj.subObjects.splice(index, 1);
-      prunePortionEntries();
-      rebuildDistribution();
-      return { objects: visibleObjects() } as T;
-    }
-    throw new Error('mock: подобъект не найден');
+  if (route === '/v1/mock/objects' && method === 'GET') {
+    return { objects } as T;
   }
 
   // --- Порционник (численность на дату + раздача по блюдам) ---
@@ -1658,6 +1351,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       });
     }
     return { date: body.date, entries } as T;
+  }
+
+  // Раскладка продуктов на день: порционник × меню × ТТК.
+  if (route === '/v1/products-spread' && method === 'GET') {
+    const date = params.get('date') ?? '';
+    const objectId = params.get('objectId') ?? null;
+    return buildProductSpread(date, objectId) as T;
   }
 
   // Склад: приходы
@@ -2109,68 +1809,8 @@ const objects: CateringObject[] = [
   },
 ];
 
-function findSubObject(subObjectId: string): SubObject | null {
-  for (const obj of objects) {
-    const subObject = obj.subObjects.find((item) => item.id === subObjectId);
-    if (subObject) return subObject;
-  }
-  return null;
-}
-
-/** Объекты видимые в справочнике: без отложенно удалённых. */
-function visibleObjects(): CateringObject[] {
-  return objects.filter((obj) => !deletedObjectIds.has(obj.id));
-}
-
-let distributionRows: DistributionRow[] = [];
-
-function rebuildDistribution() {
-  const dishes = ['Каша рисовая молочная', 'Суп картофельный с мясом', 'Котлета куриная паровая'];
-  const rows: DistributionRow[] = [];
-  // Сначала блюдо — одинаковые идут подряд для группировки в таблице.
-  for (const dishName of dishes) {
-    for (const obj of objects) {
-      for (const subObject of obj.subObjects) {
-        for (const department of subObject.departments) {
-          for (const table of department.tables) {
-            if (table.headcount <= 0) continue;
-            rows.push({
-              dishName,
-              objectName: obj.name,
-              subObjectName: subObject.name,
-              departmentName: department.name,
-              tableName: table.name,
-              kettleLabel: formatKettle(subObject.kettleNumber),
-              portions: table.headcount,
-            });
-          }
-        }
-      }
-    }
-  }
-  distributionRows = rows;
-}
-
-rebuildDistribution();
-
 /** Порционник по датам: ключ YYYY-MM-DD → строки численности. */
 const portionsByDate: Record<string, PortionEntry[]> = {};
-
-function tableExists(subObjectId: string, departmentId: string, tableId: string): boolean {
-  const subObject = findSubObject(subObjectId);
-  if (!subObject) return false;
-  const department = subObject.departments.find((item) => item.id === departmentId);
-  if (!department) return false;
-  return department.tables.some((item) => item.id === tableId);
-}
-
-function prunePortionEntries() {
-  for (const date of Object.keys(portionsByDate)) {
-    portionsByDate[date] = portionsByDate[date].filter((entry) =>
-      tableExists(entry.subObjectId, entry.departmentId, entry.tableId)
-    );
-  }
-}
 
 function ensurePortionsDay(date: string): PortionEntry[] {
   if (!date) throw new Error('mock: не указана дата порционника');
@@ -2243,4 +1883,157 @@ function buildDishDistribution(date: string, objectId: string | null): DishDistr
 function syncMemberCount(organizationId: string) {
   const org = organizations.find((o) => o.id === organizationId);
   if (org) org.memberCount = (members[organizationId] ?? []).length;
+}
+
+// --- Раскладка продуктов на день ---
+
+/** Целые сутки между датами (a → b), как в shiftIso: строки YYYY-MM-DD. */
+function daysBetween(a: string, b: string): number {
+  const from = new Date(`${a}T00:00:00`);
+  const to = new Date(`${b}T00:00:00`);
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+/** Номер дня цикла (1…cycleDays) для даты относительно старта меню. */
+function cycleDayForDate(menu: CycleMenu, date: string): number {
+  const offset = daysBetween(menu.startDate, date);
+  return (((offset % menu.cycleDays) + menu.cycleDays) % menu.cycleDays) + 1;
+}
+
+/**
+ * Слоты меню на конкретную дату. Меню цикловое (CYCLE_DAYS=14): берём слоты
+ * активного периода, если дата в него попадает, иначе — базовый день цикла.
+ */
+function slotsForDate(menu: CycleMenu, date: string): CycleMenu['slots'] {
+  const periods = periodSlots(menu.id);
+  for (const [start, periodSlotsArr] of Object.entries(periods)) {
+    const offset = daysBetween(start, date);
+    if (offset < 0 || offset >= menu.cycleDays) continue;
+    const day = (((offset % menu.cycleDays) + menu.cycleDays) % menu.cycleDays) + 1;
+    return periodSlotsArr.filter((slot) => slot.day === day);
+  }
+  const day = cycleDayForDate(menu, date);
+  return menu.slots.filter((slot) => slot.day === day);
+}
+
+/** Численность объекта на дату: сумма по подразделениям/столам порционника. */
+function unitHeadcount(entries: PortionEntry[], unit: CateringObject): number {
+  let total = 0;
+  for (const subObject of unit.subObjects) {
+    for (const department of subObject.departments) {
+      for (const table of department.tables) {
+        const entry = entries.find(
+          (item) =>
+            item.subObjectId === subObject.id &&
+            item.departmentId === department.id &&
+            item.tableId === table.id
+        );
+        total += entry?.headcount ?? 0;
+      }
+    }
+  }
+  return total;
+}
+
+/** Граммы на порцию из «брутто на порцию»; '' и промежуточные строки → null. */
+function parseIngredientGrams(grossPerPortion: string): number | null {
+  const value = Number(grossPerPortion.trim().replace(',', '.'));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** Округление до 0,01 (граммы в кг); л/шт тоже округляем до сотых. */
+function roundKg(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Ссылка на продукт справочника по имени ингредиента ТТК.
+ * Мок-ТТК пока не связывают ингредиенты с productId, а справочник продуктов
+ * живёт на бэке: id строим из имени, единица — килограммы.
+ */
+function resolveIngredientProduct(name: string): {
+  id: string;
+  name: string;
+  unit: string;
+} {
+  return { id: `ing-${name}`, name, unit: 'кг' };
+}
+
+/**
+ * Раскладка на дату: численность из порционника × меню дня × ТТК.
+ * Блюда берутся не захардкоженными, а из циклового меню каждого объекта
+ * (recipeId → рецепт ТТК → ингредиенты); продукт агрегируется по блюдам
+ * и приёмам пищи (авторазбивка).
+ */
+function buildProductSpread(
+  date: string,
+  objectId: string | null
+): {
+  date: string;
+  objectId: string | null;
+  items: ProductSpreadItem[];
+} {
+  const entries = ensurePortionsDay(date);
+  const units = objectId ? objects.filter((obj) => obj.id === objectId) : objects;
+
+  const byId = new Map<string, ProductSpreadItem>();
+
+  for (const unit of units) {
+    const menu = menus.find((item) => item.id === unit.menuId) ?? menus[0];
+    if (!menu) continue;
+    const daySlots = slotsForDate(menu, date);
+
+    const portions = unitHeadcount(entries, unit);
+    if (portions <= 0) continue;
+
+    for (const meal of MEALS) {
+      if (!unit.mealIds.includes(meal.id)) continue;
+      const dishes = daySlots
+        .filter((slot) => slot.mealId === meal.id)
+        .flatMap((slot) => slot.dishes);
+      if (dishes.length === 0) continue;
+
+      for (const dish of dishes) {
+        const recipe = recipes.find((item) => item.id === dish.recipeId);
+        if (!recipe) continue;
+
+        for (const ingredient of recipe.ingredients) {
+          const grams = parseIngredientGrams(ingredient.grossPerPortion);
+          if (grams === null) continue;
+          const product = resolveIngredientProduct(ingredient.name);
+          const quantity = roundKg((portions * grams) / 1000);
+
+          let item = byId.get(product.id);
+          if (!item) {
+            item = {
+              productId: product.id,
+              productName: product.name,
+              unit: product.unit,
+              total: 0,
+              byMeal: Object.fromEntries(MEALS.map((entry) => [entry.id, 0])) as Record<
+                ProductSpreadMealId,
+                number
+              >,
+              dishes: [],
+            };
+            byId.set(product.id, item);
+          }
+          item.byMeal[meal.id] = roundKg(item.byMeal[meal.id] + quantity);
+          item.total = roundKg(item.total + quantity);
+          item.dishes.push({
+            mealId: meal.id,
+            dishName: dish.name,
+            portions,
+            quantity,
+          });
+        }
+      }
+    }
+  }
+
+  const items = [...byId.values()]
+    .sort((a, b) => a.productName.localeCompare(b.productName, 'ru'))
+    .map((item) => ({ ...item, dishes: [...item.dishes] }));
+
+  return { date, objectId, items };
 }

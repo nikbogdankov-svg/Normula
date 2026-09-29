@@ -14,7 +14,7 @@ import {
 } from '@gravity-ui/icons';
 import { useCreateReceipt, useUpdateReceipt } from './api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useCateringObjects } from '@/features/objects/api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import { ProductPicker } from '@/features/products/product-picker';
 import type { CreateReceiptRequest, ReceiptItem, WarehouseReceipt } from './types';
 import './create-receipt-drawer.css';
@@ -277,7 +277,7 @@ export function CreateReceiptDrawer({
   const create = useCreateReceipt();
   const update = useUpdateReceipt();
   const toaster = useToaster();
-  const objects = useCateringObjects();
+  const objects = useMockCateringObjects();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');

@@ -1,0 +1,267 @@
+/* Раскладка продуктов: таблица как в ТТК — тулбар закреплён,
+   шапка отдельным блоком, скроллится только список строк-карточек. */
+
+.products-spread-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  gap: 8px;
+}
+
+.products-spread-page__toolbar {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Область таблицы: серый фон, шапка и список не выходят на края страницы. */
+.products-spread-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
+}
+
+.products-spread-page__scroll .products-spread-page__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* У Gravity UI внутренние контейнеры создают свои scroll-контексты и ломают
+   sticky-шапку — переводим их в visible, оставляя один скролл на wrap. */
+.products-spread-page__scroll .admin-table-wrap .g-table,
+.products-spread-page__scroll .admin-table-wrap .g-table__scroll-container {
+  overflow: visible;
+}
+
+/* Шапка живёт вне прокручиваемого контейнера и всегда сверху. */
+.products-spread-page__header .admin-table .g-table__head,
+.products-spread-page__header .admin-table .g-table__head .g-table__cell {
+  background: var(--ttk-thead-bg, var(--onemore-card-bg));
+}
+
+.products-spread-page__header .admin-table .g-table__head .g-table__cell {
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: 1px solid var(--g-color-line-generic);
+  /* Паддинги совпадают с ячейками тела, чтобы колонки шапки стояли ровно
+     над колонками карточек. */
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.products-spread-page__header .admin-table .g-table__body {
+  display: none;
+}
+
+/* Заголовок body-таблицы не нужен: шапка отрисована блоком выше. */
+.products-spread-page__scroll .products-spread-page__table-body .g-table__head {
+  display: none;
+}
+
+/* Строки-карточки: вертикальные зазоры между строками. */
+.products-spread-page__scroll
+  .products-spread-page__list
+  .products-spread-page__table-body
+  .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: 0;
+}
+
+/* Линии ячеек не нужны — их место заняли зазоры. Шапка живёт отдельным
+   блоком, ей нижняя линия нужна. */
+.products-spread-page__scroll
+  .products-spread-page__list
+  .products-spread-page__table-body
+  .g-table__cell {
+  border-block-end: none;
+}
+
+/* Прочие колонки (приёмы пищи) — фиксированные ширины. */
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:nth-child(2),
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:nth-child(3),
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:nth-child(4),
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:nth-child(5),
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:nth-child(6) {
+  width: 9%;
+}
+
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:first-child {
+  width: 28%;
+  min-width: 220px;
+  border-radius: 6px 0 0 6px;
+  background-clip: padding-box;
+  padding-inline-start: 0;
+  border-left: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  width: 27%;
+  border-radius: 0 6px 6px 0;
+  background-clip: padding-box;
+  padding-inline-end: 0;
+  border-right: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-page__header {
+  flex-shrink: 0;
+  margin-block-end: 0;
+}
+
+.products-spread-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+
+/* Белые карточки-строки со скруглением углов. */
+.products-spread-page__scroll
+  .products-spread-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell {
+  background: var(--onemore-card-bg);
+  padding-left: 12px;
+  padding-right: 12px;
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-page__scroll
+  .products-spread-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:first-child {
+  border-radius: 8px 0 0 8px;
+  background-clip: padding-box;
+  border-left: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-page__scroll
+  .products-spread-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row
+  .g-table__cell:last-child {
+  border-radius: 0 8px 8px 0;
+  background-clip: padding-box;
+  border-right: 1px solid var(--g-color-line-generic);
+}
+
+/* Hover строки-карточки: переопределяем глобальный стиль brand.css,
+   чтобы подсветка ложилась поверх белого фона ячеек. */
+.products-spread-page__scroll
+  .products-spread-page__list
+  .admin-table
+  .g-table__body
+  .g-table__row_interactive:hover
+  > .g-table__cell {
+  background-color: var(--g-color-base-generic);
+}
+
+/* Единственная скроллируемая область. */
+.products-spread-page__scroll .admin-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 0 0 8px;
+  margin: 0;
+}
+
+.products-spread-page__scroll .admin-table {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+}
+
+.products-spread-page__scroll .products-spread-page__table-body {
+  margin-top: 0;
+}
+
+.products-spread-page__scroll .admin-table .g-table__table,
+.products-spread-page__scroll .admin-table .g-table__table_width_max {
+  height: auto;
+}
+
+/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело): колонки
+   шапки не разъезжаются с колонками карточек. */
+.products-spread-page__header .admin-table .g-table__table,
+.products-spread-page__scroll .products-spread-page__table-body .g-table__table {
+  table-layout: fixed;
+}
+
+/* Фиксированная высота строк, чтобы при малом числе записей они не тянулись. */
+.products-spread-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell {
+  height: 24px;
+  max-height: 40px;
+}
+
+/* Отступы и ширины контента в ячейках — линии строк идут на всю ширину. */
+.products-spread-page__scroll .admin-table .g-table__cell:first-child {
+  width: 28%;
+  min-width: 220px;
+  padding-inline-start: 0;
+}
+
+.products-spread-page__scroll .admin-table .g-table__cell:nth-child(2),
+.products-spread-page__scroll .admin-table .g-table__cell:nth-child(3),
+.products-spread-page__scroll .admin-table .g-table__cell:nth-child(4),
+.products-spread-page__scroll .admin-table .g-table__cell:nth-child(5),
+.products-spread-page__scroll .admin-table .g-table__cell:nth-child(6) {
+  width: 9%;
+}
+
+.products-spread-page__scroll .admin-table .g-table__cell:last-child {
+  width: 27%;
+  padding-inline-end: 0;
+}
+
+/* Попап: таблица разбивки по блюдам. */
+.products-spread-dialog .products-spread-dishes {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: var(--g-text-body-2-font-size);
+}
+
+.products-spread-dishes thead th {
+  padding: 8px 16px;
+  text-align: left;
+  color: var(--g-color-text-secondary);
+  font-weight: var(--g-text-body-font-weight);
+  font-size: var(--g-text-body-1-font-size);
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-dishes tbody td {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-dishes tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.products-spread-dishes .products-spread-dishes__right {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.products-spread-dishes thead th.products-spread-dishes__right {
+  text-align: right;
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button, Card, Flex, Icon, Select, Table, Text } from '@gravity-ui/uikit';
 import { House, Layers, Pencil, Plus } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
@@ -8,10 +9,16 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useCateringObjects } from './api';
-import { ObjectDrawer, SubObjectsDrawer } from './objects-dialog';
-import { type CateringObject, type SubObject } from './types';
+import { useObjects } from './api';
+import { ObjectDrawer, SubObjectDrawer } from './objects-dialog';
+import { type FacilityType, type ObjectItem } from './types';
 import './objects-route.css';
+
+const FACILITY_TYPE_LABELS: Record<FacilityType, string> = {
+  school: 'Школа',
+  kindergarten: 'Детский сад',
+  hospital: 'Больница',
+};
 
 function groupRowClassNames(row: {
   isLastInDepartment: boolean;
@@ -30,15 +37,61 @@ function groupRowClassNames(row: {
   return classes;
 }
 
+/** Строки таблицы групп объекта или подобъекта: по строке на рацион группы. */
+function groupRows(object: ObjectItem | null): Array<{
+  id: string;
+  departmentId: string;
+  departmentName: string;
+  tableName: string;
+  showDepartment: boolean;
+  isLastInDepartment: boolean;
+}> {
+  const result: Array<{
+    id: string;
+    departmentId: string;
+    departmentName: string;
+    tableName: string;
+    showDepartment: boolean;
+    isLastInDepartment: boolean;
+  }> = [];
+  for (const group of object?.groups ?? []) {
+    // Группа без рационов — всё равно строка, иначе она пропала бы из таблицы.
+    const diets = group.diets.length > 0 ? group.diets : [{ id: '', name: '' }];
+    for (const diet of diets) {
+      const prevRow = result[result.length - 1];
+      const showDepartment = !prevRow || prevRow.departmentId !== group.id;
+      result.push({
+        id: `${group.id}:${diet.id}`,
+        departmentId: group.id,
+        departmentName: group.name,
+        tableName: diet.name,
+        showDepartment,
+        isLastInDepartment: false,
+      });
+    }
+  }
+  for (let i = result.length - 1; i >= 0; i--) {
+    result[i].isLastInDepartment =
+      !result[i + 1] || result[i + 1].departmentId !== result[i].departmentId;
+  }
+  return result;
+}
+
 /**
- * «Объекты»: справочник объект → подобъект → отделения → столы.
- * Численность на дату — в «Порционнике».
- * У объекта своё меню; у подобъекта — меню объекта либо собственное.
+ * «Объекты»: объект → подобъекты; у каждого свои группы с рационами.
+ * Объект и подобъект — одна структура, у подобъекта задан parentObjectId.
  */
 export function ObjectsRoute() {
   const { current } = useOrganizations();
-  const objects = useCateringObjects();
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const objects = useObjects();
+
+  // Выбранный объект — в адресе, а не в состоянии компонента: так он
+  // переживает перезапрос списка после сохранения, перемонтирование страницы
+  // и перезагрузку.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedObjectId = searchParams.get('object');
+  const setSelectedObjectId = (id: string | null) =>
+    setSearchParams(id ? { object: id } : {}, { replace: true });
 
   if (current === null) {
     return (
@@ -64,14 +117,14 @@ export function ObjectsRoute() {
     );
   }
 
-  const objectList = objects.data.objects;
+  const objectList = objects.data.objects.filter((o) => !o.parentObjectId);
   const activeObjectId =
     selectedObjectId && objectList.some((o) => o.id === selectedObjectId)
       ? selectedObjectId
       : (objectList[0]?.id ?? null);
-  const subObjects = activeObjectId
-    ? (objectList.find((o) => o.id === activeObjectId)?.subObjects ?? [])
-    : objectList.flatMap((o) => o.subObjects);
+  const subObjects = objects.data.objects.filter(
+    (o) => activeObjectId !== null && o.parentObjectId === activeObjectId
+  );
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
@@ -85,105 +138,98 @@ export function ObjectsRoute() {
   );
 }
 
+/** Секция одного подобъекта: шапка (название + тип) и таблица отделений. */
+function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit: () => void }) {
+  const rows = useMemo(() => groupRows(subObject), [subObject]);
+
+  return (
+    <Card view="filled" style={{ padding: 0 }}>
+      <Flex
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        style={{ padding: '12px 16px' }}
+      >
+        <Flex alignItems="center" gap={2}>
+          <Icon data={Layers} size={16} />
+          <Text variant="body-1" color="secondary">
+            Подобъект:
+          </Text>
+          <Text variant="subheader-2">{subObject.name}</Text>
+          <Text variant="body-1" color="secondary">
+            {FACILITY_TYPE_LABELS[subObject.type]}
+          </Text>
+        </Flex>
+        <Button view="normal" size="m" onClick={onEdit}>
+          <Icon data={Pencil} size={16} />
+          Редактировать
+        </Button>
+      </Flex>
+      <div
+        style={{
+          borderTop: '1px solid var(--g-color-line-generic)',
+          paddingTop: 4,
+          paddingBottom: 8,
+        }}
+      >
+        {rows.length === 0 ? (
+          <EmptyState text="В подобъекте нет групп/классов" />
+        ) : (
+          <div className="admin-table-wrap">
+            <Table
+              width="max"
+              className="admin-table objects-group-table objects-facility-tables"
+              data={rows}
+              getRowClassNames={(row) =>
+                groupRowClassNames({
+                  isLastInDepartment: row.isLastInDepartment,
+                  showDepartment: row.showDepartment,
+                  isLastInSubObject: true,
+                })
+              }
+              columns={[
+                {
+                  id: 'departmentName',
+                  name: 'Группа / класс',
+                  width: '60%',
+                  template: (row) => (row.showDepartment ? row.departmentName : null),
+                  placeholder: () => null,
+                },
+                {
+                  id: 'tableName',
+                  name: 'Рацион',
+                  width: '40%',
+                },
+              ]}
+            />
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function SubObjectsCard({
   objects,
   subObjects,
   selectedObjectId,
   onSelectObject,
 }: {
-  objects: CateringObject[];
-  subObjects: SubObject[];
+  objects: ObjectItem[];
+  subObjects: ObjectItem[];
   selectedObjectId: string | null;
   onSelectObject: (id: string | null) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [editingSubObjects, setEditingSubObjects] = useState(false);
+  const [addingSubObject, setAddingSubObject] = useState(false);
+  const [editingSubObjectId, setEditingSubObjectId] = useState<string | null>(null);
 
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? objects[0] ?? null;
+  const editingSubObject = subObjects.find((s) => s.id === editingSubObjectId) ?? null;
 
   /** Строки первой таблицы: группы/классы самого объекта. */
-  const objectRows = useMemo(() => {
-    const result: Array<{
-      id: string;
-      departmentId: string;
-      departmentName: string;
-      tableName: string;
-      showDepartment: boolean;
-      isLastInDepartment: boolean;
-    }> = [];
-    for (const department of selectedObject?.departments ?? []) {
-      for (const table of department.tables) {
-        const prevRow = result[result.length - 1];
-        const showDepartment = !prevRow || prevRow.departmentId !== department.id;
-        result.push({
-          id: table.id,
-          departmentId: department.id,
-          departmentName: department.name,
-          tableName: table.name,
-          showDepartment,
-          isLastInDepartment: false,
-        });
-      }
-    }
-    for (let i = result.length - 1; i >= 0; i--) {
-      result[i].isLastInDepartment =
-        !result[i + 1] || result[i + 1].departmentId !== result[i].departmentId;
-    }
-    return result;
-  }, [selectedObject]);
-
-  /** Строки второй таблицы: группы/классы подобъектов. */
-  const subObjectRows = useMemo(() => {
-    const result: Array<{
-      id: string;
-      subObjectId: string;
-      subObjectName: string;
-      departmentId: string;
-      departmentName: string;
-      tableName: string;
-      showSubObject: boolean;
-      showDepartment: boolean;
-      isLastInDepartment: boolean;
-      isLastInSubObject: boolean;
-      nextShowDepartment: boolean;
-      nextShowSubObject: boolean;
-    }> = [];
-    for (const subObject of subObjects) {
-      for (const department of subObject.departments) {
-        for (const table of department.tables) {
-          const prevRow = result[result.length - 1];
-          const showSubObject = !prevRow || prevRow.subObjectId !== subObject.id;
-          const showDepartment =
-            showSubObject || !prevRow || prevRow.departmentId !== department.id;
-          result.push({
-            id: table.id,
-            subObjectId: subObject.id,
-            subObjectName: subObject.name,
-            departmentId: department.id,
-            departmentName: department.name,
-            tableName: table.name,
-            showSubObject,
-            showDepartment,
-            isLastInDepartment: false,
-            isLastInSubObject: false,
-            nextShowDepartment: false,
-            nextShowSubObject: false,
-          });
-        }
-      }
-    }
-    // Mark last rows and propagate next-flags.
-    for (let i = result.length - 1; i >= 0; i--) {
-      const row = result[i];
-      const next = result[i + 1];
-      row.isLastInDepartment = !next || next.departmentId !== row.departmentId;
-      row.isLastInSubObject = !next || next.subObjectId !== row.subObjectId;
-      row.nextShowDepartment = next?.showDepartment ?? false;
-      row.nextShowSubObject = next?.showSubObject ?? false;
-    }
-    return result;
-  }, [subObjects]);
+  const objectRows = useMemo(() => groupRows(selectedObject), [selectedObject]);
 
   return (
     <>
@@ -218,6 +264,11 @@ function SubObjectsCard({
           <Flex alignItems="center" gap={2}>
             <Icon data={House} size={16} />
             <Text variant="subheader-2">{selectedObject ? selectedObject.name : 'Объект'}</Text>
+            {selectedObject && (
+              <Text variant="body-1" color="secondary">
+                {FACILITY_TYPE_LABELS[selectedObject.type]}
+              </Text>
+            )}
           </Flex>
           {objects.length > 0 && (
             <Button
@@ -276,91 +327,47 @@ function SubObjectsCard({
         </div>
       </Card>
 
-      <Card view="filled" style={{ padding: 0 }}>
-        <Flex
-          alignItems="center"
-          justifyContent="space-between"
-          gap={2}
-          style={{ padding: '12px 16px', borderBottom: '1px solid var(--g-color-line-generic)' }}
-        >
-          <Flex alignItems="center" gap={2}>
-            <Icon data={Layers} size={16} />
-            <Text variant="subheader-2">
-              Подобъекты{selectedObject ? ` объекта «${selectedObject.name}»` : ''}
-            </Text>
-          </Flex>
-          <Button
-            view="normal"
-            size="m"
-            disabled={selectedObject === null || subObjects.length === 0}
-            onClick={() => setEditingSubObjects(true)}
-          >
-            <Icon data={Pencil} size={16} />
-            Редактировать подобъекты
-          </Button>
-        </Flex>
+      <Button
+        view="normal-contrast"
+        size="l"
+        disabled={selectedObject === null}
+        onClick={() => setAddingSubObject(true)}
+        style={{ alignSelf: 'flex-start' }}
+      >
+        <Icon data={Plus} size={16} />
+        Добавить подобъект
+      </Button>
 
-        <div
-          style={{
-            paddingTop: 4,
-            paddingBottom: 8,
-          }}
-        >
-          {subObjects.length === 0 ? (
-            <EmptyState text="Подобъекты пока не добавлены" />
-          ) : subObjectRows.length === 0 ? (
-            <EmptyState text="В подобъектах нет групп/классов" />
-          ) : (
-            <div className="admin-table-wrap">
-              <Table
-                width="max"
-                className="admin-table objects-group-table objects-facility-tables objects-subobjects-table"
-                data={subObjectRows}
-                getRowClassNames={(row) =>
-                  groupRowClassNames({
-                    isLastInDepartment: row.isLastInDepartment,
-                    showDepartment: row.showDepartment,
-                    isLastInSubObject: row.isLastInSubObject,
-                  })
-                }
-                columns={[
-                  {
-                    id: 'subObjectName',
-                    name: 'Подобъект',
-                    width: '34%',
-                    template: (row) => (row.showSubObject ? row.subObjectName : null),
-                    placeholder: () => null,
-                  },
-                  {
-                    id: 'departmentName',
-                    name: 'Группа / класс',
-                    width: '33%',
-                    template: (row) => (row.showDepartment ? row.departmentName : null),
-                    placeholder: () => null,
-                  },
-                  {
-                    id: 'tableName',
-                    name: 'Рацион',
-                    width: '33%',
-                  },
-                ]}
-              />
-            </div>
-          )}
-        </div>
-      </Card>
+      {subObjects.length === 0 ? (
+        <Card view="filled" style={{ padding: '12px 16px' }}>
+          <EmptyState text="Подобъекты пока не добавлены" />
+        </Card>
+      ) : (
+        subObjects.map((subObject) => (
+          <SubObjectSection
+            key={subObject.id}
+            subObject={subObject}
+            onEdit={() => setEditingSubObjectId(subObject.id)}
+          />
+        ))
+      )}
 
       <ObjectDrawer
         object={editing ? selectedObject : null}
         mode={creating ? 'create' : 'edit'}
+        onCreated={onSelectObject}
         onClose={() => {
           setEditing(false);
           setCreating(false);
         }}
       />
-      <SubObjectsDrawer
-        object={editingSubObjects ? selectedObject : null}
-        onClose={() => setEditingSubObjects(false)}
+      <SubObjectDrawer
+        parent={editingSubObject || addingSubObject ? selectedObject : null}
+        subObject={editingSubObject}
+        onClose={() => {
+          setAddingSubObject(false);
+          setEditingSubObjectId(null);
+        }}
       />
     </>
   );
