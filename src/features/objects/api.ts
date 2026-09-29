@@ -5,6 +5,7 @@ import type {
   CateringObjectsResponse,
   CreateObjectRequest,
   DistributionPreviewResponse,
+  FacilityType,
   UpdateObjectMenuRequest,
   UpdateObjectRequest,
   UpdateSubObjectRequest,
@@ -74,10 +75,18 @@ export function useCreateSubObject() {
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: ({ objectId, name }: { objectId: string; name: string }) =>
+    mutationFn: ({
+      objectId,
+      name,
+      type,
+    }: {
+      objectId: string;
+      name: string;
+      type: FacilityType;
+    }) =>
       api.request<CateringObjectsResponse>(`/v1/objects/${objectId}/sub-objects`, {
         method: 'POST',
-        body: { name },
+        body: { name, type },
       }),
     onSuccess: invalidate,
   });

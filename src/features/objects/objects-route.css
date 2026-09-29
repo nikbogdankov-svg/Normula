@@ -18,14 +18,6 @@
   padding-block-end: 12px;
 }
 
-/* Линия между отделениями начинается от «Группа / класс», а не от «Подобъект»;
-   между подобъектами дивидер остаётся на всю ширину. */
-.objects-subobjects-table .objects-group-row_department-divider .g-table__cell:first-child {
-  border-block-end-color: transparent;
-}
-
-/* Полная линия между разными ЛПУ — все колонки (по умолчанию). */
-
 /* Отключаем ховер-эффект строк таблицы объектов. */
 .g-root .objects-group-table .g-table__body .g-table__row:hover,
 .g-root .objects-group-table .g-table__body .g-table__row:hover > .g-table__cell {

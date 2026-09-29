@@ -12,6 +12,7 @@ import {
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
 import {
   useCreateObject,
+  useCreateSubObject,
   useDeleteObject,
   useDeleteSubObject,
   useUpdateObject,
@@ -49,10 +50,6 @@ type ObjectForm = {
   type: FacilityType;
   menuId?: string;
   departments: DepartmentForm[];
-};
-
-type SubObjectsForm = {
-  subObjects: SubObjectForm[];
 };
 
 function tableNameToTypeId(name: string): DietTypeId | null {
@@ -185,24 +182,17 @@ function hasObjectChanges(form: ObjectForm, original: CateringObject): boolean {
   return departmentsFormHasChanges(form.departments, original.departments);
 }
 
-function hasSubObjectsChanges(subObjects: SubObjectForm[], original: CateringObject): boolean {
-  if (subObjects.length !== original.subObjects.length) return true;
+function hasSubObjectChanges(form: SubObjectForm, original: SubObject): boolean {
+  if (form.name.trim() !== original.name) return true;
+  if (form.type !== original.type) return true;
+  if (form.departments.length !== original.departments.length) return true;
 
-  for (let i = 0; i < subObjects.length; i++) {
-    const sobjForm = subObjects[i];
-    const sobjOrig = original.subObjects.find((s) => s.id === sobjForm.id);
-    if (!sobjOrig) return true;
-    if (sobjForm.name.trim() !== sobjOrig.name) return true;
-    if (sobjForm.type !== sobjOrig.type) return true;
-    if (sobjForm.departments.length !== sobjOrig.departments.length) return true;
-
-    for (let j = 0; j < sobjForm.departments.length; j++) {
-      const deptForm = sobjForm.departments[j];
-      const deptOrig = sobjOrig.departments.find((d) => d.id === deptForm.id);
-      if (!deptOrig) return true;
-      if (deptForm.name.trim() !== deptOrig.name) return true;
-      if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
-    }
+  for (let j = 0; j < form.departments.length; j++) {
+    const deptForm = form.departments[j];
+    const deptOrig = original.departments.find((d) => d.id === deptForm.id);
+    if (!deptOrig) return true;
+    if (deptForm.name.trim() !== deptOrig.name) return true;
+    if (deptForm.selectedTypes.length !== deptOrig.tables.length) return true;
   }
 
   return false;
@@ -760,7 +750,10 @@ export function ObjectDrawer({
         </div>
 
         <div className="kitchen-drawer__footer">
-          <div className="kitchen-drawer__footer-inner" style={{ justifyContent: 'space-between' }}>
+          <div
+            className="kitchen-drawer__footer-inner"
+            style={{ justifyContent: mode === 'create' ? 'flex-end' : 'space-between' }}
+          >
             {mode === 'edit' && (
               <Button view="outlined-danger" size="l" onClick={() => setConfirmingDelete(true)}>
                 <Icon data={TrashBin} size={16} />
@@ -800,34 +793,41 @@ export function ObjectDrawer({
   );
 }
 
-/** Drawer редактирования подобъектов: название, тип, группы/отделения с рационами. */
-export function SubObjectsDrawer({
+/** Drawer одного подобъекта: создание по одному (имя + тип) или редактирование
+ *  выбранного (название, тип, группы/отделения с рационами, удаление). */
+export function SubObjectDrawer({
   object,
+  subObject,
   onClose,
 }: {
   object: CateringObject | null;
+  subObject: SubObject | null;
   onClose: () => void;
 }) {
   const height = useDrawerHeight();
+  const createSubObject = useCreateSubObject();
   const update = useUpdateSubObject();
   const deleteSubObject = useDeleteSubObject();
   const toaster = useToaster();
-  const [form, setForm] = useState<SubObjectsForm | null>(null);
+  const [form, setForm] = useState<SubObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [confirmingSubObjectId, setConfirmingSubObjectId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const isCreate = subObject === null;
+  const subtitle = subObject ? `Подобъект «${subObject.name}»` : 'Новый подобъект';
 
   useEffect(() => {
     if (!object) {
       setVisible(false);
       return;
     }
-    setForm({ subObjects: object.subObjects.map(subObjectToForm) });
-    setConfirmingSubObjectId(null);
+    setForm(subObject ? subObjectToForm(subObject) : emptySubObject());
+    setConfirmingDelete(false);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, [object]);
+  }, [object, subObject]);
 
   useEffect(() => {
     if (visible || !mounted) return;
@@ -840,48 +840,72 @@ export function SubObjectsDrawer({
     onClose();
   };
 
-  const updateSubObject = (index: number, patch: Partial<SubObjectForm>) => {
+  const updateSubObject = (_index: number, patch: Partial<SubObjectForm>) => {
+    setForm((current) => (current ? { ...current, ...patch } : current));
+  };
+
+  const removeDepartment = (deptIndex: number) => {
     setForm((current) => {
       if (!current) return current;
       return {
         ...current,
-        subObjects: current.subObjects.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+        departments: current.departments.filter((_, i) => i !== deptIndex),
       };
     });
   };
 
-  const removeSubObject = (index: number) => {
-    setForm((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        subObjects: current.subObjects.filter((_, i) => i !== index),
-      };
-    });
-  };
-
-  /** Корзина подобъекта: сохранённый на сервере — в подтверждение, новый — из формы. */
-  const requestRemoveSubObject = (index: number) => {
-    if (!form || !object) return;
-    const target = form.subObjects[index];
-    const original = object.subObjects.find((s) => s.id === target.id);
-    if (!original) {
-      removeSubObject(index);
-      return;
-    }
-    setConfirmingSubObjectId(original.id);
-  };
-
-  const runDeleteSubObject = (deletionMode: ObjectDeleteMode) => {
-    if (!object || !confirmingSubObjectId) return;
-
-    deleteSubObject.mutate(
-      { id: confirmingSubObjectId, mode: deletionMode },
+  const create = () => {
+    if (!form || !object || !form.name.trim()) return;
+    createSubObject.mutate(
+      { objectId: object.id, name: form.name, type: form.type },
       {
         onSuccess: () => {
-          const index = form?.subObjects.findIndex((s) => s.id === confirmingSubObjectId);
-          if (index !== undefined && index >= 0) removeSubObject(index);
-          setConfirmingSubObjectId(null);
+          toaster.add({ name: 'subobject-created', title: 'Подобъект добавлен', theme: 'success' });
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'subobject-create',
+            title: 'Не удалось добавить',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
+  const submitEdit = () => {
+    if (!form || !subObject || !isSubObjectsFormReady([form])) return;
+
+    update.mutate(
+      { id: subObject.id, patch: subObjectFormToPatch(form, subObject) },
+      {
+        onSuccess: () => {
+          toaster.add({
+            name: 'subobject-updated',
+            title: 'Подобъект обновлён',
+            theme: 'success',
+          });
+          requestClose();
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'subobject-edit',
+            title: 'Не удалось сохранить',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
+  const runDelete = (deletionMode: ObjectDeleteMode) => {
+    if (!subObject) return;
+
+    deleteSubObject.mutate(
+      { id: subObject.id, mode: deletionMode },
+      {
+        onSuccess: () => {
           toaster.add(
             deletionMode === 'immediate'
               ? { name: 'subobject-deleted', title: 'Подобъект удалён', theme: 'success' }
@@ -892,6 +916,7 @@ export function SubObjectsDrawer({
                   theme: 'success',
                 }
           );
+          requestClose();
         },
         onError: (e) =>
           toaster.add({
@@ -904,47 +929,11 @@ export function SubObjectsDrawer({
     );
   };
 
-  const confirmingSubObject = form?.subObjects.find((s) => s.id === confirmingSubObjectId) ?? null;
-
-  const submit = () => {
-    if (!form || !object || !isSubObjectsFormReady(form.subObjects)) return;
-
-    const steps: Promise<unknown>[] = [];
-
-    for (const subObjectForm of form.subObjects) {
-      const original = object.subObjects.find((s) => s.id === subObjectForm.id);
-      if (!original) continue;
-      steps.push(
-        update.mutateAsync({
-          id: original.id,
-          patch: subObjectFormToPatch(subObjectForm, original),
-        })
-      );
-    }
-
-    Promise.all(steps)
-      .then(() => {
-        toaster.add({
-          name: 'sub-objects-updated',
-          title: 'Подобъекты обновлены',
-          theme: 'success',
-        });
-        requestClose();
-      })
-      .catch((e: Error) =>
-        toaster.add({
-          name: 'sub-objects-edit',
-          title: 'Не удалось сохранить',
-          content: e.message,
-          theme: 'danger',
-        })
-      );
-  };
-
   if (!mounted || !form || !object) return null;
 
-  const ready = isSubObjectsFormReady(form.subObjects);
-  const changed = hasSubObjectsChanges(form.subObjects, object);
+  const nameReady = form.name.trim() !== '';
+  const ready = isCreate ? nameReady : isSubObjectsFormReady([form]);
+  const changed = subObject ? hasSubObjectChanges(form, subObject) : false;
 
   return (
     <Drawer
@@ -962,7 +951,7 @@ export function SubObjectsDrawer({
       <div className="kitchen-drawer__card">
         <div className="kitchen-drawer__header">
           <div className="kitchen-drawer__header-inner">
-            <Text variant="subheader-3">Редактирование подобъектов</Text>
+            <Text variant="subheader-3">{isCreate ? 'Добавить подобъект' : subtitle}</Text>
             <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
               <Icon data={Xmark} size={20} />
             </Button>
@@ -970,63 +959,85 @@ export function SubObjectsDrawer({
         </div>
 
         <div className="kitchen-drawer__body">
-          <Flex direction="column" gap={3}>
-            {form.subObjects.map((subObject, subObjectIndex) => (
+          {isCreate ? (
+            <Flex gap={2} alignItems="flex-end">
+              <TextInput
+                size="l"
+                label="Название подобъекта:"
+                placeholder="Школа №1"
+                value={form.name}
+                onUpdate={(value) =>
+                  setForm((current) => (current ? { ...current, name: value } : current))
+                }
+                autoFocus
+                style={{ flex: 1 }}
+              />
+              <Select
+                size="l"
+                width={200}
+                value={[form.type]}
+                options={[
+                  { value: 'school', content: 'Школа' },
+                  { value: 'kindergarten', content: 'Детский сад' },
+                  { value: 'hospital', content: 'Больница' },
+                ]}
+                onUpdate={(newValue) => {
+                  const nextType = newValue[0] as FacilityType;
+                  setForm((current) => (current ? { ...current, type: nextType } : current));
+                }}
+              />
+            </Flex>
+          ) : (
+            <Flex direction="column" gap={3}>
               <SubObjectBlock
-                key={subObject.id}
-                subObject={subObject}
-                subObjectIndex={subObjectIndex}
+                subObject={form}
+                subObjectIndex={0}
                 onUpdate={updateSubObject}
-                onRemove={requestRemoveSubObject}
+                onRemove={removeDepartment}
                 canRemove
               />
-            ))}
-
-            <Button
-              view="normal"
-              size="l"
-              onClick={() =>
-                setForm((current) =>
-                  current
-                    ? { ...current, subObjects: [...current.subObjects, emptySubObject()] }
-                    : current
-                )
-              }
-              style={{ alignSelf: 'flex-start' }}
-            >
-              <Icon data={Plus} size={16} />
-              Добавить подобъект
-            </Button>
-          </Flex>
+            </Flex>
+          )}
         </div>
 
         <div className="kitchen-drawer__footer">
-          <div className="kitchen-drawer__footer-inner">
-            <Button view="outlined" size="l" onClick={requestClose}>
-              Отмена
-            </Button>
-            <Button
-              view="action"
-              size="l"
-              loading={update.isPending}
-              disabled={!ready || !changed}
-              onClick={submit}
-            >
-              <Icon data={FloppyDisk} size={16} />
-              Сохранить
-            </Button>
+          <div
+            className="kitchen-drawer__footer-inner"
+            style={{ justifyContent: isCreate ? 'flex-end' : 'space-between' }}
+          >
+            {!isCreate && (
+              <Button view="outlined-danger" size="l" onClick={() => setConfirmingDelete(true)}>
+                <Icon data={TrashBin} size={16} />
+                Удалить
+              </Button>
+            )}
+            <Flex gap={2}>
+              <Button view="outlined" size="l" onClick={requestClose}>
+                Отмена
+              </Button>
+              <Button
+                view="action"
+                size="l"
+                loading={isCreate ? createSubObject.isPending : update.isPending}
+                disabled={!ready || (!isCreate && !changed)}
+                onClick={isCreate ? create : submitEdit}
+              >
+                <Icon data={isCreate ? Plus : FloppyDisk} size={16} />
+                {isCreate ? 'Добавить' : 'Сохранить'}
+              </Button>
+            </Flex>
           </div>
         </div>
       </div>
 
       <DeleteConfirmDialog
-        open={confirmingSubObject !== null}
-        title={confirmingSubObject ? `Удалить «${confirmingSubObject.name}»?` : ''}
+        open={confirmingDelete}
+        title={subObject ? `Удалить «${subObject.name}»?` : ''}
         description="Подобъект используется в порционнике и меню. Выберите, как его удалить."
         afterPeriodHint="До конца периода подобъект останется в порционнике и меню"
-        onAfterPeriod={() => runDeleteSubObject('soft')}
-        onImmediate={() => runDeleteSubObject('immediate')}
-        onCancel={() => setConfirmingSubObjectId(null)}
+        onAfterPeriod={() => runDelete('soft')}
+        onImmediate={() => runDelete('immediate')}
+        onCancel={() => setConfirmingDelete(false)}
         pending={deleteSubObject.isPending}
       />
     </Drawer>
