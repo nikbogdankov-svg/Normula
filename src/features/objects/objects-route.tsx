@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button, Card, Flex, Icon, Select, Table, Text } from '@gravity-ui/uikit';
 import { House, Layers, Pencil, Plus } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
@@ -83,7 +84,14 @@ function groupRows(object: ObjectItem | null): Array<{
 export function ObjectsRoute() {
   const { current } = useOrganizations();
   const objects = useObjects();
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+
+  // Выбранный объект — в адресе, а не в состоянии компонента: так он
+  // переживает перезапрос списка после сохранения, перемонтирование страницы
+  // и перезагрузку.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedObjectId = searchParams.get('object');
+  const setSelectedObjectId = (id: string | null) =>
+    setSearchParams(id ? { object: id } : {}, { replace: true });
 
   if (current === null) {
     return (
