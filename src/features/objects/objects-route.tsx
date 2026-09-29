@@ -347,6 +347,7 @@ function SubObjectsCard({
       <ObjectDrawer
         object={editing ? selectedObject : null}
         mode={creating ? 'create' : 'edit'}
+        onCreated={onSelectObject}
         onClose={() => {
           setEditing(false);
           setCreating(false);

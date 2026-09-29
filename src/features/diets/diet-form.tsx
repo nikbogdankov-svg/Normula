@@ -15,6 +15,15 @@ function parseDecimal(value: string): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
+/** Норма заполнена, но это не число или оно отрицательное. */
+function isInvalidNorm(value: string): boolean {
+  if (value.trim() === '') return false;
+  const parsed = Number(value.replace(',', '.'));
+  return !Number.isFinite(parsed) || parsed < 0;
+}
+
+const NORM_ERROR = 'Не может быть отрицательным';
+
 type Draft = {
   name: string;
   appliesTo: FacilityType[];
@@ -138,6 +147,8 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
           label="Цена на день, ₽:"
           placeholder="0"
           value={draft.pricePerDay}
+          validationState={isInvalidNorm(draft.pricePerDay) ? 'invalid' : undefined}
+          errorMessage={NORM_ERROR}
           controlProps={{ min: 0, step: 1 }}
           onUpdate={(value) => patchNumber('pricePerDay', value)}
         />
@@ -148,6 +159,8 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             label="Ккал:"
             placeholder="0"
             value={draft.kcal}
+            validationState={isInvalidNorm(draft.kcal) ? 'invalid' : undefined}
+            errorMessage={NORM_ERROR}
             controlProps={{ min: 0, step: 1 }}
             onUpdate={(value) => patchNumber('kcal', value)}
             style={{ flex: 1 }}
@@ -158,6 +171,8 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             label="Белки, г:"
             placeholder="0"
             value={draft.protein}
+            validationState={isInvalidNorm(draft.protein) ? 'invalid' : undefined}
+            errorMessage={NORM_ERROR}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('protein', value)}
             style={{ flex: 1 }}
@@ -170,6 +185,8 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             label="Жиры, г:"
             placeholder="0"
             value={draft.fat}
+            validationState={isInvalidNorm(draft.fat) ? 'invalid' : undefined}
+            errorMessage={NORM_ERROR}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('fat', value)}
             style={{ flex: 1 }}
@@ -180,6 +197,8 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             label="Углеводы, г:"
             placeholder="0"
             value={draft.carbs}
+            validationState={isInvalidNorm(draft.carbs) ? 'invalid' : undefined}
+            errorMessage={NORM_ERROR}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('carbs', value)}
             style={{ flex: 1 }}
@@ -193,6 +212,11 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     fields,
     getBody,
     canSubmit:
-      Boolean(draft.name.trim()) && draft.appliesTo.length > 0 && draft.pricePerDay.trim() !== '',
+      Boolean(draft.name.trim()) &&
+      draft.appliesTo.length > 0 &&
+      draft.pricePerDay.trim() !== '' &&
+      [draft.pricePerDay, draft.kcal, draft.protein, draft.fat, draft.carbs].every(
+        (value) => !isInvalidNorm(value)
+      ),
   };
 }
