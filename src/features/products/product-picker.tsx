@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Flex, Icon, Select, type SelectOption } from '@gravity-ui/uikit';
 import { Plus } from '@gravity-ui/icons';
 import { filterProducts, useProducts } from './api';
@@ -20,6 +20,10 @@ export function ProductPicker({
   valueLabel,
   placeholder = 'Выбрать продукт',
   size = 'm',
+  products,
+  disabled,
+  selectedHint,
+  showUnitInValue = true,
   onChange,
 }: {
   /** id выбранного продукта (пусто — ничего не выбрано). */
@@ -28,25 +32,37 @@ export function ProductPicker({
   valueLabel?: string;
   placeholder?: string;
   size?: 's' | 'm' | 'l' | 'xl';
+  /**
+   * Ограничение списка продуктов (например, продуктами выбранной партии).
+   * Справочник в этом случае не используется; inline-создание отключается.
+   */
+  products?: Product[];
+  /** Полностью отключает автокомплит (выбор партии ещё не сделан). */
+  disabled?: boolean;
+  /** Доп. строка справа внутри инпута рядом с выбранным продуктом. */
+  selectedHint?: ReactNode;
+  /** Показывать единицу измерения рядом с названием в контроле (по умолчанию да). */
+  showUnitInValue?: boolean;
   onChange: (product: Product | null) => void;
 }) {
   const { data, isPending } = useProducts();
   const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
-  const products = useMemo(() => data?.products ?? [], [data]);
+  const allProducts = useMemo(() => products ?? data?.products ?? [], [products, data]);
 
-  const filtered = useMemo(() => filterProducts(products, filter), [products, filter]);
+  const filtered = useMemo(() => filterProducts(allProducts, filter), [allProducts, filter]);
 
   const selected = useMemo(
-    () => value && products.find((product) => product.id === value),
-    [products, value]
+    () => value && allProducts.find((product) => product.id === value),
+    [allProducts, value]
   );
 
   const exactMatch = filtered.some(
     (product) => product.name.toLowerCase() === filter.trim().toLowerCase()
   );
-  const showCreate = filter.trim() !== '' && !exactMatch;
+
+  const showCreate = products === undefined && filter.trim() !== '' && !exactMatch;
 
   const queryText = filter.trim();
 
@@ -92,7 +108,7 @@ export function ProductPicker({
       setCreateOpen(true);
       return;
     }
-    onChange(products.find((product) => product.id === id) ?? null);
+    onChange(allProducts.find((product) => product.id === id) ?? null);
   };
 
   return (
@@ -108,9 +124,31 @@ export function ProductPicker({
         filterOption={() => true}
         hasClear
         placeholder={placeholder}
-        disabled={isPending}
+        disabled={disabled || (products === undefined && isPending)}
+        renderSelectedOption={(option) => (
+          <Flex
+            alignItems="center"
+            justifyContent="space-between"
+            gap={2}
+            style={{ width: '100%' }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {showUnitInValue ? (option.content ?? option.text ?? '') : (option.text ?? '')}
+            </span>
+            {selectedHint ? (
+              <span
+                style={{
+                  flexShrink: 0,
+                  color: 'var(--g-color-text-secondary)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {selectedHint}
+              </span>
+            ) : null}
+          </Flex>
+        )}
         className="product-picker__select"
-        renderSelectedOption={(option) => <>{option.content ?? option.text ?? ''}</>}
       />
 
       <CreateProductDialog
