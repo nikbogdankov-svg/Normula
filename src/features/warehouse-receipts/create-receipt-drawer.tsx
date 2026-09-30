@@ -46,8 +46,6 @@ const STORAGE_CONDITIONS_OPTIONS = [
 
 const ORGANOLEPTIC_OPTIONS = ['Соответствует', 'Не соответствует', 'Соответствует с замечаниями'];
 
-const UNIT_OPTIONS = ['кг', 'г', 'мг', 'л', 'мл', 'шт', 'уп', 'кор', 'ящ'];
-
 const selectOptions = (values: string[]) => values.map((value) => ({ value, content: value }));
 
 /** Компактное текстовое поле строки товара. */
@@ -461,13 +459,6 @@ export function CreateReceiptDrawer({
                         }
                       />
                     </div>
-                    <ItemSelect
-                      label="Ед. изм.:"
-                      placeholder="кг/л/шт"
-                      value={row.unit}
-                      options={selectOptions(UNIT_OPTIONS)}
-                      onUpdate={(v) => updateItem(index, { unit: v })}
-                    />
                     <ItemInput
                       label="Кол-во:"
                       placeholder="0"

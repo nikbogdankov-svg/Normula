@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Flex, Icon, Select, Text, TextInput } from '@gravity-ui/uikit';
-import { ChevronDown, ChevronUp, Magnifier } from '@gravity-ui/icons';
+import {
+  ChevronDown,
+  ChevronUp,
+  Magnifier,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpArrowDown,
+} from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { useApi } from '@/shared/api/use-api';
@@ -28,6 +35,7 @@ export function WarehouseBalancesRoute() {
   const [warehouseId, setWarehouseId] = useState('');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [nameSort, setNameSort] = useState<'asc' | 'desc'>('asc');
 
   const toggleExpanded = (productName: string) => {
     setExpanded((current) => {
@@ -93,8 +101,10 @@ export function WarehouseBalancesRoute() {
         card.totalRemaining > 0 ? Math.round((weighted / card.totalRemaining) * 100) / 100 : 0;
       if (card.batches.length > 0) result.push(card);
     }
+    result.sort((a, b) => a.productName.localeCompare(b.productName, 'ru'));
+    if (nameSort === 'desc') result.reverse();
     return result;
-  }, [data, search]);
+  }, [data, nameSort, search]);
 
   if (api.organizationId === null) {
     return (
@@ -193,7 +203,14 @@ export function WarehouseBalancesRoute() {
             </colgroup>
             <thead>
               <tr>
-                <th>Товар</th>
+                <th>
+                  <SortableHeader
+                    label="Товар"
+                    active
+                    ascending={nameSort === 'asc'}
+                    onToggle={() => setNameSort(nameSort === 'asc' ? 'desc' : 'asc')}
+                  />
+                </th>
                 <th className="warehouse-balances-col-price">Средняя цена</th>
                 <th className="warehouse-balances-col-rest">Остаток</th>
                 <th className="warehouse-balances-col-chevron" />
@@ -263,7 +280,7 @@ export function WarehouseBalancesRoute() {
                               <Text
                                 variant="body-2"
                                 color="secondary"
-                                style={{ display: 'block', padding: '4px 16px 8px' }}
+                                style={{ display: 'block', padding: '4px 0 8px' }}
                               >
                                 Нет партий по запросу
                               </Text>
@@ -320,5 +337,46 @@ export function WarehouseBalancesRoute() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  active,
+  ascending,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  ascending: boolean;
+  onToggle: () => void;
+}) {
+  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+
+  return (
+    <Flex
+      alignItems="center"
+      justifyContent="flex-start"
+      gap={1}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={onToggle}
+      title={
+        active
+          ? ascending
+            ? 'По возрастанию — нажмите для убывания'
+            : 'По убыванию — нажмите для возрастания'
+          : `Сортировать по: ${label}`
+      }
+    >
+      {label}
+      <span
+        style={{
+          display: 'inline-flex',
+          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
+        }}
+      >
+        <Icon data={icon} size={16} />
+      </span>
+    </Flex>
   );
 }

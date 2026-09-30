@@ -15,6 +15,7 @@ import type { CateringObject } from '@/features/objects/types';
 import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
 import type { ProductSpreadItem, ProductSpreadMealId } from '@/features/products-spread/types';
 import type { WarehouseReceipt } from '@/features/warehouse-receipts/types';
+import type { WriteOff } from '@/features/write-offs/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -596,12 +597,13 @@ for (const menu of menus) {
 
 // --- Склад: приходы и остатки ---
 
-const warehouseReceipts = [
+const warehouseReceipts: WarehouseReceipt[] = [
   {
     id: 'rec-1',
     date: new Date(Date.now() - 2 * day).toISOString(),
     invoiceNumber: 'НАК-2025-001',
     warehouseId: 'warehouse-central',
+    unitId: 'object-1',
     items: [
       {
         id: 'rec-1-item-1',
@@ -648,6 +650,7 @@ const warehouseReceipts = [
     date: new Date(Date.now() - 1 * day).toISOString(),
     invoiceNumber: 'НАК-2025-002',
     warehouseId: 'warehouse-central',
+    unitId: 'object-2',
     items: [
       {
         id: 'rec-2-item-1',
@@ -748,12 +751,13 @@ const warehouseBalances = [
   },
 ];
 
-const writeOffs = [
+const writeOffs: WriteOff[] = [
   {
     id: 'wo-1',
     type: 'exceptional',
     date: new Date(Date.now() - 2 * day).toISOString(),
     warehouseId: 'warehouse-central',
+    unitId: 'object-1',
     reason: 'Истёк срок годности',
     items: [
       {
@@ -783,6 +787,7 @@ const writeOffs = [
     type: 'exceptional',
     date: new Date(Date.now() - 1 * day).toISOString(),
     warehouseId: 'warehouse-central',
+    unitId: 'object-2',
     reason: 'Бой при транспортировке',
     items: [
       {
@@ -803,6 +808,7 @@ const writeOffs = [
     type: 'daily',
     date: new Date(Date.now() - 1 * day).toISOString(),
     warehouseId: 'warehouse-central',
+    unitId: 'object-1',
     reason: 'Ежедневное списание',
     items: [
       {
@@ -832,6 +838,7 @@ const writeOffs = [
     type: 'daily',
     date: new Date(Date.now() - 3 * day).toISOString(),
     warehouseId: 'warehouse-central',
+    unitId: 'object-2',
     reason: 'Ежедневное списание',
     items: [
       {
@@ -1556,6 +1563,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       type: string;
       date: string;
       warehouseId: string;
+      unitId?: string;
       reason: string;
       items: Array<{
         productId: string;
@@ -1578,11 +1586,12 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       'p-4': 'л',
       'p-5': 'шт',
     };
-    const writeOff = {
+    const writeOff: WriteOff = {
       id: `wo-${Date.now()}`,
-      type: body.type,
+      type: body.type as WriteOff['type'],
       date: body.date,
       warehouseId: body.warehouseId,
+      unitId: body.unitId ?? undefined,
       reason: body.reason,
       items: body.items.map((item, idx) => ({
         id: `wo-item-${Date.now()}-${idx}`,
