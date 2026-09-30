@@ -7,6 +7,8 @@ export interface WriteOff {
   type: WriteOffType;
   date: string; // ISO 8601
   warehouseId: string;
+  /** Объект, на который записано списание. */
+  unitId?: string;
   reason: string; // причина списания
   items: WriteOffItem[];
   createdAt: string;
@@ -31,6 +33,8 @@ export interface CreateWriteOffRequest {
   type: WriteOffType;
   date: string;
   warehouseId: string;
+  /** Объект, на который записывается списание. */
+  unitId?: string;
   reason: string;
   items: Array<{
     productId: string;
