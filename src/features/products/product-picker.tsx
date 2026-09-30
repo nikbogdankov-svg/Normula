@@ -110,6 +110,7 @@ export function ProductPicker({
         placeholder={placeholder}
         disabled={isPending}
         className="product-picker__select"
+        renderSelectedOption={(option) => <>{option.content ?? option.text ?? ''}</>}
       />
 
       <CreateProductDialog

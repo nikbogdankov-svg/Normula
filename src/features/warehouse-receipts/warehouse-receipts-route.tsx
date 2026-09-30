@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Flex,
   Icon,
   Text,
   TextInput,
+  Select,
   Table,
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
-import { Plus, Magnifier } from '@gravity-ui/icons';
+import { Plus, Magnifier, ArrowUp, ArrowDown, ArrowUpArrowDown } from '@gravity-ui/icons';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
+import { useMockCateringObjects } from '@/features/objects/api';
 import { useReceipts } from './api';
 import { ReceiptDrawer } from './warehouse-receipt-drawer';
 import { CreateReceiptDrawer } from './create-receipt-drawer';
@@ -26,17 +28,28 @@ function receiptTotal(receipt: WarehouseReceipt): number {
 
 function ReceiptsTable({
   receipts,
-  search,
+  filterActive,
+  dateSort,
+  onDateSortToggle,
   onOpen,
 }: {
   receipts: WarehouseReceipt[];
-  search: string;
+  filterActive: boolean;
+  dateSort: 'asc' | 'desc';
+  onDateSortToggle: () => void;
   onOpen: (receipt: WarehouseReceipt) => void;
 }) {
   const columns: TableColumnConfig<WarehouseReceipt>[] = [
     {
       id: 'date',
-      name: 'Дата',
+      name: () => (
+        <SortableHeader
+          label="Дата"
+          active
+          ascending={dateSort === 'asc'}
+          onToggle={onDateSortToggle}
+        />
+      ),
       template: (row) => (
         <Text variant="body-2">{new Date(row.date).toLocaleDateString('ru-RU')}</Text>
       ),
@@ -77,9 +90,9 @@ function ReceiptsTable({
             onRowClick={onOpen}
             columns={columns}
           />
-          {search.trim() !== '' && receipts.length === 0 && (
+          {filterActive && receipts.length === 0 && (
             <Text variant="body-2" color="secondary" style={{ display: 'block', padding: 16 }}>
-              Ничего не нашли по запросу «{search}»
+              Приходы по выбранным фильтрам не найдены
             </Text>
           )}
         </div>
@@ -90,12 +103,22 @@ function ReceiptsTable({
 
 export function WarehouseReceiptsRoute() {
   const api = useApi();
+  const objects = useMockCateringObjects();
   const [search, setSearch] = useState('');
+  const [selectedObjectId, setSelectedObjectId] = useState<string>('');
   const [opened, setOpened] = useState<WarehouseReceipt | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WarehouseReceipt | null>(null);
+  const [dateSort, setDateSort] = useState<'asc' | 'desc'>('desc');
 
   const { data, isLoading, error } = useReceipts(MOCK_WAREHOUSE_ID);
+
+  const objectsList = useMemo(() => objects.data?.objects ?? [], [objects.data]);
+
+  useEffect(() => {
+    const first = objects.data?.objects[0];
+    if (first) setSelectedObjectId((current) => current || first.id);
+  }, [objects.data]);
 
   if (api.organizationId === null) {
     return (
@@ -105,28 +128,48 @@ export function WarehouseReceiptsRoute() {
     );
   }
 
-  const filteredRows = (data?.receipts ?? []).filter((receipt) => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return receipt.invoiceNumber.toLowerCase().includes(query) || receipt.date.includes(query);
-  });
+  const filterActive = search.trim() !== '';
+
+  const filteredRows = (data?.receipts ?? [])
+    .filter((receipt) => {
+      if (selectedObjectId && receipt.unitId !== selectedObjectId) return false;
+      const query = search.trim().toLowerCase();
+      if (!query) return true;
+      return receipt.invoiceNumber.toLowerCase().includes(query) || receipt.date.includes(query);
+    })
+    .sort((a, b) => {
+      const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      return dateSort === 'asc' ? diff : -diff;
+    });
 
   return (
     <div className="wr-page">
       <Flex className="wr-page__toolbar" alignItems="center" justifyContent="space-between" gap={4}>
-        <TextInput
-          size="l"
-          placeholder="Поиск по номеру накладной"
-          value={search}
-          onUpdate={setSearch}
-          hasClear
-          startContent={
-            <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
-              <Icon data={Magnifier} size={16} />
-            </span>
-          }
-          style={{ width: 280 }}
-        />
+        <Flex alignItems="center" gap={2}>
+          <TextInput
+            size="l"
+            placeholder="Поиск по номеру накладной"
+            value={search}
+            onUpdate={setSearch}
+            hasClear
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <Icon data={Magnifier} size={16} />
+              </span>
+            }
+            style={{ width: 280 }}
+          />
+          {objectsList.length > 0 && (
+            <Select
+              size="l"
+              width={280}
+              title="Объект"
+              value={[selectedObjectId]}
+              onUpdate={(value) => setSelectedObjectId(value[0] ?? '')}
+              options={objectsList.map((unit) => ({ value: unit.id, content: unit.name }))}
+            />
+          )}
+        </Flex>
         <Button view="normal-contrast" size="l" onClick={() => setCreateOpen(true)}>
           <Icon data={Plus} size={16} />
           Приход
@@ -166,7 +209,9 @@ export function WarehouseReceiptsRoute() {
       {!isLoading && !error && data && data.receipts.length > 0 && (
         <ReceiptsTable
           receipts={filteredRows}
-          search={search}
+          filterActive={filterActive}
+          dateSort={dateSort}
+          onDateSortToggle={() => setDateSort(dateSort === 'desc' ? 'asc' : 'desc')}
           onOpen={(receipt) => setOpened(receipt)}
         />
       )}
@@ -189,5 +234,46 @@ export function WarehouseReceiptsRoute() {
         initial={editing}
       />
     </div>
+  );
+}
+
+function SortableHeader({
+  label,
+  active,
+  ascending,
+  onToggle,
+}: {
+  label: string;
+  active: boolean;
+  ascending: boolean;
+  onToggle: () => void;
+}) {
+  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+
+  return (
+    <Flex
+      alignItems="center"
+      justifyContent="flex-start"
+      gap={1}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={onToggle}
+      title={
+        active
+          ? ascending
+            ? 'По возрастанию — нажмите для убывания'
+            : 'По убыванию — нажмите для возрастания'
+          : `Сортировать по: ${label}`
+      }
+    >
+      {label}
+      <span
+        style={{
+          display: 'inline-flex',
+          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
+        }}
+      >
+        <Icon data={icon} size={14} />
+      </span>
+    </Flex>
   );
 }

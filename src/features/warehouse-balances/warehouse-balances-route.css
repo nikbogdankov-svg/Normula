@@ -120,7 +120,7 @@
   box-sizing: border-box;
 }
 
-/* Строка-шапка карточки сохраняет отступы обычной строки: 8px по вертикали,
+/* Строка-шапка карточки сохраняет отступы шапки таблицы: 12px по вертикали,
    16px по бокам, название — по центру высоты. */
 .warehouse-balances-card__summary {
   display: grid;
@@ -130,7 +130,7 @@
 
 .warehouse-balances-card__name {
   min-width: 0;
-  padding: 4px 16px 4px 0;
+  padding: 12px 16px;
 }
 
 /* Название — точно по центру высоты строки (ellipsis-текст инлайн-блоком
@@ -141,7 +141,7 @@
 
 .warehouse-balances-card__price,
 .warehouse-balances-card__rest {
-  padding: 4px 16px;
+  padding: 12px 16px;
   text-align: right;
   white-space: nowrap;
 }
@@ -150,7 +150,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 4px 16px;
+  padding: 12px 16px;
   border-radius: var(--g-border-radius-s);
   transition: background-color 0.12s ease-out;
 }
@@ -193,9 +193,11 @@
   width: 48px;
 }
 
-/* Партии внутри карточки: блок под строкой товара с нормальными отступами. */
+/* Партии внутри карточки: divider на всю ширину карточки, таблица — с
+   боковыми отступами 16px, чтобы строки не прилипали к рамке. */
 .warehouse-balances-card__batches {
-  padding: 0 0 4px;
+  border-top: 1px solid var(--g-color-line-generic);
+  padding: 8px 16px 4px;
 }
 
 .warehouse-balances-batches {
@@ -214,7 +216,7 @@
 }
 
 .warehouse-balances-batches thead th {
-  padding: 4px 16px;
+  padding: 4px 2px;
   text-align: left;
   color: var(--g-color-text-secondary);
   font-weight: var(--g-text-body-font-weight);
@@ -223,7 +225,7 @@
 }
 
 .warehouse-balances-batches tbody td {
-  padding: 8px 16px;
+  padding: 8px 2px;
   border-bottom: 1px solid var(--g-color-line-generic);
 }
 
