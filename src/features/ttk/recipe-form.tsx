@@ -26,6 +26,7 @@ function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
   const [portionYield, setPortionYield] = useState('');
+  const [collectionName, setCollectionName] = useState('');
   const [recipe, setRecipe] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
@@ -37,6 +38,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     if (initial) {
       setName(initial.name);
       setPortionYield(initial.portionYield);
+      setCollectionName(initial.collectionName);
       setRecipe(initial.recipe);
       setProtein(initial.nutrition?.protein ?? '');
       setFat(initial.nutrition?.fat ?? '');
@@ -48,6 +50,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
     setName('');
     setPortionYield('');
+    setCollectionName('');
     setRecipe('');
     setProtein('');
     setFat('');
@@ -79,6 +82,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const getBody = (): CreateRecipeRequest => ({
     name: name.trim(),
     portionYield: portionYield.trim(),
+    collectionName: collectionName.trim(),
     recipe: recipe.trim(),
     ingredients: ingredients.filter((row) => row.name.trim()),
     nutrition: {
@@ -90,7 +94,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   });
 
   const fields = (
-    <Flex direction="column" gap={2}>
+    <Flex direction="column" gap={3}>
       <Flex gap={2}>
         <TextInput
           size="l"
@@ -110,6 +114,22 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           style={{ flex: 1 }}
         />
       </Flex>
+
+      <TextInput
+        size="l"
+        label="Название сборника:"
+        placeholder="Название сборника"
+        value={collectionName}
+        onUpdate={setCollectionName}
+        endContent={
+          <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
+            <Text variant="body-1" color="secondary">
+              опционально
+            </Text>
+          </Flex>
+        }
+        style={{ width: '100%' }}
+      />
 
       <Flex direction="column" gap={2}>
         <Text variant="body-1">Технология приготовления</Text>
@@ -161,7 +181,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       </Flex>
 
       <Flex direction="column" gap={2}>
-        <Text variant="subheader-1">Ингредиенты</Text>
+        <Text variant="body-1">Ингредиенты</Text>
 
         {ingredients.map((row, index) => (
           <Flex key={index} gap={2} alignItems="flex-end">

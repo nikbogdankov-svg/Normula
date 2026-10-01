@@ -79,6 +79,8 @@ export type CreateRecipeNutrition = Omit<Nutrition, 'vitaminC'>;
 export interface CreateRecipeRequest {
   name: string;
   portionYield: string;
+  /** Название сборника; пусто — карта без сборника. */
+  collectionName?: string;
   /** Технология приготовления. */
   recipe: string;
   ingredients: CreateRecipeIngredient[];

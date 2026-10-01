@@ -660,6 +660,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       portionYield: string;
+      collectionName?: string;
       recipe: string;
       ingredients: Array<{
         name: string;
@@ -675,7 +676,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       id: `t-${Date.now()}`,
       name: body.name,
       collectionId: '',
-      collectionName: '',
+      collectionName: body.collectionName ?? '',
       portionYield: body.portionYield,
       recipe: body.recipe,
       nutrition: body.nutrition ? { ...base.nutrition, ...body.nutrition } : base.nutrition,
@@ -704,6 +705,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const body = options.body as {
       name: string;
       portionYield: string;
+      collectionName?: string;
       recipe: string;
       ingredients: Array<{
         name: string;
@@ -717,6 +719,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     Object.assign(found, {
       name: body.name,
       portionYield: body.portionYield,
+      collectionName: body.collectionName ?? found.collectionName,
       recipe: body.recipe,
       nutrition: body.nutrition ? { ...found.nutrition, ...body.nutrition } : found.nutrition,
       ingredients: (body.ingredients ?? [])
