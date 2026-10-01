@@ -4,6 +4,7 @@ import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
 import { Plus, TrashBin } from '@gravity-ui/icons';
 import { ProductPicker } from '@/features/products/product-picker';
+import type { Product } from '@/features/products/types';
 import { useBalances } from '@/features/warehouse-balances/api';
 import { useCreateWriteOff } from './api';
 import type { CreateWriteOffRequest } from './types';
@@ -61,8 +62,8 @@ export function CreateWriteOffDialog({
 
   const { data: balances } = useBalances(warehouseId);
 
-  // Номера и цены партий по продукту — источники для селекта «Серия» и для
-  // автоподсчёта суммы списания.
+  // Номера и цены партий по продукту — источник для автоподсчёта суммы
+  // списания (цена берётся из партии выбранного продукта).
   const batchesByProduct = useMemo(() => {
     const map = new Map<string, Array<{ number: string; price: number }>>();
     for (const balance of balances?.balances ?? []) {
@@ -77,6 +78,29 @@ export function CreateWriteOffDialog({
       }
     }
     return map;
+  }, [balances]);
+
+  // Партия выбирается первой, поэтому по ней же строится список доступных
+  // продуктов: их можно взять только из тех, у кого эта партия есть на складе.
+  const batches = useMemo(() => {
+    const numbers = new Set<string>();
+    const productsByBatch = new Map<string, Product[]>();
+    const remainingByProduct = new Map<string, number>();
+    for (const balance of balances?.balances ?? []) {
+      for (const item of balance.items) {
+        for (const batch of item.batches) {
+          numbers.add(batch.batchNumber);
+          const list = productsByBatch.get(batch.batchNumber) ?? [];
+          if (!list.some((product) => product.id === item.productId)) {
+            list.push({ id: item.productId, name: item.productName, unit: item.unit });
+          }
+          productsByBatch.set(batch.batchNumber, list);
+          const key = `${item.productId}::${batch.batchNumber}`;
+          remainingByProduct.set(key, (remainingByProduct.get(key) ?? 0) + batch.remaining);
+        }
+      }
+    }
+    return { numbers: [...numbers], productsByBatch, remainingByProduct };
   }, [balances]);
 
   useEffect(() => {
@@ -94,7 +118,8 @@ export function CreateWriteOffDialog({
     setItems((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   };
   const allItemsComplete =
-    items.length > 0 && items.every((row) => row.productName.trim() && row.quantity.trim());
+    items.length > 0 &&
+    items.every((row) => row.series.trim() && row.productName.trim() && row.quantity.trim());
 
   // Автоподсчёт итога: количество × цена выбранной партии.
   const totalSum = items.reduce((sum, row) => {
@@ -179,36 +204,51 @@ export function CreateWriteOffDialog({
           <Flex direction="column" gap={3} style={{ marginTop: 4 }}>
             {items.map((row, index) => (
               <Flex key={index} gap={2} alignItems="flex-end">
+                <div style={{ flex: 2, minWidth: 200 }}>
+                  <Select
+                    size="l"
+                    label="Партия:"
+                    placeholder="Выберите партию"
+                    value={row.series ? [row.series] : []}
+                    onUpdate={(next) => {
+                      const series = next[0] ?? '';
+                      const patch: Partial<DraftItem> = { series };
+                      if (series !== row.series) {
+                        patch.productId = '';
+                        patch.productName = '';
+                        patch.unit = '';
+                      }
+                      updateItem(index, patch);
+                    }}
+                    options={batches.numbers.map((number) => ({
+                      value: number,
+                      content: number,
+                    }))}
+                    hasClear
+                    width="max"
+                  />
+                </div>
                 <div style={{ flex: 2 }}>
                   <ProductPicker
                     value={row.productId}
                     valueLabel={row.productName}
                     placeholder="Название товара"
                     size="l"
+                    products={row.series ? batches.productsByBatch.get(row.series) : undefined}
+                    disabled={!row.series}
+                    showUnitInValue={false}
+                    selectedHint={
+                      row.productId && row.series
+                        ? `${batches.remainingByProduct.get(`${row.productId}::${row.series}`) ?? 0}${row.unit}`
+                        : undefined
+                    }
                     onChange={(product) =>
                       updateItem(index, {
                         productId: product?.id ?? '',
                         productName: product?.name ?? '',
                         unit: product?.unit ?? '',
-                        series: '',
                       })
                     }
-                  />
-                </div>
-                <div style={{ flex: 2, minWidth: 200 }}>
-                  <Select
-                    size="l"
-                    label="Серия:"
-                    placeholder="Выберите партию"
-                    value={row.series ? [row.series] : []}
-                    onUpdate={(next) => updateItem(index, { series: next[0] ?? '' })}
-                    options={(batchesByProduct.get(row.productId) ?? []).map((batch) => ({
-                      value: batch.number,
-                      content: batch.number,
-                    }))}
-                    disabled={!row.productId}
-                    hasClear
-                    width="max"
                   />
                 </div>
                 <div style={{ flex: 1, minWidth: 120 }}>
