@@ -8,6 +8,7 @@ import type {
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { Collection, Recipe } from '@/features/ttk/types';
+import type { CreateRecipeRequest } from '@/features/ttk/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
@@ -930,6 +931,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         grossPerPortion: string;
         netPerPortion: string;
       }>;
+      nutrition?: CreateRecipeRequest['nutrition'];
     };
     const base = sampleRecipe(recipes.length + 1);
     const recipe: Recipe = {
@@ -940,6 +942,7 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
       collectionName: '',
       portionYield: body.portionYield,
       recipe: body.recipe,
+      nutrition: body.nutrition ? { ...base.nutrition, ...body.nutrition } : base.nutrition,
       ingredients: (body.ingredients ?? [])
         .filter((row) => row.name.trim())
         .map((row) => ({
@@ -972,12 +975,14 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
         grossPerPortion: string;
         netPerPortion: string;
       }>;
+      nutrition?: CreateRecipeRequest['nutrition'];
     };
 
     Object.assign(found, {
       name: body.name,
       portionYield: body.portionYield,
       recipe: body.recipe,
+      nutrition: body.nutrition ? { ...found.nutrition, ...body.nutrition } : found.nutrition,
       ingredients: (body.ingredients ?? [])
         .filter((row) => row.name.trim())
         .map((row) => ({

@@ -27,6 +27,10 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
   const [portionYield, setPortionYield] = useState('');
   const [recipe, setRecipe] = useState('');
+  const [protein, setProtein] = useState('');
+  const [fat, setFat] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [kcal, setKcal] = useState('');
   const [ingredients, setIngredients] = useState<CreateRecipeIngredient[]>([emptyIngredient()]);
 
   useEffect(() => {
@@ -34,6 +38,10 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       setName(initial.name);
       setPortionYield(initial.portionYield);
       setRecipe(initial.recipe);
+      setProtein(initial.nutrition?.protein ?? '');
+      setFat(initial.nutrition?.fat ?? '');
+      setCarbs(initial.nutrition?.carbs ?? '');
+      setKcal(initial.nutrition?.kcal ?? '');
       setIngredients(ingredientsFromRecipe(initial));
       return;
     }
@@ -41,6 +49,10 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setName('');
     setPortionYield('');
     setRecipe('');
+    setProtein('');
+    setFat('');
+    setCarbs('');
+    setKcal('');
     setIngredients([emptyIngredient()]);
     // Сбрасываем только по ключу сессии формы, не по ссылке на initial.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resetKey задаёт момент предзаполнения
@@ -69,6 +81,12 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     portionYield: portionYield.trim(),
     recipe: recipe.trim(),
     ingredients: ingredients.filter((row) => row.name.trim()),
+    nutrition: {
+      protein: protein.trim(),
+      fat: fat.trim(),
+      carbs: carbs.trim(),
+      kcal: kcal.trim(),
+    },
   });
 
   const fields = (
@@ -102,6 +120,44 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           onUpdate={setRecipe}
           minRows={3}
         />
+      </Flex>
+
+      <Flex direction="column" gap={2}>
+        <Text variant="body-1">Пищевая ценность</Text>
+        <Flex gap={2} wrap>
+          <TextInput
+            size="l"
+            label="Белки, г:"
+            placeholder="0"
+            value={protein}
+            onUpdate={setProtein}
+            style={{ flex: 1 }}
+          />
+          <TextInput
+            size="l"
+            label="Жиры, г:"
+            placeholder="0"
+            value={fat}
+            onUpdate={setFat}
+            style={{ flex: 1 }}
+          />
+          <TextInput
+            size="l"
+            label="Углеводы, г:"
+            placeholder="0"
+            value={carbs}
+            onUpdate={setCarbs}
+            style={{ flex: 1 }}
+          />
+          <TextInput
+            size="l"
+            label="Калории, ккал:"
+            placeholder="0"
+            value={kcal}
+            onUpdate={setKcal}
+            style={{ flex: 1 }}
+          />
+        </Flex>
       </Flex>
 
       <Flex direction="column" gap={2}>
