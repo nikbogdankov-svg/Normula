@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useMockCateringObjects } from '@/features/objects/api';
-import type { ReceiptItem, WarehouseReceipt } from './types';
+import { ErrorState, LoadingState } from '@/shared/ui/states';
+import { useReceipt } from '@/features/warehouse/api';
+import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/format';
+import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
+import type { Receipt, ReceiptItem } from '@/features/warehouse/types';
 import './warehouse-receipt-drawer.css';
 
 function Cell({
@@ -15,29 +18,24 @@ function Cell({
   color?: 'primary' | 'secondary' | 'complementary';
   className?: string;
 }) {
-  if (!value) {
-    return (
-      <Text variant="body-2" color="secondary" className={className}>
-        —
-      </Text>
-    );
-  }
   return (
-    <Text variant="body-2" color={color} className={className}>
-      {value}
+    <Text variant="body-2" color={value ? color : 'secondary'} className={className}>
+      {value || '—'}
     </Text>
   );
 }
 
-/** Дополнительная информация о товаре, раскрываемая шевроном. */
+/** Приёмочный контроль строки, раскрывается шевроном. */
 function ItemDetails({ item }: { item: ReceiptItem }) {
-  const rows: [string, string?][] = [
+  const rows: [string, string][] = [
     ['Изготовитель', item.manufacturer],
     ['Фасовка', item.packaging],
-    ['Дата выработки', item.productionDate],
+    ['Дата выработки', formatDate(item.productionDate)],
     ['Тип документа', item.documentType],
     ['Органолептика', item.organoleptic],
     ['Условия хранения', item.storageConditions],
+    ['Цена за единицу', formatMoney(item.unitPrice)],
+    ['Сумма', formatMoney(item.total)],
     ['Примечание', item.note],
   ];
 
@@ -48,38 +46,21 @@ function ItemDetails({ item }: { item: ReceiptItem }) {
           <Text variant="body-1" color="secondary">
             {label}
           </Text>
-          {value ? (
-            <Cell value={value} />
-          ) : (
-            <Text variant="body-2" color="secondary">
-              —
-            </Text>
-          )}
+          <Cell value={value} />
         </div>
       ))}
     </div>
   );
 }
 
-/**
- * Детали накладной как нижний Drawer (desktop).
- * Просмотр в нижней панели: приёмочный контроль продукции по каждому товару.
- */
-export function ReceiptDrawer({
+function ReceiptView({
   receipt,
-  onClose,
-  onEdit,
+  objectOptions,
 }: {
-  receipt: WarehouseReceipt | null;
-  onClose: () => void;
-  onEdit?: (receipt: WarehouseReceipt) => void;
+  receipt: Receipt;
+  objectOptions: ObjectOption[];
 }) {
-  const height = useDrawerHeight();
-  const objects = useMockCateringObjects();
-  const [open, setOpen] = useState(false);
-  const [view, setView] = useState<WarehouseReceipt | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const allowCloseRef = useRef(false);
 
   const toggleItem = (id: string) => {
     setExpandedIds((prev) => {
@@ -93,54 +74,120 @@ export function ReceiptDrawer({
     });
   };
 
+  return (
+    <Flex direction="column" gap={4}>
+      <Flex direction="column">
+        <div className="warehouse-receipt-drawer__unit" style={{ marginBottom: 12 }}>
+          <Flex alignItems="center" gap={4}>
+            <Flex alignItems="center" gap={1}>
+              <Text variant="body-3" color="secondary">
+                Объект:
+              </Text>
+              <Text variant="body-3">{objectName(objectOptions, receipt.objectId)}</Text>
+            </Flex>
+            <Flex alignItems="center" gap={1}>
+              <Text variant="body-3" color="secondary">
+                Сумма:
+              </Text>
+              <Text variant="body-3">{formatMoney(receipt.total)}</Text>
+            </Flex>
+          </Flex>
+        </div>
+        <div className="warehouse-receipt-drawer__items">
+          <div className="warehouse-receipt-drawer__items-head">
+            <Text variant="body-2">Товар</Text>
+            <Text variant="body-2">Кол-во</Text>
+            <Text variant="body-2">Поставщик</Text>
+            <Text variant="body-2">Номер документа</Text>
+            <Text variant="body-2" className="warehouse-receipt-drawer__cell-right">
+              Срок реал.
+            </Text>
+            <span></span>
+          </div>
+
+          {receipt.items.map((item) => {
+            const expanded = expandedIds.has(item.id);
+            return (
+              <div
+                key={item.id}
+                className={`warehouse-receipt-drawer__card${
+                  expanded ? ' warehouse-receipt-drawer__card_expanded' : ''
+                }`}
+              >
+                <div className="warehouse-receipt-drawer__card-main">
+                  <div className="warehouse-receipt-drawer__card-name">
+                    <Text variant="body-2">{item.productName}</Text>
+                  </div>
+                  <Text variant="body-2">{formatQuantity(item.quantity, item.unit)}</Text>
+                  <Cell value={item.supplier} color="secondary" />
+                  <Cell value={item.documentNumber} color="secondary" />
+                  <Cell
+                    value={formatDate(item.expiryDate)}
+                    className="warehouse-receipt-drawer__cell-right"
+                  />
+                  <Button
+                    view="flat"
+                    size="m"
+                    className="warehouse-receipt-drawer__toggle"
+                    onClick={() => toggleItem(item.id)}
+                    aria-label="Больше информации"
+                  >
+                    <Icon data={expanded ? ChevronUp : ChevronDown} size={16} />
+                  </Button>
+                </div>
+                {expanded && <ItemDetails item={item} />}
+              </div>
+            );
+          })}
+        </div>
+      </Flex>
+    </Flex>
+  );
+}
+
+/**
+ * Детали накладной в нижнем drawer. Накладная грузится по id: список отдаёт
+ * только шапки, строки с приёмочным контролем — отдельным запросом.
+ */
+export function ReceiptDrawer({
+  receiptId,
+  objectOptions,
+  onClose,
+  onEdit,
+}: {
+  receiptId: string | null;
+  objectOptions: ObjectOption[];
+  onClose: () => void;
+  onEdit: (receipt: Receipt) => void;
+}) {
+  const height = useDrawerHeight();
+  const [open, setOpen] = useState(false);
+  const [viewId, setViewId] = useState<string | null>(null);
+  const receipt = useReceipt(viewId);
+
+  // Открытие — после монтирования, чтобы сработала анимация; закрытие —
+  // с задержкой, чтобы содержимое не пропало раньше панели.
   useEffect(() => {
-    if (!receipt) {
-      setOpen(false);
-      return;
+    if (receiptId) {
+      setViewId(receiptId);
+      const frame = requestAnimationFrame(() => setOpen(true));
+      return () => cancelAnimationFrame(frame);
     }
 
-    setView(receipt);
-  }, [receipt]);
-
-  useEffect(() => {
-    if (!receipt) return;
-
-    allowCloseRef.current = false;
-    const frame = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- открытие по id накладной
-  }, [receipt?.id]);
-
-  useEffect(() => {
-    if (open || !view || receipt) return;
-    const timer = window.setTimeout(() => {
-      setView(null);
-    }, 220);
-    return () => window.clearTimeout(timer);
-  }, [open, view, receipt]);
-
-  const requestClose = () => {
-    allowCloseRef.current = true;
     setOpen(false);
-    onClose();
-  };
+    const timer = window.setTimeout(() => setViewId(null), 220);
+    return () => window.clearTimeout(timer);
+  }, [receiptId]);
 
-  if (!view) return null;
+  if (!viewId) return null;
+
+  const view = receipt.data?.receipt;
 
   return (
     <Drawer
       open={open}
-      onOpenChange={(nextOpen, _event, reason) => {
-        if (nextOpen) {
-          setOpen(true);
-          return;
-        }
-
-        // Явное закрытие (крестик / Escape).
-        if (allowCloseRef.current || reason === 'outside-press' || reason === 'escape-key') {
-          setOpen(false);
-          onClose();
-        }
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
       }}
       placement="bottom"
       size={height}
@@ -153,98 +200,35 @@ export function ReceiptDrawer({
         <div className="warehouse-receipt-drawer__header">
           <div className="warehouse-receipt-drawer__header-inner">
             <Flex alignItems="center" gap={2}>
-              <Text variant="subheader-3">Накладная {view.invoiceNumber}</Text>
-              <Label theme="normal" size="m">
-                {new Date(view.date).toLocaleDateString('ru-RU').replaceAll('.', '/')}
-              </Label>
+              <Text variant="subheader-3">
+                {view ? `Накладная ${view.invoiceNumber}` : 'Накладная'}
+              </Text>
+              {view && (
+                <Label theme="normal" size="m">
+                  {formatDate(view.date)}
+                </Label>
+              )}
             </Flex>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+            <Button view="flat" size="l" onClick={onClose} aria-label="Закрыть">
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
         </div>
 
         <div className="warehouse-receipt-drawer__body">
-          <Flex direction="column" gap={4}>
-            <Flex direction="column">
-              <div className="warehouse-receipt-drawer__unit" style={{ marginBottom: 12 }}>
-                <Flex alignItems="center" gap={1}>
-                  <Text variant="body-3" color="secondary">
-                    Объект:
-                  </Text>
-                  <Text variant="body-3">
-                    {view.unitId
-                      ? (objects.data?.objects.find((k) => k.id === view.unitId)?.name ?? '—')
-                      : '—'}
-                  </Text>
-                </Flex>
-              </div>
-              <div className="warehouse-receipt-drawer__items">
-                <div className="warehouse-receipt-drawer__items-head">
-                  <Text variant="body-2">Товар</Text>
-                  <Text variant="body-2">Кол-во</Text>
-                  <Text variant="body-2">Поставщик</Text>
-                  <Text variant="body-2">Номер документа</Text>
-                  <Text variant="body-2" className="warehouse-receipt-drawer__cell-right">
-                    Срок реал.
-                  </Text>
-                  <span></span>
-                </div>
-
-                {view.items.map((item) => {
-                  const expanded = expandedIds.has(item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      className={`warehouse-receipt-drawer__card${
-                        expanded ? ' warehouse-receipt-drawer__card_expanded' : ''
-                      }`}
-                    >
-                      <div className="warehouse-receipt-drawer__card-main">
-                        <div className="warehouse-receipt-drawer__card-name">
-                          <Text variant="body-2">{item.productName}</Text>
-                        </div>
-                        <Text variant="body-2">
-                          {item.quantity} {item.unit}
-                        </Text>
-                        <Cell value={item.supplier} color="secondary" />
-                        <Cell value={item.documentNumber} color="secondary" />
-                        <Cell
-                          value={item.expiryDate}
-                          className="warehouse-receipt-drawer__cell-right"
-                        />
-                        <Button
-                          view="flat"
-                          size="m"
-                          className="warehouse-receipt-drawer__toggle"
-                          onClick={() => toggleItem(item.id)}
-                          aria-label="Больше информации"
-                        >
-                          <Icon data={expanded ? ChevronUp : ChevronDown} size={16} />
-                        </Button>
-                      </div>
-                      {expanded && <ItemDetails item={item} />}
-                    </div>
-                  );
-                })}
-              </div>
-            </Flex>
-          </Flex>
+          {receipt.isPending && <LoadingState />}
+          {receipt.isError && (
+            <ErrorState error={receipt.error} onRetry={() => void receipt.refetch()} />
+          )}
+          {view && <ReceiptView receipt={view} objectOptions={objectOptions} />}
         </div>
 
         <div className="warehouse-receipt-drawer__footer">
           <div className="warehouse-receipt-drawer__footer-inner">
-            <Button view="outlined" size="l" onClick={requestClose}>
+            <Button view="outlined" size="l" onClick={onClose}>
               Закрыть
             </Button>
-            <Button
-              view="normal"
-              size="l"
-              onClick={() => {
-                onEdit?.(view);
-                requestClose();
-              }}
-            >
+            <Button view="normal" size="l" disabled={!view} onClick={() => view && onEdit(view)}>
               Редактировать
             </Button>
           </div>

@@ -57,7 +57,7 @@ export interface CreateObjectRequest extends UpdateObjectRequest {
 
 /*
  * Ниже — форма мок-объектов для разделов, которые ещё на моках (меню,
- * порционник, склад, раскладка продуктов): см. useMockCateringObjects.
+ * порционник, раскладка продуктов): см. useMockCateringObjects.
  * Удаляется вместе с их моками.
  */
 

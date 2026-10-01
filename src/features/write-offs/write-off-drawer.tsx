@@ -1,76 +1,109 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Flex, Icon, Text } from '@gravity-ui/uikit';
+import { useEffect, useState } from 'react';
+import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { Xmark } from '@gravity-ui/icons';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import type { WriteOff } from './types';
+import { ErrorState, LoadingState } from '@/shared/ui/states';
+import { useWriteOff } from '@/features/warehouse/api';
+import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/format';
+import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
+import type { WriteOff } from '@/features/warehouse/types';
 import './write-off-drawer.css';
 
-/**
- * Детали списания как нижний Drawer (desktop).
- * Просмотр в нижней панели.
- */
-export function WriteOffDrawer({
+function WriteOffView({
   writeOff,
-  onClose,
+  objectOptions,
 }: {
-  writeOff: WriteOff | null;
+  writeOff: WriteOff;
+  objectOptions: ObjectOption[];
+}) {
+  return (
+    <Flex direction="column" gap={3}>
+      <Flex direction="column" gap={1}>
+        <Text variant="body-2" color="secondary">
+          Объект: <strong>{objectName(objectOptions, writeOff.objectId)}</strong>
+        </Text>
+        <Text variant="body-2" color="secondary">
+          Дата: <strong>{formatDate(writeOff.date)}</strong>
+        </Text>
+      </Flex>
+
+      <div className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Накладная</th>
+              <th>Товар</th>
+              <th style={{ width: 120, textAlign: 'right' }}>Кол-во</th>
+              <th style={{ width: 120, textAlign: 'right' }}>Цена</th>
+              <th style={{ width: 140, textAlign: 'right' }}>Сумма</th>
+            </tr>
+          </thead>
+          <tbody>
+            {writeOff.items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.invoiceNumber}</td>
+                <td>{item.productName}</td>
+                <td style={{ textAlign: 'right' }}>{formatQuantity(item.quantity, item.unit)}</td>
+                <td style={{ textAlign: 'right' }}>{formatMoney(item.unitPrice)}</td>
+                <td style={{ textAlign: 'right' }}>{formatMoney(item.total)}</td>
+              </tr>
+            ))}
+            <tr className="admin-table__row_total">
+              <td>
+                <strong>Всего</strong>
+              </td>
+              <td />
+              <td />
+              <td />
+              <td style={{ textAlign: 'right' }}>
+                <strong>{formatMoney(writeOff.total)}</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Flex>
+  );
+}
+
+/** Детали списания в нижнем drawer; списание грузится по id. */
+export function WriteOffDrawer({
+  writeOffId,
+  objectOptions,
+  onClose,
+  onEdit,
+}: {
+  writeOffId: string | null;
+  objectOptions: ObjectOption[];
   onClose: () => void;
+  onEdit: (writeOff: WriteOff) => void;
 }) {
   const height = useDrawerHeight();
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<WriteOff | null>(null);
-  const allowCloseRef = useRef(false);
+  const [viewId, setViewId] = useState<string | null>(null);
+  const writeOff = useWriteOff(viewId);
 
   useEffect(() => {
-    if (!writeOff) {
-      setOpen(false);
-      return;
+    if (writeOffId) {
+      setViewId(writeOffId);
+      const frame = requestAnimationFrame(() => setOpen(true));
+      return () => cancelAnimationFrame(frame);
     }
 
-    setView(writeOff);
-  }, [writeOff]);
-
-  useEffect(() => {
-    if (!writeOff) return;
-
-    allowCloseRef.current = false;
-    const frame = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- открытие по id списания
-  }, [writeOff?.id]);
-
-  useEffect(() => {
-    if (open || !view || writeOff) return;
-    const timer = window.setTimeout(() => {
-      setView(null);
-    }, 220);
-    return () => window.clearTimeout(timer);
-  }, [open, view, writeOff]);
-
-  const requestClose = () => {
-    allowCloseRef.current = true;
     setOpen(false);
-    onClose();
-  };
+    const timer = window.setTimeout(() => setViewId(null), 220);
+    return () => window.clearTimeout(timer);
+  }, [writeOffId]);
 
-  if (!view) return null;
+  if (!viewId) return null;
 
-  const totalSum = view.items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const view = writeOff.data?.writeOff;
 
   return (
     <Drawer
       open={open}
-      onOpenChange={(nextOpen, _event, reason) => {
-        if (nextOpen) {
-          setOpen(true);
-          return;
-        }
-
-        // Явное закрытие (крестик / Escape).
-        if (allowCloseRef.current || reason === 'outside-press' || reason === 'escape-key') {
-          setOpen(false);
-          onClose();
-        }
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
       }}
       placement="bottom"
       size={height}
@@ -81,60 +114,34 @@ export function WriteOffDrawer({
     >
       <div className="write-off-drawer__card">
         <div className="write-off-drawer__header">
-          <Text variant="subheader-2">Списание: {view.reason}</Text>
-          <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+          <Flex alignItems="center" gap={2}>
+            <Text variant="subheader-2">{view ? `Списание: ${view.reason}` : 'Списание'}</Text>
+            {view && (
+              <Label theme="normal" size="m">
+                {formatDate(view.date)}
+              </Label>
+            )}
+          </Flex>
+          <Button view="flat" size="l" onClick={onClose} aria-label="Закрыть">
             <Icon data={Xmark} size={20} />
           </Button>
         </div>
 
         <div className="write-off-drawer__body">
-          <Flex direction="column" gap={3}>
-            <Flex direction="column" gap={1}>
-              <Text variant="body-2" color="secondary">
-                Дата: <strong>{new Date(view.date).toLocaleDateString('ru-RU')}</strong>
-              </Text>
-              <Text variant="body-2" color="secondary">
-                Тип:{' '}
-                <strong>{view.type === 'exceptional' ? 'Исключительное' : 'Автоматическое'}</strong>
-              </Text>
-            </Flex>
+          {writeOff.isPending && <LoadingState />}
+          {writeOff.isError && (
+            <ErrorState error={writeOff.error} onRetry={() => void writeOff.refetch()} />
+          )}
+          {view && <WriteOffView writeOff={view} objectOptions={objectOptions} />}
+        </div>
 
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Товар</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Кол-во</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Ед.</th>
-                    <th style={{ width: 100, textAlign: 'right' }}>Цена</th>
-                    <th style={{ width: 120, textAlign: 'right' }}>Сумма</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {view.items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.productName}</td>
-                      <td style={{ textAlign: 'right' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right' }}>{item.unit}</td>
-                      <td style={{ textAlign: 'right' }}>{item.unitPrice.toFixed(2)}</td>
-                      <td style={{ textAlign: 'right' }}>{item.totalPrice.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  <tr className="admin-table__row_total">
-                    <td>
-                      <strong>Всего</strong>
-                    </td>
-                    <td />
-                    <td />
-                    <td />
-                    <td style={{ textAlign: 'right' }}>
-                      <strong>{totalSum.toFixed(2)} ₽</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Flex>
+        <div className="write-off-drawer__footer">
+          <Button view="outlined" size="l" onClick={onClose}>
+            Закрыть
+          </Button>
+          <Button view="normal" size="l" disabled={!view} onClick={() => view && onEdit(view)}>
+            Редактировать
+          </Button>
         </div>
       </div>
     </Drawer>

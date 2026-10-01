@@ -107,3 +107,16 @@
   font-weight: 600;
   background-color: var(--g-color-bg-secondary);
 }
+
+/* Подвал drawer'а с действиями — как у деталей накладной. */
+.write-off-drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-block: 16px;
+  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
+  border-top: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}

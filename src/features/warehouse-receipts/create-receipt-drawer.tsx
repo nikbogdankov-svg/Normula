@@ -12,16 +12,32 @@ import {
   CircleCheck,
   CircleDashed,
 } from '@gravity-ui/icons';
-import { useCreateReceipt, useUpdateReceipt } from './api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
-import { useMockCateringObjects } from '@/features/objects/api';
 import { ProductPicker } from '@/features/products/product-picker';
-import type { CreateReceiptRequest, ReceiptItem, WarehouseReceipt } from './types';
+import { useCreateReceipt, useUpdateReceipt } from '@/features/warehouse/api';
+import {
+  decimalToInput,
+  formatMoney,
+  isoToPicker,
+  lineTotal,
+  parseDecimal,
+  pickerToIso,
+  todayPicker,
+} from '@/features/warehouse/format';
+import { ObjectSelect, type ObjectOption } from '@/features/warehouse/object-select';
+import {
+  PRICE_DECIMALS,
+  QUANTITY_DECIMALS,
+  type Receipt,
+  type ReceiptItem,
+  type ReceiptItemInput,
+  type ReceiptRequest,
+} from '@/features/warehouse/types';
 import './create-receipt-drawer.css';
 
 /**
- * Возможные значения для селектов приёмочного контроля. Пока держим в одном
- * месте, синхронно с данными в mock-handlers.
+ * Значения селектов приёмочного контроля. Бэкенд хранит их как текст и
+ * списки не проверяет, поэтому список живёт только здесь.
  */
 const DOCUMENT_TYPE_OPTIONS = [
   'Декларация о соответствии',
@@ -56,6 +72,8 @@ function ItemInput({
   onUpdate,
   flex = 1,
   optional = false,
+  invalid = false,
+  endContent,
 }: {
   label: string;
   placeholder?: string;
@@ -63,6 +81,8 @@ function ItemInput({
   onUpdate: (value: string) => void;
   flex?: number;
   optional?: boolean;
+  invalid?: boolean;
+  endContent?: React.ReactNode;
 }) {
   return (
     <TextInput
@@ -72,14 +92,16 @@ function ItemInput({
       value={value}
       onUpdate={onUpdate}
       style={{ flex }}
+      validationState={invalid ? 'invalid' : undefined}
       endContent={
-        optional ? (
+        endContent ??
+        (optional ? (
           <div style={{ marginRight: 4 }}>
             <Text variant="body-1" color="secondary">
               необязательно
             </Text>
           </div>
-        ) : undefined
+        ) : undefined)
       }
     />
   );
@@ -116,7 +138,7 @@ function ItemSelect({
   );
 }
 
-/** Поле даты строки товара/накладной через календарь. */
+/** Поле даты через календарь; значение — дд/мм/гггг. */
 function ItemDate({
   label,
   value,
@@ -143,7 +165,10 @@ function ItemDate({
   );
 }
 
+/** Строка формы: числа и даты — строками, как их ввёл пользователь. */
 interface DraftItem {
+  /** id существующей строки при редактировании; пусто — новая. */
+  id: string;
   productId: string;
   productName: string;
   unit: string;
@@ -162,6 +187,7 @@ interface DraftItem {
 }
 
 const emptyItem = (): DraftItem => ({
+  id: '',
   productId: '',
   productName: '',
   unit: '',
@@ -179,16 +205,80 @@ const emptyItem = (): DraftItem => ({
   note: '',
 });
 
+/** Строка накладной с бэкенда → черновик формы. */
+function receiptToDraft(item: ReceiptItem): DraftItem {
+  return {
+    id: item.id,
+    productId: item.productId,
+    productName: item.productName,
+    unit: item.unit,
+    quantity: decimalToInput(item.quantity),
+    unitPrice: decimalToInput(item.unitPrice),
+    packaging: item.packaging,
+    productionDate: isoToPicker(item.productionDate),
+    manufacturer: item.manufacturer,
+    supplier: item.supplier,
+    documentNumber: item.documentNumber,
+    documentType: item.documentType,
+    organoleptic: item.organoleptic,
+    storageConditions: item.storageConditions,
+    expiryDate: isoToPicker(item.expiryDate),
+    note: item.note,
+  };
+}
+
+/**
+ * Черновик → строка запроса. null, если строку отправлять нельзя: бэкенд
+ * требует продукт, количество больше нуля, цену не меньше нуля и все поля
+ * бракеража, кроме примечания.
+ */
+function draftToInput(row: DraftItem): ReceiptItemInput | null {
+  const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS);
+  const unitPrice = parseDecimal(row.unitPrice, PRICE_DECIMALS);
+  const productionDate = pickerToIso(row.productionDate);
+  const expiryDate = pickerToIso(row.expiryDate);
+
+  const required = [
+    row.productId,
+    row.packaging,
+    row.manufacturer,
+    row.supplier,
+    row.documentType,
+    row.documentNumber,
+    row.organoleptic,
+    row.storageConditions,
+    productionDate,
+    expiryDate,
+  ];
+  if (required.some((value) => value.trim() === '')) return null;
+  if (quantity === null || quantity <= 0 || unitPrice === null) return null;
+
+  return {
+    id: row.id || undefined,
+    productId: row.productId,
+    quantity,
+    unitPrice,
+    packaging: row.packaging.trim(),
+    manufacturer: row.manufacturer.trim(),
+    supplier: row.supplier.trim(),
+    productionDate,
+    documentType: row.documentType,
+    documentNumber: row.documentNumber.trim(),
+    organoleptic: row.organoleptic,
+    storageConditions: row.storageConditions,
+    expiryDate,
+    note: row.note.trim(),
+  };
+}
+
 type ItemStatus = 'done' | 'active' | 'skipped';
 
-/** Статус заполнения строки: всё заполнено / в процессе / оставлен для другой. */
+/** Статус заполнения строки: готова к отправке / в работе / не заполнена. */
 function itemStatus(row: DraftItem, index: number, expandedIndex: number | null): ItemStatus {
-  const filled = Boolean(row.productName.trim() && row.quantity.trim() && row.unitPrice.trim());
-  if (filled) return 'done';
+  if (draftToInput(row) !== null) return 'done';
   return expandedIndex === index ? 'active' : 'skipped';
 }
 
-/** Индикатор заполнения строки товара. */
 function ItemStatusIcon({ status }: { status: ItemStatus }) {
   const icon =
     status === 'done' ? (
@@ -215,72 +305,35 @@ function ItemStatusIcon({ status }: { status: ItemStatus }) {
   );
 }
 
-/** Сегодня в формате дд/мм/гггг. */
-function todayLocal(): string {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${now.getFullYear()}`;
+/** Число введено, но бэкенд его не примет (лишние знаки, не число). */
+function isBadDecimal(value: string, decimals: number): boolean {
+  return value.trim() !== '' && parseDecimal(value, decimals) === null;
 }
 
-/** дд/мм/гггг → гггг-мм-дд (формат хранения/бэка). */
-function toIsoDate(value: string): string {
-  const [dd, mm, yyyy] = value.split('/');
-  if (!dd || !mm || yyyy?.length !== 4) return '';
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-/** гггг-мм-дд → дд/мм/гггг (для показа в форме). */
-function isoToLocal(value?: string): string {
-  if (!value) return '';
-  const [yyyy, mm, dd] = value.split('-');
-  if (!yyyy || !mm || !dd) return value;
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-/** Строка прихода → черновик строки формы. */
-function receiptToDraft(item: ReceiptItem): DraftItem {
-  return {
-    productId: item.productId ?? '',
-    productName: item.productName,
-    unit: item.unit,
-    quantity: item.quantity ? String(item.quantity) : '',
-    unitPrice: item.unitPrice ? String(item.unitPrice) : '',
-    packaging: item.packaging ?? '',
-    productionDate: isoToLocal(item.productionDate),
-    manufacturer: item.manufacturer ?? '',
-    supplier: item.supplier ?? '',
-    documentNumber: item.documentNumber ?? '',
-    documentType: item.documentType ?? '',
-    organoleptic: item.organoleptic ?? '',
-    storageConditions: item.storageConditions ?? '',
-    expiryDate: isoToLocal(item.expiryDate),
-    note: item.note ?? '',
-  };
-}
-
-/** Создание прихода (накладной) в нижнем drawer. */
+/** Создание и редактирование накладной в нижнем drawer. */
 export function CreateReceiptDrawer({
   open,
   onClose,
-  warehouseId,
+  objectId,
+  objectOptions,
   initial = null,
 }: {
   open: boolean;
   onClose: () => void;
-  warehouseId: string;
-  initial?: WarehouseReceipt | null;
+  /** Объект, выбранный на странице — подставляется в новую накладную. */
+  objectId: string;
+  objectOptions: ObjectOption[];
+  initial?: Receipt | null;
 }) {
   const height = useDrawerHeight();
   const create = useCreateReceipt();
   const update = useUpdateReceipt();
   const toaster = useToaster();
-  const objects = useMockCateringObjects();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [date, setDate] = useState(todayLocal());
-  const [unitId, setUnitId] = useState('');
+  const [date, setDate] = useState(todayPicker());
+  const [draftObjectId, setDraftObjectId] = useState('');
   const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
@@ -292,21 +345,20 @@ export function CreateReceiptDrawer({
 
     if (initial) {
       setInvoiceNumber(initial.invoiceNumber);
-      setDate(isoToLocal(initial.date));
-      setUnitId(initial.unitId ?? '');
+      setDate(isoToPicker(initial.date));
+      setDraftObjectId(initial.objectId);
       setItems(initial.items.length ? initial.items.map(receiptToDraft) : [emptyItem()]);
-      setExpandedIndex(0);
     } else {
       setInvoiceNumber('');
-      setDate(todayLocal());
-      setUnitId('');
+      setDate(todayPicker());
+      setDraftObjectId(objectId);
       setItems([emptyItem()]);
-      setExpandedIndex(0);
     }
+    setExpandedIndex(0);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
     return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- форма заполняется при открытии
   }, [open, initial?.id]);
 
   // После анимации закрытия размонтируем drawer.
@@ -330,37 +382,26 @@ export function CreateReceiptDrawer({
     setExpandedIndex(null);
   };
 
-  const filledItems = items.filter((row) => row.productName.trim());
+  const inputs = items.map(draftToInput);
+  const allItemsComplete = inputs.length > 0 && inputs.every((input) => input !== null);
+  const isoDate = pickerToIso(date.trim());
+  const canSubmit =
+    allItemsComplete && invoiceNumber.trim() !== '' && isoDate !== '' && draftObjectId !== '';
 
-  const allItemsComplete =
-    items.length > 0 &&
-    items.every((row) => row.productName.trim() && row.quantity.trim() && row.unitPrice.trim());
-
-  const getBody = (): CreateReceiptRequest => ({
-    date: toIsoDate(date.trim()),
-    invoiceNumber: invoiceNumber.trim(),
-    warehouseId,
-    unitId: unitId || undefined,
-    items: filledItems.map((row) => ({
-      productId: row.productId || undefined,
-      productName: row.productName,
-      unit: row.unit,
-      quantity: Number(row.quantity),
-      unitPrice: Number(row.unitPrice),
-      packaging: row.packaging,
-      productionDate: toIsoDate(row.productionDate),
-      manufacturer: row.manufacturer,
-      supplier: row.supplier,
-      documentNumber: row.documentNumber,
-      documentType: row.documentType,
-      organoleptic: row.organoleptic,
-      storageConditions: row.storageConditions,
-      expiryDate: toIsoDate(row.expiryDate),
-      note: row.note,
-    })),
-  });
+  const total = items.reduce((sum, row) => {
+    const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS) ?? 0;
+    const unitPrice = parseDecimal(row.unitPrice, PRICE_DECIMALS) ?? 0;
+    return sum + lineTotal(quantity, unitPrice);
+  }, 0);
 
   const submit = () => {
+    const body: ReceiptRequest = {
+      objectId: draftObjectId,
+      date: isoDate,
+      invoiceNumber: invoiceNumber.trim(),
+      items: inputs.filter((input): input is ReceiptItemInput => input !== null),
+    };
+
     const onSuccess = () => {
       toaster.add({
         name: initial ? 'receipt-updated' : 'receipt-created',
@@ -377,9 +418,8 @@ export function CreateReceiptDrawer({
         theme: 'danger',
       });
 
-    const body = getBody();
     if (initial) {
-      update.mutate({ id: initial.id, data: body }, { onSuccess, onError });
+      update.mutate({ id: initial.id, body }, { onSuccess, onError });
     } else {
       create.mutate(body, { onSuccess, onError });
     }
@@ -423,18 +463,12 @@ export function CreateReceiptDrawer({
                 onUpdate={setInvoiceNumber}
                 style={{ flex: 1 }}
               />
-              <ItemDate label="Дата:" value={date} onUpdate={(v) => setDate(v)} flex={1} />
+              <ItemDate label="Дата:" value={date} onUpdate={setDate} flex={1} />
               <div style={{ flex: 1 }}>
-                <Select
-                  size="l"
-                  label="Объект:"
-                  placeholder="Выберите объект"
-                  value={unitId ? [unitId] : []}
-                  options={(objects.data?.objects ?? []).map((k) => ({
-                    value: k.id,
-                    content: k.name,
-                  }))}
-                  onUpdate={(next) => setUnitId(next[0] ?? '')}
+                <ObjectSelect
+                  value={draftObjectId}
+                  onUpdate={setDraftObjectId}
+                  options={objectOptions}
                   width="max"
                 />
               </div>
@@ -442,7 +476,7 @@ export function CreateReceiptDrawer({
 
             <Flex direction="column" gap={3}>
               {items.map((row, index) => (
-                <div key={index} className="create-receipt-drawer__item">
+                <div key={row.id || `new-${index}`} className="create-receipt-drawer__item">
                   <Flex gap={2} alignItems="flex-end" className="create-receipt-drawer__item-main">
                     <div style={{ flex: 2 }}>
                       <ProductPicker
@@ -454,7 +488,7 @@ export function CreateReceiptDrawer({
                           updateItem(index, {
                             productId: product?.id ?? '',
                             productName: product?.name ?? '',
-                            unit: product?.unit ?? row.unit,
+                            unit: product?.unit ?? '',
                           })
                         }
                       />
@@ -464,12 +498,26 @@ export function CreateReceiptDrawer({
                       placeholder="0"
                       value={row.quantity}
                       onUpdate={(v) => updateItem(index, { quantity: v })}
+                      invalid={isBadDecimal(row.quantity, QUANTITY_DECIMALS)}
+                      endContent={
+                        row.unit ? (
+                          <span
+                            style={{
+                              color: 'var(--g-color-text-secondary)',
+                              paddingInlineEnd: 4,
+                            }}
+                          >
+                            {row.unit}
+                          </span>
+                        ) : undefined
+                      }
                     />
                     <ItemInput
                       label="Цена, ₽:"
                       placeholder="0.00"
                       value={row.unitPrice}
                       onUpdate={(v) => updateItem(index, { unitPrice: v })}
+                      invalid={isBadDecimal(row.unitPrice, PRICE_DECIMALS)}
                     />
                     <ItemStatusIcon status={itemStatus(row, index, expandedIndex)} />
                     <Button
@@ -504,19 +552,16 @@ export function CreateReceiptDrawer({
                             label="Изготовитель:"
                             value={row.manufacturer}
                             onUpdate={(v) => updateItem(index, { manufacturer: v })}
-                            flex={1}
                           />
                           <ItemInput
                             label="Поставщик:"
                             value={row.supplier}
                             onUpdate={(v) => updateItem(index, { supplier: v })}
-                            flex={1}
                           />
                           <ItemInput
                             label="Фасовка:"
                             value={row.packaging}
                             onUpdate={(v) => updateItem(index, { packaging: v })}
-                            flex={1}
                           />
                         </Flex>
                         <Flex gap={3}>
@@ -524,7 +569,6 @@ export function CreateReceiptDrawer({
                             label="Дата выработки:"
                             value={row.productionDate}
                             onUpdate={(v) => updateItem(index, { productionDate: v })}
-                            flex={1}
                           />
                           <ItemSelect
                             label="Тип документа:"
@@ -532,13 +576,11 @@ export function CreateReceiptDrawer({
                             value={row.documentType}
                             options={selectOptions(DOCUMENT_TYPE_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { documentType: v })}
-                            flex={1}
                           />
                           <ItemInput
                             label="Номер документа:"
                             value={row.documentNumber}
                             onUpdate={(v) => updateItem(index, { documentNumber: v })}
-                            flex={1}
                           />
                         </Flex>
                         <Flex gap={3}>
@@ -546,7 +588,6 @@ export function CreateReceiptDrawer({
                             label="Срок реализации:"
                             value={row.expiryDate}
                             onUpdate={(v) => updateItem(index, { expiryDate: v })}
-                            flex={1}
                           />
                           <ItemSelect
                             label="Органолептика:"
@@ -554,7 +595,6 @@ export function CreateReceiptDrawer({
                             value={row.organoleptic}
                             options={selectOptions(ORGANOLEPTIC_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { organoleptic: v })}
-                            flex={1}
                           />
                           <ItemSelect
                             label="Условия хранения:"
@@ -562,7 +602,6 @@ export function CreateReceiptDrawer({
                             value={row.storageConditions}
                             options={selectOptions(STORAGE_CONDITIONS_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { storageConditions: v })}
-                            flex={1}
                           />
                         </Flex>
                         <ItemInput
@@ -570,7 +609,6 @@ export function CreateReceiptDrawer({
                           placeholder="Необязательное поле"
                           value={row.note}
                           onUpdate={(v) => updateItem(index, { note: v })}
-                          flex={1}
                           optional
                         />
                       </Flex>
@@ -597,14 +635,17 @@ export function CreateReceiptDrawer({
 
         <div className="create-receipt-drawer__footer">
           <div className="create-receipt-drawer__footer-inner">
+            <Text variant="subheader-2" style={{ marginInlineEnd: 'auto' }}>
+              Итого: {formatMoney(total)}
+            </Text>
             <Button view="outlined" size="l" onClick={requestClose}>
               Отмена
             </Button>
             <Button
-              view={allItemsComplete ? 'action' : 'normal'}
+              view={canSubmit ? 'action' : 'normal'}
               size="l"
               onClick={submit}
-              disabled={!allItemsComplete}
+              disabled={!canSubmit}
               loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={Plus} size={16} />
