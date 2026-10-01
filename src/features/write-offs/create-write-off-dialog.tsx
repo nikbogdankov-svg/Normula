@@ -3,182 +3,253 @@ import { Button, Dialog, Flex, Icon, Select, Text, TextInput, useToaster } from 
 import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
 import { Plus, TrashBin } from '@gravity-ui/icons';
-import { ProductPicker } from '@/features/products/product-picker';
-import type { Product } from '@/features/products/types';
-import { useBalances } from '@/features/warehouse-balances/api';
-import { useCreateWriteOff } from './api';
-import type { CreateWriteOffRequest } from './types';
+import { useCreateWriteOff, useOpenBatches, useUpdateWriteOff } from '@/features/warehouse/api';
+import {
+  decimalToInput,
+  formatDate,
+  formatMoney,
+  formatQuantity,
+  isoToPicker,
+  lineTotal,
+  parseDecimal,
+  pickerToIso,
+  todayPicker,
+} from '@/features/warehouse/format';
+import { ObjectSelect, type ObjectOption } from '@/features/warehouse/object-select';
+import {
+  QUANTITY_DECIMALS,
+  type Batch,
+  type WriteOff,
+  type WriteOffRequest,
+} from '@/features/warehouse/types';
 
-interface DraftItem {
-  productId: string;
-  productName: string;
-  unit: string;
+/** Строка формы: накладная выбирается первой, товар — из её партий. */
+interface DraftRow {
+  receiptId: string;
+  batchId: string;
   quantity: string;
-  series: string;
 }
 
-const emptyItem = (): DraftItem => ({
-  productId: '',
-  productName: '',
-  unit: '',
-  quantity: '',
-  series: '',
-});
+const emptyRow = (): DraftRow => ({ receiptId: '', batchId: '', quantity: '' });
 
-/** Сегодня в формате дд/мм/гггг. */
-function todayLocal(): string {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${now.getFullYear()}`;
-}
-
-/** дд/мм/гггг → гггг-мм-дд (формат хранения/бэка). */
-function toIsoDate(value: string): string {
-  const [dd, mm, yyyy] = value.split('/');
-  if (!dd || !mm || yyyy?.length !== 4) return '';
-  return `${yyyy}-${mm}-${dd}`;
+/** Накладная в селекте: номер и дата. */
+interface ReceiptOption {
+  value: string;
+  content: string;
 }
 
 /**
- * Попап создания исключительного списания (СКЛАД-03). Обычные списания
- * создаются автоматически по нормам — вручную заводят только исключительные,
- * поэтому тип здесь не выбирается.
+ * Партии, доступные для списания. Бэкенд отдаёт только открытые партии, а
+ * при редактировании строки этого же списания могли исчерпать партию до
+ * нуля — тогда её нет в ответе. Собственные строки добавляются обратно, и
+ * их количество прибавляется к остатку: бэкенд при замене строк считает так
+ * же.
  */
+function availableBatches(open: Batch[], initial: WriteOff | null, objectId: string): Batch[] {
+  const byId = new Map<string, Batch>();
+  for (const batch of open) {
+    byId.set(batch.id, { ...batch });
+  }
+
+  if (initial && initial.objectId === objectId) {
+    for (const item of initial.items) {
+      const existing = byId.get(item.batchId);
+      if (existing) {
+        existing.remaining += item.quantity;
+        continue;
+      }
+
+      byId.set(item.batchId, {
+        id: item.batchId,
+        receiptId: item.receiptId,
+        invoiceNumber: item.invoiceNumber,
+        receiptDate: '',
+        productId: item.productId,
+        productName: item.productName,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        remaining: item.quantity,
+      });
+    }
+  }
+
+  return [...byId.values()];
+}
+
+/** Диалог создания и редактирования списания. */
 export function CreateWriteOffDialog({
   open,
-  warehouseId,
+  objectId,
+  objectOptions,
+  initial = null,
   onClose,
 }: {
   open: boolean;
-  warehouseId: string;
+  /** Объект, выбранный на странице — подставляется в новое списание. */
+  objectId: string;
+  objectOptions: ObjectOption[];
+  initial?: WriteOff | null;
   onClose: () => void;
 }) {
   const create = useCreateWriteOff();
+  const update = useUpdateWriteOff();
   const toaster = useToaster();
-  const [date, setDate] = useState(todayLocal());
+  const [draftObjectId, setDraftObjectId] = useState('');
+  const [date, setDate] = useState(todayPicker());
   const [reason, setReason] = useState('');
-  const [items, setItems] = useState<DraftItem[]>([emptyItem()]);
+  const [rows, setRows] = useState<DraftRow[]>([emptyRow()]);
 
-  const { data: balances } = useBalances(warehouseId);
-
-  // Номера и цены партий по продукту — источник для автоподсчёта суммы
-  // списания (цена берётся из партии выбранного продукта).
-  const batchesByProduct = useMemo(() => {
-    const map = new Map<string, Array<{ number: string; price: number }>>();
-    for (const balance of balances?.balances ?? []) {
-      for (const item of balance.items) {
-        const list = map.get(item.productId) ?? [];
-        for (const batch of item.batches) {
-          if (!list.some((entry) => entry.number === batch.batchNumber)) {
-            list.push({ number: batch.batchNumber, price: batch.price });
-          }
-        }
-        map.set(item.productId, list);
-      }
-    }
-    return map;
-  }, [balances]);
-
-  // Партия выбирается первой, поэтому по ней же строится список доступных
-  // продуктов: их можно взять только из тех, у кого эта партия есть на складе.
-  const batches = useMemo(() => {
-    const numbers = new Set<string>();
-    const productsByBatch = new Map<string, Product[]>();
-    const remainingByProduct = new Map<string, number>();
-    for (const balance of balances?.balances ?? []) {
-      for (const item of balance.items) {
-        for (const batch of item.batches) {
-          numbers.add(batch.batchNumber);
-          const list = productsByBatch.get(batch.batchNumber) ?? [];
-          if (!list.some((product) => product.id === item.productId)) {
-            list.push({ id: item.productId, name: item.productName, unit: item.unit });
-          }
-          productsByBatch.set(batch.batchNumber, list);
-          const key = `${item.productId}::${batch.batchNumber}`;
-          remainingByProduct.set(key, (remainingByProduct.get(key) ?? 0) + batch.remaining);
-        }
-      }
-    }
-    return { numbers: [...numbers], productsByBatch, remainingByProduct };
-  }, [balances]);
+  const openBatches = useOpenBatches(draftObjectId);
 
   useEffect(() => {
     if (!open) return;
-    setDate(todayLocal());
-    setReason('');
-    setItems([emptyItem()]);
-  }, [open]);
 
-  const updateItem = (index: number, patch: Partial<DraftItem>) => {
-    setItems((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    if (initial) {
+      setDraftObjectId(initial.objectId);
+      setDate(isoToPicker(initial.date));
+      setReason(initial.reason);
+      setRows(
+        initial.items.map((item) => ({
+          receiptId: item.receiptId,
+          batchId: item.batchId,
+          quantity: decimalToInput(item.quantity),
+        }))
+      );
+    } else {
+      setDraftObjectId(objectId);
+      setDate(todayPicker());
+      setReason('');
+      setRows([emptyRow()]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- форма заполняется при открытии
+  }, [open, initial?.id]);
+
+  const batches = useMemo(
+    () => availableBatches(openBatches.data?.batches ?? [], initial, draftObjectId),
+    [openBatches.data, initial, draftObjectId]
+  );
+
+  const batchById = useMemo(() => new Map(batches.map((batch) => [batch.id, batch])), [batches]);
+
+  // Накладные, в которых есть что списать: порядок — как у бэкенда, свежие
+  // сверху.
+  const receiptOptions = useMemo(() => {
+    const out: ReceiptOption[] = [];
+    const seen = new Set<string>();
+    for (const batch of batches) {
+      if (seen.has(batch.receiptId)) continue;
+      seen.add(batch.receiptId);
+      const date = batch.receiptDate ? ` от ${formatDate(batch.receiptDate)}` : '';
+      out.push({ value: batch.receiptId, content: `${batch.invoiceNumber}${date}` });
+    }
+    return out;
+  }, [batches]);
+
+  const batchOptionsFor = (receiptId: string) =>
+    batches
+      .filter((batch) => batch.receiptId === receiptId)
+      .map((batch) => ({
+        value: batch.id,
+        content: `${batch.productName} — остаток ${formatQuantity(batch.remaining, batch.unit)}, ${formatMoney(batch.unitPrice)}`,
+      }));
+
+  const updateRow = (index: number, patch: Partial<DraftRow>) => {
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
-  const removeItem = (index: number) => {
-    setItems((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
+  const removeRow = (index: number) => {
+    setRows((current) => (current.length <= 1 ? current : current.filter((_, i) => i !== index)));
   };
-  const allItemsComplete =
-    items.length > 0 &&
-    items.every((row) => row.series.trim() && row.productName.trim() && row.quantity.trim());
 
-  // Автоподсчёт итога: количество × цена выбранной партии.
-  const totalSum = items.reduce((sum, row) => {
-    const qty = Number(row.quantity);
-    if (!qty) return sum;
-    const batch = (batchesByProduct.get(row.productId) ?? []).find(
-      (entry) => entry.number === row.series
-    );
-    return sum + (batch?.price ?? 0) * qty;
+  const changeObject = (next: string) => {
+    setDraftObjectId(next);
+    setRows([emptyRow()]);
+  };
+
+  /** Проблема строки для подсветки; null — строка готова к отправке. */
+  const rowProblem = (row: DraftRow, index: number): string | null => {
+    const batch = batchById.get(row.batchId);
+    if (!batch) return 'Выберите накладную и товар';
+
+    if (rows.some((other, i) => i !== index && other.batchId === row.batchId)) {
+      return 'Эта партия уже есть в другой строке';
+    }
+
+    const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS);
+    if (quantity === null || quantity <= 0) return 'Введите количество';
+    if (quantity > batch.remaining) {
+      return `Не больше ${formatQuantity(batch.remaining, batch.unit)}`;
+    }
+
+    return null;
+  };
+
+  const problems = rows.map(rowProblem);
+  const isoDate = pickerToIso(date.trim());
+  const canSubmit =
+    draftObjectId !== '' &&
+    isoDate !== '' &&
+    reason.trim() !== '' &&
+    problems.every((problem) => problem === null);
+
+  const total = rows.reduce((sum, row) => {
+    const batch = batchById.get(row.batchId);
+    const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS) ?? 0;
+    return batch ? sum + lineTotal(quantity, batch.unitPrice) : sum;
   }, 0);
 
-  const canSubmit = toIsoDate(date.trim()) !== '' && reason.trim() !== '' && allItemsComplete;
-
   const submit = () => {
-    const body: CreateWriteOffRequest = {
-      type: 'exceptional',
-      date: toIsoDate(date.trim()),
-      warehouseId,
+    const body: WriteOffRequest = {
+      objectId: draftObjectId,
+      date: isoDate,
       reason: reason.trim(),
-      items: items.map((row) => {
-        const qty = Number(row.quantity);
-        const batch = (batchesByProduct.get(row.productId) ?? []).find(
-          (entry) => entry.number === row.series
-        );
-        return {
-          productId: row.productId,
-          quantity: qty,
-          unitPrice: batch?.price ?? 0,
-          series: row.series.trim() || undefined,
-        };
-      }),
+      items: rows.map((row) => ({
+        batchId: row.batchId,
+        quantity: parseDecimal(row.quantity, QUANTITY_DECIMALS) ?? 0,
+      })),
     };
 
-    create.mutate(body, {
-      onSuccess: () => {
-        toaster.add({
-          name: 'write-off-created',
-          title: 'Списание создано',
-          theme: 'success',
-        });
-        onClose();
-      },
-      onError: (e) =>
-        toaster.add({
-          name: 'write-off-create',
-          title: 'Ошибка',
-          content: e.message,
-          theme: 'danger',
-        }),
-    });
+    const onSuccess = () => {
+      toaster.add({
+        name: initial ? 'write-off-updated' : 'write-off-created',
+        title: initial ? 'Списание обновлено' : 'Списание создано',
+        theme: 'success',
+      });
+      onClose();
+    };
+    const onError = (e: Error) =>
+      toaster.add({
+        name: initial ? 'write-off-update' : 'write-off-create',
+        title: 'Ошибка',
+        content: e.message,
+        theme: 'danger',
+      });
+
+    if (initial) {
+      update.mutate({ id: initial.id, body }, { onSuccess, onError });
+    } else {
+      create.mutate(body, { onSuccess, onError });
+    }
   };
+
+  const noBatches = openBatches.isSuccess && batches.length === 0;
 
   return (
     <Dialog open={open} onClose={onClose} size="l">
-      <Dialog.Header caption="Добавить списание" />
+      <Dialog.Header caption={initial ? 'Редактировать списание' : 'Добавить списание'} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
           <Flex gap={2} alignItems="flex-end" wrap>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <ObjectSelect
+                value={draftObjectId}
+                onUpdate={changeObject}
+                options={objectOptions}
+                width="max"
+              />
+            </div>
             <div style={{ flex: 1, minWidth: 220 }}>
               <DatePicker
                 size="l"
@@ -201,96 +272,92 @@ export function CreateWriteOffDialog({
             autoFocus
           />
 
+          {noBatches && (
+            <Text variant="body-2" color="secondary">
+              На этом объекте нет партий с остатком — списывать нечего.
+            </Text>
+          )}
+
           <Flex direction="column" gap={3} style={{ marginTop: 4 }}>
-            {items.map((row, index) => (
-              <Flex key={index} gap={2} alignItems="flex-end">
-                <div style={{ flex: 2, minWidth: 200 }}>
-                  <Select
-                    size="l"
-                    label="Партия:"
-                    placeholder="Выберите партию"
-                    value={row.series ? [row.series] : []}
-                    onUpdate={(next) => {
-                      const series = next[0] ?? '';
-                      const patch: Partial<DraftItem> = { series };
-                      if (series !== row.series) {
-                        patch.productId = '';
-                        patch.productName = '';
-                        patch.unit = '';
+            {rows.map((row, index) => {
+              const batch = batchById.get(row.batchId);
+              const problem = problems[index];
+              const quantityInvalid =
+                row.quantity.trim() !== '' && problem !== null && batch !== undefined;
+
+              return (
+                <Flex key={index} gap={2} alignItems="flex-end">
+                  <div style={{ flex: 2, minWidth: 180 }}>
+                    <Select
+                      size="l"
+                      label="Накладная:"
+                      placeholder="Выберите накладную"
+                      value={row.receiptId ? [row.receiptId] : []}
+                      onUpdate={(next) =>
+                        updateRow(index, { receiptId: next[0] ?? '', batchId: '', quantity: '' })
                       }
-                      updateItem(index, patch);
-                    }}
-                    options={batches.numbers.map((number) => ({
-                      value: number,
-                      content: number,
-                    }))}
-                    hasClear
-                    width="max"
-                  />
-                </div>
-                <div style={{ flex: 2 }}>
-                  <ProductPicker
-                    value={row.productId}
-                    valueLabel={row.productName}
-                    placeholder="Название товара"
+                      options={receiptOptions}
+                      disabled={openBatches.isPending || receiptOptions.length === 0}
+                      width="max"
+                    />
+                  </div>
+                  <div style={{ flex: 3, minWidth: 240 }}>
+                    <Select
+                      size="l"
+                      label="Товар:"
+                      placeholder="Выберите товар"
+                      value={row.batchId ? [row.batchId] : []}
+                      onUpdate={(next) => updateRow(index, { batchId: next[0] ?? '' })}
+                      options={batchOptionsFor(row.receiptId)}
+                      disabled={!row.receiptId}
+                      width="max"
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <TextInput
+                      size="l"
+                      label="Кол-во:"
+                      placeholder="0"
+                      value={row.quantity}
+                      onUpdate={(value) => updateRow(index, { quantity: value })}
+                      disabled={!row.batchId}
+                      validationState={quantityInvalid ? 'invalid' : undefined}
+                      errorMessage={quantityInvalid ? problem : undefined}
+                      style={{ width: '100%' }}
+                      endContent={
+                        batch ? (
+                          <span
+                            style={{
+                              color: 'var(--g-color-text-secondary)',
+                              paddingInlineEnd: 4,
+                            }}
+                          >
+                            {batch.unit}
+                          </span>
+                        ) : undefined
+                      }
+                    />
+                  </div>
+                  <Button
+                    view="flat"
                     size="l"
-                    products={row.series ? batches.productsByBatch.get(row.series) : undefined}
-                    disabled={!row.series}
-                    showUnitInValue={false}
-                    selectedHint={
-                      row.productId && row.series
-                        ? `${batches.remainingByProduct.get(`${row.productId}::${row.series}`) ?? 0}${row.unit}`
-                        : undefined
-                    }
-                    onChange={(product) =>
-                      updateItem(index, {
-                        productId: product?.id ?? '',
-                        productName: product?.name ?? '',
-                        unit: product?.unit ?? '',
-                      })
-                    }
-                  />
-                </div>
-                <div style={{ flex: 1, minWidth: 120 }}>
-                  <TextInput
-                    size="l"
-                    label="Кол-во:"
-                    placeholder="0"
-                    value={row.quantity}
-                    onUpdate={(value) => updateItem(index, { quantity: value })}
-                    style={{ width: '100%' }}
-                    endContent={
-                      row.unit ? (
-                        <span
-                          style={{
-                            color: 'var(--g-color-text-secondary)',
-                            paddingInlineEnd: 4,
-                          }}
-                        >
-                          {row.unit}
-                        </span>
-                      ) : undefined
-                    }
-                  />
-                </div>
-                <Button
-                  view="flat"
-                  size="l"
-                  onClick={() => removeItem(index)}
-                  title="Удалить"
-                  aria-label="Удалить товар"
-                  disabled={items.length <= 1}
-                >
-                  <Icon data={TrashBin} size={18} />
-                </Button>
-              </Flex>
-            ))}
+                    onClick={() => removeRow(index)}
+                    title="Удалить"
+                    aria-label="Удалить строку"
+                    disabled={rows.length <= 1}
+                  >
+                    <Icon data={TrashBin} size={18} />
+                  </Button>
+                </Flex>
+              );
+            })}
 
             <Button
               view="normal"
               size="l"
-              onClick={() => setItems((rows) => [...rows, emptyItem()])}
+              onClick={() => setRows((current) => [...current, emptyRow()])}
               style={{ alignSelf: 'flex-start' }}
+              disabled={noBatches}
             >
               <Icon data={Plus} size={16} />
               Добавить товар
@@ -301,7 +368,7 @@ export function CreateWriteOffDialog({
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ width: '100%' }}>
-          <Text variant="subheader-2">Итого: {totalSum.toFixed(2)} ₽</Text>
+          <Text variant="subheader-2">Итого: {formatMoney(total)}</Text>
           <Flex gap={2}>
             <Button view="outlined" size="l" onClick={onClose}>
               Отмена
@@ -311,10 +378,10 @@ export function CreateWriteOffDialog({
               size="l"
               onClick={submit}
               disabled={!canSubmit}
-              loading={create.isPending}
+              loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={Plus} size={16} />
-              Добавить списание
+              {initial ? 'Сохранить' : 'Добавить списание'}
             </Button>
           </Flex>
         </Flex>

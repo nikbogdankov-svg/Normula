@@ -1,58 +1,48 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   Button,
   Flex,
   Icon,
   Text,
   TextInput,
-  Select,
   Table,
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
-import { Plus, Magnifier, ArrowUp, ArrowDown, ArrowUpArrowDown } from '@gravity-ui/icons';
-import { NoOrganizationSelectedState } from '@/shared/ui/states';
+import { Plus, Magnifier } from '@gravity-ui/icons';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  NoOrganizationSelectedState,
+} from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
-import { useMockCateringObjects } from '@/features/objects/api';
-import { useReceipts } from './api';
+import { useReceipts } from '@/features/warehouse/api';
+import { formatDate, formatMoney } from '@/features/warehouse/format';
+import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
+import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
+import type { Receipt, ReceiptSummary } from '@/features/warehouse/types';
 import { ReceiptDrawer } from './warehouse-receipt-drawer';
 import { CreateReceiptDrawer } from './create-receipt-drawer';
-import type { WarehouseReceipt } from './types';
 import './warehouse-receipts-route.css';
-
-const MOCK_WAREHOUSE_ID = 'warehouse-central'; // пока захардкодили
-
-/** Сумма позиций прихода. */
-function receiptTotal(receipt: WarehouseReceipt): number {
-  return receipt.items.reduce((sum, item) => sum + item.totalPrice, 0);
-}
 
 function ReceiptsTable({
   receipts,
-  filterActive,
-  dateSort,
-  onDateSortToggle,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onOpen,
 }: {
-  receipts: WarehouseReceipt[];
-  filterActive: boolean;
-  dateSort: 'asc' | 'desc';
-  onDateSortToggle: () => void;
-  onOpen: (receipt: WarehouseReceipt) => void;
+  receipts: ReceiptSummary[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  onOpen: (receipt: ReceiptSummary) => void;
 }) {
-  const columns: TableColumnConfig<WarehouseReceipt>[] = [
+  const columns: TableColumnConfig<ReceiptSummary>[] = [
     {
       id: 'date',
-      name: () => (
-        <SortableHeader
-          label="Дата"
-          active
-          ascending={dateSort === 'asc'}
-          onToggle={onDateSortToggle}
-        />
-      ),
-      template: (row) => (
-        <Text variant="body-2">{new Date(row.date).toLocaleDateString('ru-RU')}</Text>
-      ),
+      name: 'Дата',
+      template: (row) => <Text variant="body-2">{formatDate(row.date)}</Text>,
     },
     {
       id: 'invoiceNumber',
@@ -64,7 +54,7 @@ function ReceiptsTable({
       name: 'Кол-во товаров',
       template: (row) => (
         <Text variant="body-2" color="secondary">
-          {row.items.length}
+          {row.itemsCount}
         </Text>
       ),
     },
@@ -72,7 +62,7 @@ function ReceiptsTable({
       id: 'total',
       name: 'Сумма',
       align: 'end',
-      template: (row) => <Text variant="body-2">{receiptTotal(row).toFixed(2)} ₽</Text>,
+      template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
     },
   ];
 
@@ -90,10 +80,12 @@ function ReceiptsTable({
             onRowClick={onOpen}
             columns={columns}
           />
-          {filterActive && receipts.length === 0 && (
-            <Text variant="body-2" color="secondary" style={{ display: 'block', padding: 16 }}>
-              Приходы по выбранным фильтрам не найдены
-            </Text>
+          {hasMore && (
+            <Flex justifyContent="center" style={{ padding: 8 }}>
+              <Button view="flat" size="l" loading={loadingMore} onClick={onLoadMore}>
+                Загрузить ещё
+              </Button>
+            </Flex>
           )}
         </div>
       </div>
@@ -101,24 +93,19 @@ function ReceiptsTable({
   );
 }
 
+/** Раздел «Склад → Приход»: накладные выбранного объекта. */
 export function WarehouseReceiptsRoute() {
   const api = useApi();
-  const objects = useMockCateringObjects();
+  const [objectId, setObjectId] = useState('');
+  const { options, objects } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
-  const [selectedObjectId, setSelectedObjectId] = useState<string>('');
-  const [opened, setOpened] = useState<WarehouseReceipt | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [openedId, setOpenedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<WarehouseReceipt | null>(null);
-  const [dateSort, setDateSort] = useState<'asc' | 'desc'>('desc');
+  const [editing, setEditing] = useState<Receipt | null>(null);
 
-  const { data, isLoading, error } = useReceipts(MOCK_WAREHOUSE_ID);
-
-  const objectsList = useMemo(() => objects.data?.objects ?? [], [objects.data]);
-
-  useEffect(() => {
-    const first = objects.data?.objects[0];
-    if (first) setSelectedObjectId((current) => current || first.id);
-  }, [objects.data]);
+  const receipts = useReceipts({ objectId, search: debouncedSearch });
+  const rows = receipts.data?.pages.flatMap((page) => page.receipts) ?? [];
 
   if (api.organizationId === null) {
     return (
@@ -128,24 +115,18 @@ export function WarehouseReceiptsRoute() {
     );
   }
 
-  const filterActive = search.trim() !== '';
-
-  const filteredRows = (data?.receipts ?? [])
-    .filter((receipt) => {
-      if (selectedObjectId && receipt.unitId !== selectedObjectId) return false;
-      const query = search.trim().toLowerCase();
-      if (!query) return true;
-      return receipt.invoiceNumber.toLowerCase().includes(query) || receipt.date.includes(query);
-    })
-    .sort((a, b) => {
-      const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
-      return dateSort === 'asc' ? diff : -diff;
-    });
+  const noObjects = objects.isSuccess && options.length === 0;
 
   return (
     <div className="wr-page">
       <Flex className="wr-page__toolbar" alignItems="center" justifyContent="space-between" gap={4}>
-        <Flex alignItems="center" gap={2}>
+        <Flex alignItems="center" gap={2} wrap>
+          <ObjectSelect
+            value={objectId}
+            onUpdate={setObjectId}
+            options={options}
+            disabled={objects.isPending}
+          />
           <TextInput
             size="l"
             placeholder="Поиск по номеру накладной"
@@ -159,121 +140,64 @@ export function WarehouseReceiptsRoute() {
             }
             style={{ width: 280 }}
           />
-          {objectsList.length > 0 && (
-            <Select
-              size="l"
-              width={280}
-              title="Объект"
-              value={[selectedObjectId]}
-              onUpdate={(value) => setSelectedObjectId(value[0] ?? '')}
-              options={objectsList.map((unit) => ({ value: unit.id, content: unit.name }))}
-            />
-          )}
         </Flex>
-        <Button view="normal-contrast" size="l" onClick={() => setCreateOpen(true)}>
+        <Button
+          view="normal-contrast"
+          size="l"
+          onClick={() => setCreateOpen(true)}
+          disabled={!objectId}
+        >
           <Icon data={Plus} size={16} />
           Приход
         </Button>
       </Flex>
 
-      {isLoading && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" style={{ display: 'block', padding: 16 }}>
-              Загрузка...
-            </Text>
-          </div>
-        </div>
+      {objects.isError && (
+        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       )}
-
-      {error && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" color="danger" style={{ display: 'block', padding: 16 }}>
-              Ошибка: {error instanceof Error ? error.message : 'неизвестная ошибка'}
-            </Text>
-          </div>
-        </div>
+      {noObjects && <EmptyState text="Сначала заведите объект в справочнике «Объекты»" />}
+      {!noObjects && !objects.isError && (objects.isPending || receipts.isPending) && (
+        <LoadingState />
       )}
-
-      {!isLoading && !error && data && data.receipts.length === 0 && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" style={{ display: 'block', padding: 16 }}>
-              Нет приходов
-            </Text>
-          </div>
-        </div>
+      {receipts.isError && (
+        <ErrorState error={receipts.error} onRetry={() => void receipts.refetch()} />
       )}
-
-      {!isLoading && !error && data && data.receipts.length > 0 && (
+      {receipts.isSuccess && rows.length === 0 && (
+        <EmptyState
+          text={
+            debouncedSearch ? `Ничего не нашли по запросу «${debouncedSearch}»` : 'Нет приходов'
+          }
+        />
+      )}
+      {receipts.isSuccess && rows.length > 0 && (
         <ReceiptsTable
-          receipts={filteredRows}
-          filterActive={filterActive}
-          dateSort={dateSort}
-          onDateSortToggle={() => setDateSort(dateSort === 'desc' ? 'asc' : 'desc')}
-          onOpen={(receipt) => setOpened(receipt)}
+          receipts={rows}
+          hasMore={receipts.hasNextPage}
+          loadingMore={receipts.isFetchingNextPage}
+          onLoadMore={() => void receipts.fetchNextPage()}
+          onOpen={(receipt) => setOpenedId(receipt.id)}
         />
       )}
 
       <ReceiptDrawer
-        receipt={opened}
-        onClose={() => setOpened(null)}
+        receiptId={openedId}
+        objectOptions={options}
+        onClose={() => setOpenedId(null)}
         onEdit={(receipt) => {
           setEditing(receipt);
-          setOpened(null);
+          setOpenedId(null);
         }}
       />
       <CreateReceiptDrawer
-        open={createOpen || Boolean(editing)}
+        open={createOpen || editing !== null}
         onClose={() => {
           setCreateOpen(false);
           setEditing(null);
         }}
-        warehouseId={MOCK_WAREHOUSE_ID}
+        objectId={objectId}
+        objectOptions={options}
         initial={editing}
       />
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  active,
-  ascending,
-  onToggle,
-}: {
-  label: string;
-  active: boolean;
-  ascending: boolean;
-  onToggle: () => void;
-}) {
-  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
-
-  return (
-    <Flex
-      alignItems="center"
-      justifyContent="flex-start"
-      gap={1}
-      style={{ cursor: 'pointer', userSelect: 'none' }}
-      onClick={onToggle}
-      title={
-        active
-          ? ascending
-            ? 'По возрастанию — нажмите для убывания'
-            : 'По убыванию — нажмите для возрастания'
-          : `Сортировать по: ${label}`
-      }
-    >
-      {label}
-      <span
-        style={{
-          display: 'inline-flex',
-          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
-        }}
-      >
-        <Icon data={icon} size={14} />
-      </span>
-    </Flex>
   );
 }

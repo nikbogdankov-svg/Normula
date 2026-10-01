@@ -1,59 +1,48 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Button,
   Flex,
   Icon,
-  SegmentedRadioGroup,
   Text,
   TextInput,
-  Select,
   Table,
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
-import { Plus, Magnifier, ArrowUp, ArrowDown, ArrowUpArrowDown } from '@gravity-ui/icons';
-import { NoOrganizationSelectedState } from '@/shared/ui/states';
+import { Plus, Magnifier } from '@gravity-ui/icons';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  NoOrganizationSelectedState,
+} from '@/shared/ui/states';
 import { useApi } from '@/shared/api/use-api';
-import { useMockCateringObjects } from '@/features/objects/api';
-import { useWriteOffs } from './api';
+import { useWriteOffs } from '@/features/warehouse/api';
+import { formatDate, formatMoney } from '@/features/warehouse/format';
+import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
+import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
+import type { WriteOff, WriteOffSummary } from '@/features/warehouse/types';
 import { WriteOffDrawer } from './write-off-drawer';
 import { CreateWriteOffDialog } from './create-write-off-dialog';
-import type { WriteOff, WriteOffType } from './types';
 import './write-offs-route.css';
-
-const MOCK_WAREHOUSE_ID = 'warehouse-central'; // пока захардкодили
-
-/** Сумма позиций списания. */
-function writeOffTotal(writeOff: WriteOff): number {
-  return writeOff.items.reduce((sum, item) => sum + item.totalPrice, 0);
-}
 
 function WriteOffsTable({
   writeOffs,
-  filterActive,
-  dateSort,
-  onDateSortToggle,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onOpen,
 }: {
-  writeOffs: WriteOff[];
-  filterActive: boolean;
-  dateSort: 'asc' | 'desc';
-  onDateSortToggle: () => void;
-  onOpen: (writeOff: WriteOff) => void;
+  writeOffs: WriteOffSummary[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  onOpen: (writeOff: WriteOffSummary) => void;
 }) {
-  const columns: TableColumnConfig<WriteOff>[] = [
+  const columns: TableColumnConfig<WriteOffSummary>[] = [
     {
       id: 'date',
-      name: () => (
-        <SortableHeader
-          label="Дата"
-          active
-          ascending={dateSort === 'asc'}
-          onToggle={onDateSortToggle}
-        />
-      ),
-      template: (row) => (
-        <Text variant="body-2">{new Date(row.date).toLocaleDateString('ru-RU')}</Text>
-      ),
+      name: 'Дата',
+      template: (row) => <Text variant="body-2">{formatDate(row.date)}</Text>,
     },
     {
       id: 'reason',
@@ -65,7 +54,7 @@ function WriteOffsTable({
       name: 'Кол-во товаров',
       template: (row) => (
         <Text variant="body-2" color="secondary">
-          {row.items.length}
+          {row.itemsCount}
         </Text>
       ),
     },
@@ -73,7 +62,7 @@ function WriteOffsTable({
       id: 'total',
       name: 'Сумма',
       align: 'end',
-      template: (row) => <Text variant="body-2">{writeOffTotal(row).toFixed(2)} ₽</Text>,
+      template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
     },
   ];
 
@@ -91,10 +80,12 @@ function WriteOffsTable({
             onRowClick={onOpen}
             columns={columns}
           />
-          {filterActive && writeOffs.length === 0 && (
-            <Text variant="body-2" color="secondary" style={{ display: 'block', padding: 16 }}>
-              Списания по выбранным фильтрам не найдены
-            </Text>
+          {hasMore && (
+            <Flex justifyContent="center" style={{ padding: 8 }}>
+              <Button view="flat" size="l" loading={loadingMore} onClick={onLoadMore}>
+                Загрузить ещё
+              </Button>
+            </Flex>
           )}
         </div>
       </div>
@@ -102,24 +93,19 @@ function WriteOffsTable({
   );
 }
 
+/** Раздел «Склад → Списание»: списания выбранного объекта. */
 export function WriteOffsRoute() {
   const api = useApi();
-  const objects = useMockCateringObjects();
+  const [objectId, setObjectId] = useState('');
+  const { options, objects } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
-  const [type, setType] = useState<WriteOffType>('exceptional');
-  const [selectedObjectId, setSelectedObjectId] = useState<string>('');
-  const [opened, setOpened] = useState<WriteOff | null>(null);
+  const debouncedSearch = useDebouncedValue(search.trim());
+  const [openedId, setOpenedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [dateSort, setDateSort] = useState<'asc' | 'desc'>('desc');
+  const [editing, setEditing] = useState<WriteOff | null>(null);
 
-  const { data, isLoading, error } = useWriteOffs(MOCK_WAREHOUSE_ID, type);
-
-  const objectsList = objects.data?.objects ?? [];
-
-  useEffect(() => {
-    const first = objects.data?.objects[0];
-    if (first) setSelectedObjectId((current) => current || first.id);
-  }, [objects.data]);
+  const writeOffs = useWriteOffs({ objectId, search: debouncedSearch });
+  const rows = writeOffs.data?.pages.flatMap((page) => page.writeOffs) ?? [];
 
   if (api.organizationId === null) {
     return (
@@ -129,24 +115,18 @@ export function WriteOffsRoute() {
     );
   }
 
-  const filterActive = search.trim() !== '';
-
-  const filteredRows = (data?.writeOffs ?? [])
-    .filter((writeOff) => {
-      if (selectedObjectId && writeOff.unitId !== selectedObjectId) return false;
-      const query = search.trim().toLowerCase();
-      if (!query) return true;
-      return writeOff.reason.toLowerCase().includes(query) || writeOff.date.includes(query);
-    })
-    .sort((a, b) => {
-      const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
-      return dateSort === 'asc' ? diff : -diff;
-    });
+  const noObjects = objects.isSuccess && options.length === 0;
 
   return (
     <div className="wr-page">
       <Flex className="wr-page__toolbar" alignItems="center" justifyContent="space-between" gap={4}>
         <Flex alignItems="center" gap={2} wrap>
+          <ObjectSelect
+            value={objectId}
+            onUpdate={setObjectId}
+            options={options}
+            disabled={objects.isPending}
+          />
           <TextInput
             size="l"
             placeholder="Поиск по причине"
@@ -160,118 +140,64 @@ export function WriteOffsRoute() {
             }
             style={{ width: 280 }}
           />
-          {objectsList.length > 0 && (
-            <Select
-              size="l"
-              width={280}
-              title="Объект"
-              value={[selectedObjectId]}
-              onUpdate={(value) => setSelectedObjectId(value[0] ?? '')}
-              options={objectsList.map((unit) => ({ value: unit.id, content: unit.name }))}
-            />
-          )}
-          <SegmentedRadioGroup
-            size="l"
-            value={type}
-            onUpdate={(value) => setType(value as WriteOffType)}
-          >
-            <SegmentedRadioGroup.Option value="exceptional" content="Исключительные" />
-            <SegmentedRadioGroup.Option value="daily" content="Автоматические" />
-          </SegmentedRadioGroup>
         </Flex>
-        <Button view="normal-contrast" size="l" onClick={() => setCreateOpen(true)}>
+        <Button
+          view="normal-contrast"
+          size="l"
+          onClick={() => setCreateOpen(true)}
+          disabled={!objectId}
+        >
           <Icon data={Plus} size={16} />
           Списание
         </Button>
       </Flex>
 
-      {isLoading && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" style={{ display: 'block', padding: 16 }}>
-              Загрузка...
-            </Text>
-          </div>
-        </div>
+      {objects.isError && (
+        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       )}
-
-      {error && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" color="danger" style={{ display: 'block', padding: 16 }}>
-              Ошибка: {error instanceof Error ? error.message : 'неизвестная ошибка'}
-            </Text>
-          </div>
-        </div>
+      {noObjects && <EmptyState text="Сначала заведите объект в справочнике «Объекты»" />}
+      {!noObjects && !objects.isError && (objects.isPending || writeOffs.isPending) && (
+        <LoadingState />
       )}
-
-      {!isLoading && !error && data && data.writeOffs.length === 0 && (
-        <div className="wr-page__scroll">
-          <div className="admin-table-wrap">
-            <Text variant="body-1" style={{ display: 'block', padding: 16 }}>
-              Нет списаний
-            </Text>
-          </div>
-        </div>
+      {writeOffs.isError && (
+        <ErrorState error={writeOffs.error} onRetry={() => void writeOffs.refetch()} />
       )}
-
-      {!isLoading && !error && data && data.writeOffs.length > 0 && (
+      {writeOffs.isSuccess && rows.length === 0 && (
+        <EmptyState
+          text={
+            debouncedSearch ? `Ничего не нашли по запросу «${debouncedSearch}»` : 'Нет списаний'
+          }
+        />
+      )}
+      {writeOffs.isSuccess && rows.length > 0 && (
         <WriteOffsTable
-          writeOffs={filteredRows}
-          filterActive={filterActive}
-          dateSort={dateSort}
-          onDateSortToggle={() => setDateSort(dateSort === 'desc' ? 'asc' : 'desc')}
-          onOpen={(writeOff) => setOpened(writeOff)}
+          writeOffs={rows}
+          hasMore={writeOffs.hasNextPage}
+          loadingMore={writeOffs.isFetchingNextPage}
+          onLoadMore={() => void writeOffs.fetchNextPage()}
+          onOpen={(writeOff) => setOpenedId(writeOff.id)}
         />
       )}
 
-      <WriteOffDrawer writeOff={opened} onClose={() => setOpened(null)} />
+      <WriteOffDrawer
+        writeOffId={openedId}
+        objectOptions={options}
+        onClose={() => setOpenedId(null)}
+        onEdit={(writeOff) => {
+          setEditing(writeOff);
+          setOpenedId(null);
+        }}
+      />
       <CreateWriteOffDialog
-        open={createOpen}
-        warehouseId={MOCK_WAREHOUSE_ID}
-        onClose={() => setCreateOpen(false)}
+        open={createOpen || editing !== null}
+        objectId={objectId}
+        objectOptions={options}
+        initial={editing}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditing(null);
+        }}
       />
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  active,
-  ascending,
-  onToggle,
-}: {
-  label: string;
-  active: boolean;
-  ascending: boolean;
-  onToggle: () => void;
-}) {
-  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
-
-  return (
-    <Flex
-      alignItems="center"
-      justifyContent="flex-start"
-      gap={1}
-      style={{ cursor: 'pointer', userSelect: 'none' }}
-      onClick={onToggle}
-      title={
-        active
-          ? ascending
-            ? 'По возрастанию — нажмите для убывания'
-            : 'По убыванию — нажмите для возрастания'
-          : `Сортировать по: ${label}`
-      }
-    >
-      {label}
-      <span
-        style={{
-          display: 'inline-flex',
-          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
-        }}
-      >
-        <Icon data={icon} size={14} />
-      </span>
-    </Flex>
   );
 }
