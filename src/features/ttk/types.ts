@@ -73,12 +73,17 @@ export interface CreateRecipeIngredient {
   netPerPortion: string;
 }
 
+/** Поля пищевой ценности, которые заполняет форма ТТК (витамин С приходит из импорта). */
+export type CreateRecipeNutrition = Omit<Nutrition, 'vitaminC'>;
+
 export interface CreateRecipeRequest {
   name: string;
   portionYield: string;
   /** Технология приготовления. */
   recipe: string;
   ingredients: CreateRecipeIngredient[];
+  /** Белки/жиры/углеводы и калории (на 100 г готового блюда). */
+  nutrition?: CreateRecipeNutrition;
 }
 
 /** Тело обновления ТТК — те же поля, что и при создании. */

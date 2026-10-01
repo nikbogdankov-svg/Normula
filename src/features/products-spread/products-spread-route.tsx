@@ -268,16 +268,18 @@ function ProductSpreadDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {item.dishes.map((row) => (
-                    <tr key={`${row.mealId}-${row.dishName}`}>
-                      <td>{row.dishName}</td>
-                      <td>{MEALS.find((meal) => meal.id === row.mealId)?.label}</td>
-                      <td className="products-spread-dishes__right">{row.portions}</td>
-                      <td className="products-spread-dishes__right">
-                        {formatQuantity(row.quantity, item.unit)}
-                      </td>
-                    </tr>
-                  ))}
+                  {item.dishes
+                    .filter((row) => row.quantity > 0)
+                    .map((row) => (
+                      <tr key={`${row.mealId}-${row.dishName}`}>
+                        <td>{row.dishName}</td>
+                        <td>{MEALS.find((meal) => meal.id === row.mealId)?.label}</td>
+                        <td className="products-spread-dishes__right">{row.portions}</td>
+                        <td className="products-spread-dishes__right">
+                          {formatQuantity(row.quantity, item.unit)}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </Flex>
