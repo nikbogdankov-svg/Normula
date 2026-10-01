@@ -103,7 +103,7 @@
   min-width: 220px;
   border-radius: 6px 0 0 6px;
   background-clip: padding-box;
-  padding-inline-start: 0;
+  padding-inline-start: 12px;
   border-left: 1px solid var(--g-color-line-generic);
 }
 
@@ -111,7 +111,7 @@
   width: 27%;
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
-  padding-inline-end: 0;
+  padding-inline-end: 12px;
   border-right: 1px solid var(--g-color-line-generic);
 }
 
