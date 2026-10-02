@@ -196,7 +196,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
             </div>
             <TextInput
               size="l"
-              label="Брутто на 1 порц, г:"
+              label="Брутто на 1 порц:"
               placeholder="000"
               value={row.grossPerPortion}
               onUpdate={(value) => updateIngredient(index, { grossPerPortion: value })}
@@ -204,7 +204,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
             />
             <TextInput
               size="l"
-              label="Нетто на 1 порц, г:"
+              label="Нетто на 1 порц:"
               placeholder="000"
               value={row.netPerPortion}
               onUpdate={(value) => updateIngredient(index, { netPerPortion: value })}

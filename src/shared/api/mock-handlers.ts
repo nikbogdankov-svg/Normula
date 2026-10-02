@@ -7,7 +7,7 @@ import type {
 } from '@/features/organizations/types';
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
-import type { Collection, Recipe } from '@/features/ttk/types';
+import type { Collection, Ingredient, Recipe } from '@/features/ttk/types';
 import type { CreateRecipeRequest } from '@/features/ttk/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
@@ -271,7 +271,456 @@ const DISH_NAMES = [
   'Какао с молоком',
 ];
 
+/** Спецификация ингредиента мок-ТТК: брутто/нетто на 1 порцию и цена за единицу закупки. */
+interface MockIngredientSpec {
+  name: string;
+  grossPerPortion: string;
+  netPerPortion: string;
+  pricePerUnit: string;
+}
+
+/** Рецептура и технология каждого блюда — продукты не должны повторяться в каждом блюде. */
+interface DishMockSpec {
+  technology: string;
+  ingredients: MockIngredientSpec[];
+}
+
+const FALLBACK_SPEC: DishMockSpec = {
+  technology:
+    'Продукты подготавливают и доводят до готовности в соответствии с технологической картой.',
+  ingredients: [
+    { name: 'Картофель', grossPerPortion: '180', netPerPortion: '135', pricePerUnit: '60 р/ед' },
+    {
+      name: 'Масло растительное',
+      grossPerPortion: '8',
+      netPerPortion: '8',
+      pricePerUnit: '200 р/ед',
+    },
+    { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+  ],
+};
+
+const DISH_SPECS: Record<string, DishMockSpec> = {
+  'Бефстроганов из мяса': {
+    technology:
+      'Мясо нарезают брусочками, обжаривают, добавляют пассерованный лук, муку, сметану и тушат до готовности.',
+    ingredients: [
+      { name: 'Говядина', grossPerPortion: '193', netPerPortion: '142', pricePerUnit: '450 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '29', netPerPortion: '24', pricePerUnit: '80 р/ед' },
+      { name: 'Мука пшеничная', grossPerPortion: '4', netPerPortion: '4', pricePerUnit: '70 р/ед' },
+      { name: 'Сметана', grossPerPortion: '23', netPerPortion: '23', pricePerUnit: '320 р/ед' },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '7',
+        netPerPortion: '7',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1,8', netPerPortion: '1,8', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Каша рисовая молочная': {
+    technology:
+      'Рис промывают, засыпают в кипящее молоко с водой, варят до загустения, добавляют соль, сахар и масло.',
+    ingredients: [
+      { name: 'Рис', grossPerPortion: '48', netPerPortion: '48', pricePerUnit: '130 р/ед' },
+      { name: 'Молоко', grossPerPortion: '150', netPerPortion: '150', pricePerUnit: '70 р/ед' },
+      { name: 'Сахар', grossPerPortion: '10', netPerPortion: '10', pricePerUnit: '90 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Омлет натуральный': {
+    technology:
+      'Яйца взбивают с молоком и солью, выливают на разогретую с маслом сковороду и запекают.',
+    ingredients: [
+      { name: 'Яйца', grossPerPortion: '100', netPerPortion: '100', pricePerUnit: '180 р/ед' },
+      { name: 'Молоко', grossPerPortion: '30', netPerPortion: '30', pricePerUnit: '70 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Суп картофельный с мясом': {
+    technology:
+      'Мясо варят до готовности, бульон процеживают, закладывают картофель и пассерованные овощи и варят до мягкости.',
+    ingredients: [
+      { name: 'Картофель', grossPerPortion: '140', netPerPortion: '105', pricePerUnit: '60 р/ед' },
+      { name: 'Говядина', grossPerPortion: '60', netPerPortion: '44', pricePerUnit: '450 р/ед' },
+      { name: 'Морковь', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '45 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '10', netPerPortion: '8', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Котлета куриная паровая': {
+    technology:
+      'Филе пропускают через мясорубку с луком, добавляют замоченный в молоке хлеб, формуют котлеты и готовят на пару.',
+    ingredients: [
+      {
+        name: 'Куриное филе',
+        grossPerPortion: '157',
+        netPerPortion: '120',
+        pricePerUnit: '280 р/ед',
+      },
+      {
+        name: 'Хлеб пшеничный',
+        grossPerPortion: '24',
+        netPerPortion: '24',
+        pricePerUnit: '80 р/ед',
+      },
+      { name: 'Молоко', grossPerPortion: '38', netPerPortion: '38', pricePerUnit: '70 р/ед' },
+      { name: 'Яйца', grossPerPortion: '8', netPerPortion: '8', pricePerUnit: '180 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '20', netPerPortion: '16', pricePerUnit: '80 р/ед' },
+      { name: 'Соль', grossPerPortion: '1,5', netPerPortion: '1,5', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Компот из сухофруктов': {
+    technology:
+      'Сухофрукты промывают, заливают горячей водой, добавляют сахар и варят, затем настаивают.',
+    ingredients: [
+      {
+        name: 'Сухофрукты',
+        grossPerPortion: '120',
+        netPerPortion: '120',
+        pricePerUnit: '400 р/ед',
+      },
+      { name: 'Сахар', grossPerPortion: '40', netPerPortion: '40', pricePerUnit: '90 р/ед' },
+      { name: 'Вода', grossPerPortion: '200', netPerPortion: '200', pricePerUnit: '' },
+    ],
+  },
+  'Салат из свежих овощей': {
+    technology: 'Овощи нарезают, заправляют маслом и солью, перемешивают и охлаждают.',
+    ingredients: [
+      { name: 'Огурцы', grossPerPortion: '40', netPerPortion: '38', pricePerUnit: '120 р/ед' },
+      { name: 'Помидоры', grossPerPortion: '50', netPerPortion: '48', pricePerUnit: '180 р/ед' },
+      { name: 'Лук зелёный', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '150 р/ед' },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '8',
+        netPerPortion: '8',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Пюре картофельное': {
+    technology:
+      'Картофель отваривают до готовности, разминают с горячим молоком и маслом до однородной массы.',
+    ingredients: [
+      { name: 'Картофель', grossPerPortion: '220', netPerPortion: '165', pricePerUnit: '60 р/ед' },
+      { name: 'Молоко', grossPerPortion: '40', netPerPortion: '40', pricePerUnit: '70 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '10',
+        netPerPortion: '10',
+        pricePerUnit: '600 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Рыба запечённая': {
+    technology: 'Рыбу панируют в муке, кладут на противень, смазанный маслом, и запекают.',
+    ingredients: [
+      { name: 'Рыба', grossPerPortion: '150', netPerPortion: '124', pricePerUnit: '350 р/ед' },
+      {
+        name: 'Мука пшеничная',
+        grossPerPortion: '10',
+        netPerPortion: '10',
+        pricePerUnit: '70 р/ед',
+      },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '8',
+        netPerPortion: '8',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1,5', netPerPortion: '1,5', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Чай с сахаром': {
+    technology: 'Чай заваривают кипятком, настаивают, процеживают и добавляют сахар.',
+    ingredients: [
+      { name: 'Чай', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '1200 р/ед' },
+      { name: 'Сахар', grossPerPortion: '20', netPerPortion: '20', pricePerUnit: '90 р/ед' },
+      { name: 'Вода', grossPerPortion: '200', netPerPortion: '200', pricePerUnit: '' },
+    ],
+  },
+  'Бутерброд с сыром': {
+    technology: 'Хлеб намазывают сливочным маслом и покрывают ломтиками сыра.',
+    ingredients: [
+      {
+        name: 'Хлеб пшеничный',
+        grossPerPortion: '50',
+        netPerPortion: '50',
+        pricePerUnit: '80 р/ед',
+      },
+      { name: 'Сыр', grossPerPortion: '25', netPerPortion: '25', pricePerUnit: '700 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+    ],
+  },
+  'Борщ со сметаной': {
+    technology:
+      'Свёклу тушат с томатной пастой, в бульон закладывают капусту и картофель, затем заправку; подают со сметаной.',
+    ingredients: [
+      { name: 'Свекла', grossPerPortion: '50', netPerPortion: '40', pricePerUnit: '50 р/ед' },
+      {
+        name: 'Капуста белокочанная',
+        grossPerPortion: '40',
+        netPerPortion: '32',
+        pricePerUnit: '40 р/ед',
+      },
+      { name: 'Картофель', grossPerPortion: '60', netPerPortion: '45', pricePerUnit: '60 р/ед' },
+      { name: 'Морковь', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '45 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '10', netPerPortion: '8', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Томатная паста',
+        grossPerPortion: '6',
+        netPerPortion: '6',
+        pricePerUnit: '250 р/ед',
+      },
+      { name: 'Сметана', grossPerPortion: '15', netPerPortion: '15', pricePerUnit: '320 р/ед' },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Гуляш из говядины': {
+    technology:
+      'Говядину нарезают кубиками, обжаривают с луком, добавляют муку, томатную пасту и тушат.',
+    ingredients: [
+      { name: 'Говядина', grossPerPortion: '120', netPerPortion: '88', pricePerUnit: '450 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '40', netPerPortion: '34', pricePerUnit: '80 р/ед' },
+      { name: 'Мука пшеничная', grossPerPortion: '8', netPerPortion: '8', pricePerUnit: '70 р/ед' },
+      {
+        name: 'Томатная паста',
+        grossPerPortion: '10',
+        netPerPortion: '10',
+        pricePerUnit: '250 р/ед',
+      },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '10',
+        netPerPortion: '10',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Каша гречневая': {
+    technology:
+      'Гречневую крупу засыпают в кипящую подсоленную воду и варят до полного впитывания жидкости.',
+    ingredients: [
+      {
+        name: 'Крупа гречневая',
+        grossPerPortion: '50',
+        netPerPortion: '50',
+        pricePerUnit: '120 р/ед',
+      },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+      { name: 'Вода', grossPerPortion: '120', netPerPortion: '120', pricePerUnit: '' },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Сок яблочный': {
+    technology: 'Яблоки отжимают, сок доводят до кипения с сахаром и охлаждают.',
+    ingredients: [
+      { name: 'Яблоки', grossPerPortion: '200', netPerPortion: '165', pricePerUnit: '120 р/ед' },
+      { name: 'Сахар', grossPerPortion: '10', netPerPortion: '10', pricePerUnit: '90 р/ед' },
+      { name: 'Вода', grossPerPortion: '60', netPerPortion: '60', pricePerUnit: '' },
+    ],
+  },
+  'Запеканка творожная': {
+    technology:
+      'Творог протирают, смешивают с манкой, яйцами и сахаром, запекают и подают со сметаной.',
+    ingredients: [
+      { name: 'Творог', grossPerPortion: '130', netPerPortion: '130', pricePerUnit: '320 р/ед' },
+      { name: 'Крупа манная', grossPerPortion: '15', netPerPortion: '15', pricePerUnit: '95 р/ед' },
+      { name: 'Яйца', grossPerPortion: '10', netPerPortion: '10', pricePerUnit: '180 р/ед' },
+      { name: 'Сахар', grossPerPortion: '20', netPerPortion: '20', pricePerUnit: '90 р/ед' },
+      { name: 'Сметана', grossPerPortion: '25', netPerPortion: '25', pricePerUnit: '320 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+    ],
+  },
+  'Щи из свежей капусты': {
+    technology:
+      'Капусту и картофель варят в бульоне, добавляют пассерованные овощи с томатной пастой и доводят до готовности.',
+    ingredients: [
+      {
+        name: 'Капуста белокочанная',
+        grossPerPortion: '90',
+        netPerPortion: '72',
+        pricePerUnit: '40 р/ед',
+      },
+      { name: 'Картофель', grossPerPortion: '60', netPerPortion: '45', pricePerUnit: '60 р/ед' },
+      { name: 'Морковь', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '45 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '10', netPerPortion: '8', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Томатная паста',
+        grossPerPortion: '6',
+        netPerPortion: '6',
+        pricePerUnit: '250 р/ед',
+      },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '6',
+        netPerPortion: '6',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Котлета рыбная': {
+    technology:
+      'Филе рыбы пропускают через мясорубку с луком и хлебом, формуют котлеты, панируют и запекают.',
+    ingredients: [
+      { name: 'Рыба', grossPerPortion: '130', netPerPortion: '110', pricePerUnit: '350 р/ед' },
+      {
+        name: 'Хлеб пшеничный',
+        grossPerPortion: '20',
+        netPerPortion: '20',
+        pricePerUnit: '80 р/ед',
+      },
+      { name: 'Молоко', grossPerPortion: '30', netPerPortion: '30', pricePerUnit: '70 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Сухари панировочные',
+        grossPerPortion: '8',
+        netPerPortion: '8',
+        pricePerUnit: '150 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1,5', netPerPortion: '1,5', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Макароны отварные': {
+    technology:
+      'Макароны варят в подсоленной воде до готовности, откидывают и заправляют сливочным маслом.',
+    ingredients: [
+      { name: 'Макароны', grossPerPortion: '70', netPerPortion: '70', pricePerUnit: '90 р/ед' },
+      {
+        name: 'Масло сливочное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '600 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Кисель ягодный': {
+    technology:
+      'Ягоды протирают, отвар доводят до кипения, вводят разведённый крахмал и сахар, охлаждают.',
+    ingredients: [
+      { name: 'Ягоды', grossPerPortion: '30', netPerPortion: '30', pricePerUnit: '350 р/ед' },
+      {
+        name: 'Крахмал картофельный',
+        grossPerPortion: '15',
+        netPerPortion: '15',
+        pricePerUnit: '140 р/ед',
+      },
+      { name: 'Сахар', grossPerPortion: '25', netPerPortion: '25', pricePerUnit: '90 р/ед' },
+      { name: 'Вода', grossPerPortion: '190', netPerPortion: '190', pricePerUnit: '' },
+    ],
+  },
+  'Яйцо варёное': {
+    technology: 'Яйца варят 8-10 минут в кипящей воде, охлаждают и чистят.',
+    ingredients: [
+      { name: 'Яйца', grossPerPortion: '55', netPerPortion: '55', pricePerUnit: '180 р/ед' },
+      { name: 'Соль', grossPerPortion: '1', netPerPortion: '1', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Суп гороховый': {
+    technology:
+      'Горох замачивают и варят до размягчения, добавляют картофель и пассерованные овощи, солят.',
+    ingredients: [
+      { name: 'Горох', grossPerPortion: '60', netPerPortion: '60', pricePerUnit: '95 р/ед' },
+      { name: 'Картофель', grossPerPortion: '80', netPerPortion: '60', pricePerUnit: '60 р/ед' },
+      { name: 'Морковь', grossPerPortion: '15', netPerPortion: '12', pricePerUnit: '45 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '10', netPerPortion: '8', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '5',
+        netPerPortion: '5',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Рагу овощное': {
+    technology: 'Овощи нарезают, обжаривают, добавляют томатную пасту и тушат до мягкости.',
+    ingredients: [
+      { name: 'Картофель', grossPerPortion: '120', netPerPortion: '90', pricePerUnit: '60 р/ед' },
+      { name: 'Кабачки', grossPerPortion: '60', netPerPortion: '50', pricePerUnit: '90 р/ед' },
+      { name: 'Морковь', grossPerPortion: '30', netPerPortion: '24', pricePerUnit: '45 р/ед' },
+      { name: 'Лук репчатый', grossPerPortion: '25', netPerPortion: '20', pricePerUnit: '80 р/ед' },
+      {
+        name: 'Томатная паста',
+        grossPerPortion: '8',
+        netPerPortion: '8',
+        pricePerUnit: '250 р/ед',
+      },
+      {
+        name: 'Масло растительное',
+        grossPerPortion: '10',
+        netPerPortion: '10',
+        pricePerUnit: '200 р/ед',
+      },
+      { name: 'Соль', grossPerPortion: '2', netPerPortion: '2', pricePerUnit: '25 р/ед' },
+    ],
+  },
+  'Какао с молоком': {
+    technology: 'Какао смешивают с сахаром, разводят горячим молоком и доводят до кипения.',
+    ingredients: [
+      { name: 'Какао-порошок', grossPerPortion: '5', netPerPortion: '5', pricePerUnit: '900 р/ед' },
+      { name: 'Сахар', grossPerPortion: '15', netPerPortion: '15', pricePerUnit: '90 р/ед' },
+      { name: 'Молоко', grossPerPortion: '180', netPerPortion: '180', pricePerUnit: '70 р/ед' },
+    ],
+  },
+};
+
+/** Перевод спецификации в строку с пересчётом «на 100 порций» и ценой. */
+const toIngredient = (spec: MockIngredientSpec): Ingredient => {
+  const gross = Number(spec.grossPerPortion.replace(',', '.'));
+  const net = Number(spec.netPerPortion.replace(',', '.'));
+  if (!Number.isFinite(gross) || !Number.isFinite(net)) {
+    return { ...spec, grossPer100: '', netPer100: '' };
+  }
+  return {
+    ...spec,
+    grossPer100: String(+(gross / 10).toFixed(2)).replace('.', ','),
+    netPer100: String(+(net / 10).toFixed(2)).replace('.', ','),
+    unit: 'кг',
+  };
+};
+
 const sampleRecipe = (index: number): Recipe => {
+  const name = DISH_NAMES[(index - 1) % DISH_NAMES.length];
+  const spec = DISH_SPECS[name] ?? FALLBACK_SPEC;
   const inCollection = index % 3 !== 0;
   const protein = (12 + (index % 8) * 2.4).toFixed(1).replace('.', ',');
   const fat = (8 + (index % 6) * 1.7).toFixed(1).replace('.', ',');
@@ -280,74 +729,14 @@ const sampleRecipe = (index: number): Recipe => {
 
   return {
     id: `t-${index}`,
-    name: DISH_NAMES[(index - 1) % DISH_NAMES.length],
+    name,
     collectionName: inCollection ? collections[index % 2].name : '',
     collectionId: inCollection ? collections[index % 2].id : '',
     portionYield: index % 2 === 0 ? '150/50' : '90/50',
     price: 95 + (index % 7) * 18,
     kcal,
-    recipe:
-      'Подготовленное мясо, нарезанное широкими кусками, отбивают до толщины 5-8 мм и нарезают ' +
-      'брусочками длиной 3-4 см массой 5-7 г. Затем кладут ровным слоем на сковороду, посыпают ' +
-      'солью и запекают. Из пассерованной муки и сметаны приготавливают соус.',
-    ingredients: [
-      {
-        name: 'Говядина',
-        grossPerPortion: '193',
-        netPerPortion: '142',
-        grossPer100: '19,3',
-        netPer100: '14,2',
-        pricePerKg: '450 ₽',
-      },
-      {
-        name: 'Масса готового мяса',
-        grossPerPortion: '',
-        netPerPortion: '90',
-        grossPer100: '',
-        netPer100: '9,0',
-        pricePerKg: '',
-      },
-      {
-        name: 'Лук репчатый',
-        grossPerPortion: '29',
-        netPerPortion: '24',
-        grossPer100: '2,9',
-        netPer100: '2,4',
-        pricePerKg: '80 ₽',
-      },
-      {
-        name: 'Масло растительное',
-        grossPerPortion: '7',
-        netPerPortion: '7',
-        grossPer100: '0,7',
-        netPer100: '0,7',
-        pricePerKg: '200 ₽',
-      },
-      {
-        name: 'Мука пшеничная',
-        grossPerPortion: '4',
-        netPerPortion: '4',
-        grossPer100: '0,4',
-        netPer100: '0,4',
-        pricePerKg: '70 ₽',
-      },
-      {
-        name: 'Сметана',
-        grossPerPortion: '23',
-        netPerPortion: '23',
-        grossPer100: '2,3',
-        netPer100: '2,3',
-        pricePerKg: '320 ₽',
-      },
-      {
-        name: 'Соль',
-        grossPerPortion: '1,8',
-        netPerPortion: '1,8',
-        grossPer100: '0,18',
-        netPer100: '0,18',
-        pricePerKg: '25 ₽',
-      },
-    ],
+    recipe: spec.technology,
+    ingredients: spec.ingredients.map(toIngredient),
     outputPerPortion: index % 2 === 0 ? '150/50' : '90/50',
     outputPer100: '9,0/5,0',
     nutrition: {
@@ -449,7 +838,7 @@ function emptySlots(cycleDays: number): CycleMenu['slots'] {
 
 /**
  * Пищевая ценность блюд по приёмам: в сумме за день ≈ норма «Основная»
- * (1800 ккал / Б 90 / Ж 60 / У 250 / 450 ₽) с допуском ±10%.
+ * (1800 ккал / Б 90 / Ж 60 / У 250 / 450 р/ед) с допуском ±10%.
  */
 const MEAL_NUTRITION: Record<
   MealId,
@@ -689,7 +1078,8 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
           netPerPortion: row.netPerPortion,
           grossPer100: '',
           netPer100: '',
-          pricePerKg: '',
+          pricePerUnit: '',
+          unit: 'кг',
         })),
     };
     recipes.unshift(recipe);
@@ -731,7 +1121,8 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
           netPerPortion: row.netPerPortion,
           grossPer100: '',
           netPer100: '',
-          pricePerKg: '',
+          pricePerUnit: '',
+          unit: 'кг',
         })),
     });
 

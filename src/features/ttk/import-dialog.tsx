@@ -50,7 +50,7 @@ function dishToRecipe(dish: ExtractedDish, collectionName: string): Recipe {
       netPerPortion: row.netPerPortion,
       grossPer100: '',
       netPer100: '',
-      pricePerKg: '',
+      pricePerUnit: '',
     })),
     outputPerPortion: '',
     outputPer100: '',
