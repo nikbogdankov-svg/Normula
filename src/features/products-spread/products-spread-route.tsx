@@ -202,11 +202,14 @@ function ProductsSpreadTable({
       name: meal.label,
       width: '9%',
       align: 'end' as const,
-      template: (row: ProductSpreadItem) => (
-        <Text variant="body-2">
-          {row.byMeal[meal.id] > 0 ? formatQuantity(row.byMeal[meal.id], row.unit) : '—'}
-        </Text>
-      ),
+      template: (row: ProductSpreadItem) =>
+        row.byMeal[meal.id] > 0 ? (
+          <Text variant="body-2">{formatQuantity(row.byMeal[meal.id], row.unit)}</Text>
+        ) : (
+          <Text variant="body-2" color="hint">
+            —
+          </Text>
+        ),
     })),
     {
       id: 'total',
@@ -286,9 +289,8 @@ function ProductSpreadDialog({
           </Dialog.Body>
           <Dialog.Divider />
           <Dialog.Footer
-            textButtonCancel="Закрыть"
-            onClickButtonCancel={onClose}
             textButtonApply="ОК"
+            propsButtonApply={{ view: 'normal' }}
             onClickButtonApply={onClose}
           />
         </>

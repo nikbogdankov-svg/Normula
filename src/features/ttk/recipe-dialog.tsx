@@ -266,7 +266,7 @@ export function RecipeDialog({
                       netPerPortion: view.outputPerPortion,
                       grossPer100: '',
                       netPer100: view.outputPer100,
-                      pricePerKg: '',
+                      pricePerUnit: '',
                     },
                   ]}
                   columns={[
@@ -277,33 +277,39 @@ export function RecipeDialog({
                     },
                     {
                       id: 'grossPerPortion',
-                      name: '1 порция, Брутто, г',
+                      name: '1 порция, Брутто',
                       align: 'right',
                       template: (row) => <Text variant="body-2">{row.grossPerPortion}</Text>,
                     },
                     {
                       id: 'netPerPortion',
-                      name: '1 порция, Нетто, г',
+                      name: '1 порция, Нетто',
                       align: 'right',
                       template: (row) => <Text variant="body-2">{row.netPerPortion}</Text>,
                     },
                     {
                       id: 'grossPer100',
-                      name: '100 порций, Брутто, кг',
+                      name: '100 порций, Брутто',
                       align: 'right',
                       template: (row) => <Text variant="body-2">{row.grossPer100}</Text>,
                     },
                     {
                       id: 'netPer100',
-                      name: '100 порций, Нетто, кг',
+                      name: '100 порций, Нетто',
                       align: 'right',
                       template: (row) => <Text variant="body-2">{row.netPer100}</Text>,
                     },
                     {
-                      id: 'pricePerKg',
-                      name: 'Цена за 1кг',
+                      id: 'pricePerUnit',
+                      name: 'Цена',
                       align: 'right',
-                      template: (row) => <Text variant="body-2">{row.pricePerKg}</Text>,
+                      template: (row) => (
+                        <Text variant="body-2">
+                          {row.pricePerUnit
+                            ? row.pricePerUnit.replace('р/ед', `р/${row.unit || 'кг'}`)
+                            : ''}
+                        </Text>
+                      ),
                     },
                   ]}
                 />
