@@ -15,8 +15,10 @@ export interface Ingredient {
   netPerPortion: string;
   grossPer100: string;
   netPer100: string;
-  /** Цена за 1 кг; пустая строка — ячейка пустая. */
-  pricePerKg: string;
+  /** Цена за единицу закупки продукта; пустая строка — ячейка пустая. */
+  pricePerUnit: string;
+  /** Единица измерения закупки (кг, л, шт). */
+  unit?: string;
 }
 
 export interface Nutrition {
@@ -79,6 +81,8 @@ export type CreateRecipeNutrition = Omit<Nutrition, 'vitaminC'>;
 export interface CreateRecipeRequest {
   name: string;
   portionYield: string;
+  /** Название сборника; пусто — карта без сборника. */
+  collectionName?: string;
   /** Технология приготовления. */
   recipe: string;
   ingredients: CreateRecipeIngredient[];
