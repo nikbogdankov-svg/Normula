@@ -11,10 +11,11 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { Pencil, TrashBin, Xmark } from '@gravity-ui/icons';
-import { useQueryClient } from '@tanstack/react-query';
-import { useDeleteRecipe, useCreateRecipe, useUpdateRecipe } from './api';
+import { ErrorState, LoadingState } from '@/shared/ui/states';
+import { formatMoney, formatQuantity } from '@/features/warehouse/format';
+import { useCreateRecipe, useDeleteRecipe, useRecipe, useUpdateRecipe } from './api';
 import { useRecipeForm } from './recipe-form';
-import type { Recipe } from './types';
+import type { Ingredient, Recipe } from './types';
 import { useDrawerHeight } from './use-drawer-height';
 import './recipe-drawer.css';
 
@@ -30,28 +31,92 @@ function MetaRow({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/** Таблица ингредиентов: на порцию, на 100 порций (умножением) и деньги. */
+function IngredientsTable({ recipe }: { recipe: Recipe }) {
+  const per100 = (value: number) => Math.round(value * 100 * 1000) / 1000;
+
+  return (
+    <Table<Ingredient>
+      width="max"
+      data={recipe.ingredients}
+      columns={[
+        {
+          id: 'name',
+          name: 'Наименование',
+          template: (row) => <Text variant="body-2">{row.productName}</Text>,
+        },
+        {
+          id: 'gross',
+          name: '1 порция, брутто',
+          align: 'right',
+          template: (row) => <Text variant="body-2">{formatQuantity(row.gross, row.unit)}</Text>,
+        },
+        {
+          id: 'net',
+          name: '1 порция, нетто',
+          align: 'right',
+          template: (row) => <Text variant="body-2">{formatQuantity(row.net, row.unit)}</Text>,
+        },
+        {
+          id: 'gross100',
+          name: '100 порций, брутто',
+          align: 'right',
+          template: (row) => (
+            <Text variant="body-2">{formatQuantity(per100(row.gross), row.unit)}</Text>
+          ),
+        },
+        {
+          id: 'net100',
+          name: '100 порций, нетто',
+          align: 'right',
+          template: (row) => (
+            <Text variant="body-2">{formatQuantity(per100(row.net), row.unit)}</Text>
+          ),
+        },
+        {
+          id: 'unitPrice',
+          name: 'Цена за ед.',
+          align: 'right',
+          template: (row) => (
+            <Text variant="body-2" color={row.unitPrice ? 'primary' : 'secondary'}>
+              {row.unitPrice ? `${formatMoney(row.unitPrice)}/${row.unit}` : 'нет остатков'}
+            </Text>
+          ),
+        },
+        {
+          id: 'total',
+          name: 'Сумма',
+          align: 'right',
+          template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
+        },
+      ]}
+    />
+  );
+}
+
 /**
- * Технологическая карта как нижний Drawer (desktop).
- * Просмотр и редактирование — в одной панели: оба режима остаются в DOM,
- * чтобы Floating UI не закрывал drawer при смене содержимого.
+ * Технологическая карта как нижний Drawer (desktop). Карта грузится по id:
+ * список отдаёт только шапки. Просмотр и редактирование — в одной панели:
+ * оба режима остаются в DOM, чтобы Floating UI не закрывал drawer при
+ * смене содержимого.
  */
 export function RecipeDialog({
-  recipe,
+  recipeId,
   onClose,
   onRecipeChange,
 }: {
-  recipe: Recipe | null;
+  recipeId: string | null;
   onClose: () => void;
-  onRecipeChange?: (recipe: Recipe) => void;
+  /** «Сохранить в новой» создаёт карту — родитель переключается на неё. */
+  onRecipeChange: (recipeId: string) => void;
 }) {
   const height = useDrawerHeight();
   const update = useUpdateRecipe();
   const create = useCreateRecipe();
   const remove = useDeleteRecipe();
   const toaster = useToaster();
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<Recipe | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [editKey, setEditKey] = useState(0);
@@ -61,35 +126,28 @@ export function RecipeDialog({
 
   modeRef.current = mode;
 
+  const recipe = useRecipe(viewId);
+  const view = recipe.data?.recipe ?? null;
   const form = useRecipeForm(view, `${view?.id ?? ''}-${editKey}`);
 
+  // Открытие — после монтирования, чтобы сработала анимация; закрытие — с
+  // задержкой, чтобы содержимое не пропало раньше панели.
   useEffect(() => {
-    if (!recipe) {
-      setOpen(false);
-      return;
+    if (recipeId) {
+      setViewId(recipeId);
+      setMode('view');
+      allowCloseRef.current = false;
+      const frame = requestAnimationFrame(() => setOpen(true));
+      return () => cancelAnimationFrame(frame);
     }
 
-    setView(recipe);
-  }, [recipe]);
-
-  useEffect(() => {
-    if (!recipe) return;
-
-    setMode('view');
-    allowCloseRef.current = false;
-    const frame = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- открытие по id карты
-  }, [recipe?.id]);
-
-  useEffect(() => {
-    if (open || !view || recipe) return;
+    setOpen(false);
     const timer = window.setTimeout(() => {
-      setView(null);
+      setViewId(null);
       setMode('view');
     }, 220);
     return () => window.clearTimeout(timer);
-  }, [open, view, recipe]);
+  }, [recipeId]);
 
   const requestClose = () => {
     allowCloseRef.current = true;
@@ -102,18 +160,6 @@ export function RecipeDialog({
     setMode('edit');
   };
 
-  const cancelEdit = () => {
-    setMode('view');
-  };
-
-  const startDelete = () => {
-    setConfirmDeleteOpen(true);
-  };
-
-  const cancelDelete = () => {
-    setConfirmDeleteOpen(false);
-  };
-
   const runDelete = (deletionMode: 'soft' | 'immediate') => {
     if (!view) return;
 
@@ -121,6 +167,7 @@ export function RecipeDialog({
       { id: view.id, mode: deletionMode },
       {
         onSuccess: () => {
+          setConfirmDeleteOpen(false);
           toaster.add(
             deletionMode === 'immediate'
               ? { name: 'ttk-deleted', title: 'ТТК удалена', theme: 'success' }
@@ -134,64 +181,49 @@ export function RecipeDialog({
           requestClose();
         },
         onError: (e) =>
-          toaster.add({
-            name: 'ttk-delete',
-            title: 'Ошибка',
-            content: e.message,
-            theme: 'danger',
-          }),
+          toaster.add({ name: 'ttk-delete', title: 'Ошибка', content: e.message, theme: 'danger' }),
       }
     );
   };
 
   const save = () => {
-    if (!view) return;
+    const body = form.getBody();
+    if (!view || !body) return;
 
     update.mutate(
-      { id: view.id, body: form.getBody() },
+      { id: view.id, body },
       {
-        onSuccess: (data) => {
-          setView(data.recipe);
+        onSuccess: () => {
           setMode('view');
           setOpen(true);
-          onRecipeChange?.(data.recipe);
           toaster.add({ name: 'ttk-updated', title: 'ТТК сохранена', theme: 'success' });
-          void queryClient.invalidateQueries({ queryKey: ['ttk'] });
         },
         onError: (e) =>
-          toaster.add({
-            name: 'ttk-update',
-            title: 'Ошибка',
-            content: e.message,
-            theme: 'danger',
-          }),
+          toaster.add({ name: 'ttk-update', title: 'Ошибка', content: e.message, theme: 'danger' }),
       }
     );
   };
 
   /** Сохранить изменения как новую карту, оригинал не трогаем. */
   const saveAsNew = () => {
-    if (!view) return;
+    const body = form.getBody();
+    if (!body) return;
 
-    create.mutate(form.getBody(), {
-      onSuccess: (data) => {
-        setView(data.recipe);
+    create.mutate(body, {
+      onSuccess: (created) => {
         setMode('view');
         setOpen(true);
-        onRecipeChange?.(data.recipe);
+        onRecipeChange(created.id);
         toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
       },
       onError: (e) =>
-        toaster.add({
-          name: 'ttk-create',
-          title: 'Ошибка',
-          content: e.message,
-          theme: 'danger',
-        }),
+        toaster.add({ name: 'ttk-create', title: 'Ошибка', content: e.message, theme: 'danger' }),
     });
   };
 
-  if (!view) return null;
+  if (!viewId) return null;
+
+  const busy = update.isPending || create.isPending;
 
   return (
     <>
@@ -215,15 +247,15 @@ export function RecipeDialog({
           // focus-out и пр. при смене mode игнорируем, иначе Save закрывает drawer.
           if (
             modeRef.current === 'view' &&
-            !update.isPending &&
+            !busy &&
             (reason === 'outside-press' || reason === 'escape-key')
           ) {
             setOpen(false);
             onClose();
           }
         }}
-        disableOutsideClick={mode === 'edit' || update.isPending || create.isPending}
-        disableEscapeKeyDown={mode === 'edit' || update.isPending || create.isPending}
+        disableOutsideClick={mode === 'edit' || busy}
+        disableEscapeKeyDown={mode === 'edit' || busy}
         placement="bottom"
         size={height}
         maxSize={typeof window !== 'undefined' ? window.innerHeight : 2000}
@@ -236,13 +268,18 @@ export function RecipeDialog({
           <div className="ttk-recipe-drawer__mode" hidden={mode !== 'view'}>
             <div className="ttk-recipe-drawer__header">
               <div className="ttk-recipe-drawer__title-row">
-                <Text variant="subheader-3">{view.name}</Text>
-                <Label theme="normal" size="s">
-                  Выход порции: {view.portionYield}
-                </Label>
-                <Label theme="normal" size="s">
-                  {view.price} ₽
-                </Label>
+                <Text variant="subheader-3">{view?.name ?? 'ТТК'}</Text>
+                {view && (
+                  <>
+                    <Label theme="normal" size="s">
+                      Выход: {view.yieldNet}
+                      {view.yieldLoss ? ` (потери ${view.yieldLoss})` : ''}
+                    </Label>
+                    <Label theme="normal" size="s">
+                      {formatMoney(view.price)}
+                    </Label>
+                  </>
+                )}
               </div>
               <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
                 <Icon data={Xmark} size={20} />
@@ -250,138 +287,71 @@ export function RecipeDialog({
             </div>
 
             <div className="ttk-recipe-drawer__body">
-              <div className="ttk-recipe-drawer__meta">
-                <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
-                <MetaRow title="Рецепт:">{view.recipe}</MetaRow>
-              </div>
+              {recipe.isPending && <LoadingState />}
+              {recipe.isError && (
+                <ErrorState error={recipe.error} onRetry={() => void recipe.refetch()} />
+              )}
+              {view && (
+                <>
+                  <div className="ttk-recipe-drawer__meta">
+                    <MetaRow title="Название ТТК:">{view.cardName || '—'}</MetaRow>
+                    <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
+                    <MetaRow title="Технология:">{view.technology || '—'}</MetaRow>
+                  </div>
 
-              <div className="ttk-recipe-drawer__table-wrap">
-                <Table
-                  width="max"
-                  data={[
-                    ...view.ingredients,
-                    {
-                      name: 'Выход',
-                      grossPerPortion: '',
-                      netPerPortion: view.outputPerPortion,
-                      grossPer100: '',
-                      netPer100: view.outputPer100,
-                      pricePerUnit: '',
-                    },
-                  ]}
-                  columns={[
-                    {
-                      id: 'name',
-                      name: 'Наименование',
-                      template: (row) => <Text variant="body-2">{row.name}</Text>,
-                    },
-                    {
-                      id: 'grossPerPortion',
-                      name: '1 порция, Брутто',
-                      align: 'right',
-                      template: (row) => (
-                        <Text variant="body-2">
-                          {row.grossPerPortion}
-                          {row.grossPerPortion && row.name !== 'Выход' ? ` ${row.unit || 'г'}` : ''}
-                        </Text>
-                      ),
-                    },
-                    {
-                      id: 'netPerPortion',
-                      name: '1 порция, Нетто',
-                      align: 'right',
-                      template: (row) => (
-                        <Text variant="body-2">
-                          {row.netPerPortion}
-                          {row.netPerPortion && row.name !== 'Выход' ? ` ${row.unit || 'г'}` : ''}
-                        </Text>
-                      ),
-                    },
-                    {
-                      id: 'grossPer100',
-                      name: '100 порций, Брутто',
-                      align: 'right',
-                      template: (row) => (
-                        <Text variant="body-2">
-                          {row.grossPer100}
-                          {row.grossPer100 && row.name !== 'Выход'
-                            ? ` ${row.unit === 'кг' ? 'кг' : row.unit || 'г'}`
-                            : ''}
-                        </Text>
-                      ),
-                    },
-                    {
-                      id: 'netPer100',
-                      name: '100 порций, Нетто',
-                      align: 'right',
-                      template: (row) => (
-                        <Text variant="body-2">
-                          {row.netPer100}
-                          {row.netPer100 && row.name !== 'Выход'
-                            ? ` ${row.unit === 'кг' ? 'кг' : row.unit || 'г'}`
-                            : ''}
-                        </Text>
-                      ),
-                    },
-                    {
-                      id: 'pricePerUnit',
-                      name: 'Цена',
-                      align: 'right',
-                      template: (row) => (
-                        <Text variant="body-2">
-                          {row.pricePerUnit
-                            ? `${row.pricePerUnit.replace('р/ед', '').replace('р', '').replace('₽', '')}₽/${row.unit || 'кг'}`
-                            : ''}
-                        </Text>
-                      ),
-                    },
-                  ]}
-                />
-              </div>
+                  <div className="ttk-recipe-drawer__table-wrap">
+                    {view.ingredients.length > 0 ? (
+                      <IngredientsTable recipe={view} />
+                    ) : (
+                      <Text variant="body-2" color="secondary">
+                        Ингредиенты не указаны
+                      </Text>
+                    )}
+                  </div>
 
-              <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
-                <Table
-                  width="max"
-                  data={[
-                    {
-                      protein: view.nutrition.protein,
-                      fat: view.nutrition.fat,
-                      carbs: view.nutrition.carbs,
-                      kcal: view.nutrition.kcal,
-                    },
-                  ]}
-                  columns={[
-                    {
-                      id: 'protein',
-                      name: 'Белки, г',
-                      align: 'center',
-                      template: (row) => <Text variant="body-2">{row.protein}</Text>,
-                    },
-                    {
-                      id: 'fat',
-                      name: 'Жиры, г',
-                      align: 'center',
-                      template: (row) => <Text variant="body-2">{row.fat}</Text>,
-                    },
-                    {
-                      id: 'carbs',
-                      name: 'Углеводы, г',
-                      align: 'center',
-                      template: (row) => <Text variant="body-2">{row.carbs}</Text>,
-                    },
-                    {
-                      id: 'kcal',
-                      name: 'Энерг. ценность, ккал',
-                      align: 'center',
-                      template: (row) => <Text variant="body-2">{row.kcal}</Text>,
-                    },
-                  ]}
-                />
-              </div>
+                  <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
+                    <Table
+                      width="max"
+                      data={[view]}
+                      columns={[
+                        {
+                          id: 'protein',
+                          name: 'Белки, г',
+                          align: 'center',
+                          template: (row) => <Text variant="body-2">{row.protein}</Text>,
+                        },
+                        {
+                          id: 'fat',
+                          name: 'Жиры, г',
+                          align: 'center',
+                          template: (row) => <Text variant="body-2">{row.fat}</Text>,
+                        },
+                        {
+                          id: 'carbs',
+                          name: 'Углеводы, г',
+                          align: 'center',
+                          template: (row) => <Text variant="body-2">{row.carbs}</Text>,
+                        },
+                        {
+                          id: 'kcal',
+                          name: 'Энерг. ценность, ккал',
+                          align: 'center',
+                          template: (row) => <Text variant="body-2">{row.kcal}</Text>,
+                        },
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="ttk-recipe-drawer__footer ttk-recipe-drawer__footer_view">
-              <Button view="outlined-danger" size="l" onClick={startDelete}>
+              <Button
+                view="outlined-danger"
+                size="l"
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={!view}
+              >
                 <Icon data={TrashBin} size={16} />
                 Удалить
               </Button>
@@ -389,7 +359,7 @@ export function RecipeDialog({
                 <Button view="outlined" size="l" onClick={requestClose}>
                   Отмена
                 </Button>
-                <Button view="normal" size="l" onClick={startEdit}>
+                <Button view="normal" size="l" onClick={startEdit} disabled={!view}>
                   <Icon data={Pencil} size={16} />
                   Редактировать
                 </Button>
@@ -412,7 +382,7 @@ export function RecipeDialog({
             </div>
 
             <div className="ttk-recipe-drawer__footer">
-              <Button view="outlined" size="l" onClick={cancelEdit}>
+              <Button view="outlined" size="l" onClick={() => setMode('view')}>
                 Отмена
               </Button>
               <Flex gap={2}>
@@ -440,8 +410,8 @@ export function RecipeDialog({
         </div>
       </Drawer>
 
-      <Dialog open={confirmDeleteOpen} onClose={cancelDelete} size="s">
-        <Dialog.Header caption={`Удалить «${view.name}»?`} />
+      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} size="s">
+        <Dialog.Header caption={`Удалить «${view?.name ?? ''}»?`} />
         <Dialog.Divider />
         <Dialog.Body>
           <Flex direction="column" gap={3}>
@@ -474,7 +444,12 @@ export function RecipeDialog({
                 Будет убрана из всех разделов немедленно
               </Text>
             </Flex>
-            <Button view="flat" size="l" onClick={cancelDelete} disabled={remove.isPending}>
+            <Button
+              view="flat"
+              size="l"
+              onClick={() => setConfirmDeleteOpen(false)}
+              disabled={remove.isPending}
+            >
               Отмена
             </Button>
           </Flex>

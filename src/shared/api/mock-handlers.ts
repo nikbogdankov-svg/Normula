@@ -7,8 +7,7 @@ import type {
 } from '@/features/organizations/types';
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
-import type { Collection, Ingredient, Recipe } from '@/features/ttk/types';
-import type { CreateRecipeRequest } from '@/features/ttk/types';
+import type { MockCollection, MockIngredient, MockRecipe } from '@/features/ttk/types';
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
@@ -34,7 +33,8 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * сразу пойдут по сети, без правок в фичах.
  */
 export const MOCKED_PREFIXES = [
-  '/v1/ttk',
+  // Мок-двойник карт ТТК — для меню и порционника: см. useMockRecipes.
+  '/v1/mock/ttk',
   '/v1/menus',
   // Мок-двойники объектов и диет — для разделов, которые ещё на моках
   // (меню, порционник, раскладка продуктов): см. useMockCateringObjects,
@@ -239,7 +239,7 @@ const employeeDocuments: Record<string, EmployeeDocuments> = Object.fromEntries(
 
 // --- ТТК ---
 
-const collections: Collection[] = [
+const collections: MockCollection[] = [
   { id: 'c-1', name: 'Сборник рецептур на продукцию для обучающихся, Москва 2017' },
   { id: 'c-2', name: 'Сборник технических нормативов, 2020' },
 ];
@@ -704,7 +704,7 @@ const DISH_SPECS: Record<string, DishMockSpec> = {
 };
 
 /** Перевод спецификации в строку с пересчётом «на 100 порций» и ценой. */
-const toIngredient = (spec: MockIngredientSpec): Ingredient => {
+const toIngredient = (spec: MockIngredientSpec): MockIngredient => {
   const gross = Number(spec.grossPerPortion.replace(',', '.'));
   const net = Number(spec.netPerPortion.replace(',', '.'));
   if (!Number.isFinite(gross) || !Number.isFinite(net)) {
@@ -718,7 +718,7 @@ const toIngredient = (spec: MockIngredientSpec): Ingredient => {
   };
 };
 
-const sampleRecipe = (index: number): Recipe => {
+const sampleRecipe = (index: number): MockRecipe => {
   const name = DISH_NAMES[(index - 1) % DISH_NAMES.length];
   const spec = DISH_SPECS[name] ?? FALLBACK_SPEC;
   const inCollection = index % 3 !== 0;
@@ -744,15 +744,13 @@ const sampleRecipe = (index: number): Recipe => {
       fat,
       carbs,
       kcal: String(kcal),
-      vitaminC: (0.4 + (index % 5) * 0.2).toFixed(2).replace('.', ','),
     },
   };
 };
 
-const recipes: Recipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
+const recipes: MockRecipe[] = Array.from({ length: 24 }, (_, index) => sampleRecipe(index + 1));
 
 // Soft-удалённые ТТК: остаются в меню до конца периода.
-const deletedRecipeIds = new Set<string>();
 
 const mockedDiets: Diet[] = [
   {
@@ -925,7 +923,7 @@ function parseRuNumber(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function dishRef(recipe: Recipe): MenuDishRef {
+function dishRef(recipe: MockRecipe): MenuDishRef {
   return {
     recipeId: recipe.id,
     name: recipe.name,
@@ -1008,32 +1006,16 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   const [route, search] = path.split('?');
   const params = new URLSearchParams(search);
 
-  // ТТК
-  if (route === '/v1/ttk-collections' && method === 'GET') {
-    return { collections } as T;
-  }
-
-  if (route === '/v1/ttk-collections/import' && method === 'POST') {
-    const body = options.body as { fileNames: string[] };
-
-    return { imported: body.fileNames.length * 12 } as T;
-  }
-
-  if (route === '/v1/ttk' && method === 'GET') {
+  // Мок-двойник карт ТТК для разделов на моках: только чтение.
+  if (route === '/v1/mock/ttk' && method === 'GET') {
     const query = (params.get('search') ?? '').trim().toLowerCase();
     const collectionId = params.get('collectionId') ?? '';
     const sort = params.get('sort') ?? 'name';
     const ascending = (params.get('order') ?? 'asc') !== 'desc';
 
-    let found = recipes.filter((r) => !deletedRecipeIds.has(r.id));
+    let found = recipes;
     if (query) found = found.filter((r) => r.name.toLowerCase().includes(query));
-    if (collectionId) {
-      if (collectionId === 'none') {
-        found = found.filter((r) => !r.collectionId);
-      } else {
-        found = found.filter((r) => r.collectionId === collectionId);
-      }
-    }
+    if (collectionId) found = found.filter((r) => r.collectionId === collectionId);
 
     const sorted = [...found].sort((a, b) => {
       const dir = ascending ? 1 : -1;
@@ -1049,105 +1031,6 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     const pageRecipes = sorted.slice(start, start + pageSize);
 
     return { recipes: pageRecipes, total, page, pageSize } as T;
-  }
-
-  if (route === '/v1/ttk' && method === 'POST') {
-    const body = options.body as {
-      name: string;
-      portionYield: string;
-      collectionName?: string;
-      recipe: string;
-      ingredients: Array<{
-        name: string;
-        productId?: string;
-        grossPerPortion: string;
-        netPerPortion: string;
-      }>;
-      nutrition?: CreateRecipeRequest['nutrition'];
-    };
-    const base = sampleRecipe(recipes.length + 1);
-    const recipe: Recipe = {
-      ...base,
-      id: `t-${Date.now()}`,
-      name: body.name,
-      collectionId: '',
-      collectionName: body.collectionName ?? '',
-      portionYield: body.portionYield,
-      recipe: body.recipe,
-      nutrition: body.nutrition ? { ...base.nutrition, ...body.nutrition } : base.nutrition,
-      ingredients: (body.ingredients ?? [])
-        .filter((row) => row.name.trim())
-        .map((row) => ({
-          name: row.name,
-          productId: row.productId ?? undefined,
-          grossPerPortion: row.grossPerPortion,
-          netPerPortion: row.netPerPortion,
-          grossPer100: '',
-          netPer100: '',
-          pricePerUnit: '',
-          unit: 'кг',
-        })),
-    };
-    recipes.unshift(recipe);
-
-    return { recipe } as T;
-  }
-
-  const ttkRecipe = match('/v1/ttk/:id', route);
-  if (ttkRecipe && method === 'PATCH') {
-    const found = recipes.find((r) => r.id === ttkRecipe.id);
-    if (!found) throw new Error('mock: ТТК не найдена');
-
-    const body = options.body as {
-      name: string;
-      portionYield: string;
-      collectionName?: string;
-      recipe: string;
-      ingredients: Array<{
-        name: string;
-        productId?: string;
-        grossPerPortion: string;
-        netPerPortion: string;
-      }>;
-      nutrition?: CreateRecipeRequest['nutrition'];
-    };
-
-    Object.assign(found, {
-      name: body.name,
-      portionYield: body.portionYield,
-      collectionName: body.collectionName ?? found.collectionName,
-      recipe: body.recipe,
-      nutrition: body.nutrition ? { ...found.nutrition, ...body.nutrition } : found.nutrition,
-      ingredients: (body.ingredients ?? [])
-        .filter((row) => row.name.trim())
-        .map((row) => ({
-          name: row.name,
-          productId: row.productId ?? undefined,
-          grossPerPortion: row.grossPerPortion,
-          netPerPortion: row.netPerPortion,
-          grossPer100: '',
-          netPer100: '',
-          pricePerUnit: '',
-          unit: 'кг',
-        })),
-    });
-
-    return { recipe: found } as T;
-  }
-
-  if (ttkRecipe && method === 'DELETE') {
-    const found = recipes.find((r) => r.id === ttkRecipe.id);
-    if (!found) throw new Error('mock: ТТК не найдена');
-
-    const mode = params.get('mode') ?? 'soft';
-    if (mode === 'immediate') {
-      const index = recipes.indexOf(found);
-      recipes.splice(index, 1);
-    } else {
-      deletedRecipeIds.add(ttkRecipe.id);
-    }
-
-    return {} as T;
   }
 
   // Диеты: справочник рационов питания (см. features/diets).

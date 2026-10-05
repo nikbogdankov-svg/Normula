@@ -31,7 +31,7 @@ import {
 } from '@/shared/ui/states';
 import { useMockCateringObjects } from '@/features/objects/api';
 import type { SubObject } from '@/features/objects/types';
-import { useInfiniteRecipes } from '@/features/ttk/api';
+import { useInfiniteMockRecipes } from '@/features/ttk/api';
 import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
@@ -87,7 +87,12 @@ export function PortionsRoute() {
 
   // Веса порций блюд из ТТК — для килограммов в раздаче. Отдаём всё одной
   // выгрузкой; ключ кэша совпадает с ТТК, поэтому повторных запросов нет.
-  const recipes = useInfiniteRecipes({ search: '', collectionId: '', sort: 'name', pageSize: 100 });
+  const recipes = useInfiniteMockRecipes({
+    search: '',
+    collectionId: '',
+    sort: 'name',
+    pageSize: 100,
+  });
   const weightGramsByDish = useMemo(() => {
     const map = new Map<string, number>();
     for (const page of recipes.data?.pages ?? []) {

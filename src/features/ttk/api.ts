@@ -1,93 +1,35 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
 import type {
-  CreateRecipeRequest,
-  ImportCollectionsRequest,
-  ImportCollectionsResponse,
-  ListCollectionsResponse,
+  GetRecipeResponse,
+  ListMockRecipesResponse,
   ListRecipesResponse,
-  Recipe,
-  UpdateRecipeRequest,
+  RecipeRequest,
 } from './types';
 
 /** API раздела ТТК. Данные организационные — токен по умолчанию. */
 
 const KEY = 'ttk';
 
-export type RecipeSort = 'name' | 'price';
-
-export function useRecipes(params: {
-  search: string;
-  collectionId: string;
-  sort: RecipeSort;
-  ascending?: boolean;
-  page?: number;
-  pageSize?: number;
-}) {
+/** Все карты организации кратко одним запросом; фильтры — на клиенте. */
+export function useRecipes() {
   const api = useApi();
-  const ascending = params.ascending ?? true;
-  const page = params.page ?? 1;
-  const pageSize = params.pageSize ?? 10;
 
   return useQuery({
-    queryKey: [KEY, api.organizationId, { ...params, ascending }],
-    queryFn: () => {
-      const query = new URLSearchParams({
-        search: params.search,
-        collectionId: params.collectionId,
-        sort: params.sort,
-        order: ascending ? 'asc' : 'desc',
-        page: String(page),
-        pageSize: String(pageSize),
-      });
-
-      return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);
-    },
+    queryKey: [KEY, api.organizationId],
+    queryFn: () => api.request<ListRecipesResponse>('/v1/ttk'),
     enabled: api.organizationId !== null,
   });
 }
 
-export function useInfiniteRecipes(params: {
-  search: string;
-  collectionId: string;
-  sort: RecipeSort;
-  ascending?: boolean;
-  pageSize?: number;
-}) {
-  const api = useApi();
-  const ascending = params.ascending ?? true;
-  const pageSize = params.pageSize ?? 20;
-
-  return useInfiniteQuery({
-    queryKey: [KEY, api.organizationId, { ...params, ascending }],
-    queryFn: ({ pageParam }) => {
-      const query = new URLSearchParams({
-        search: params.search,
-        collectionId: params.collectionId,
-        sort: params.sort,
-        order: ascending ? 'asc' : 'desc',
-        page: String(pageParam),
-        pageSize: String(pageSize),
-      });
-
-      return api.request<ListRecipesResponse>(`/v1/ttk?${query.toString()}`);
-    },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      const maxPage = Math.max(1, Math.ceil(lastPage.total / lastPage.pageSize));
-      return lastPage.page < maxPage ? lastPage.page + 1 : undefined;
-    },
-    enabled: api.organizationId !== null,
-  });
-}
-
-export function useCollections() {
+/** Карта целиком, с ингредиентами и ценами. */
+export function useRecipe(id: string | null) {
   const api = useApi();
 
   return useQuery({
-    queryKey: [KEY, 'collections', api.organizationId],
-    queryFn: () => api.request<ListCollectionsResponse>('/v1/ttk-collections'),
-    enabled: api.organizationId !== null,
+    queryKey: [KEY, api.organizationId, 'recipe', id],
+    queryFn: () => api.request<GetRecipeResponse>(`/v1/ttk/${id}`),
+    enabled: api.organizationId !== null && id !== null,
   });
 }
 
@@ -102,23 +44,27 @@ export function useCreateRecipe() {
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: (body: CreateRecipeRequest) =>
-      api.request<{ recipe: Recipe }>('/v1/ttk', { method: 'POST', body }),
+    mutationFn: (body: RecipeRequest) =>
+      api.request<{ id: string }>('/v1/ttk', { method: 'POST', body }),
     onSuccess: invalidate,
   });
 }
 
 export function useUpdateRecipe() {
   const api = useApi();
+  const invalidate = useInvalidate();
 
-  // Инвалидацию списка делает RecipeDialog после переключения в view —
-  // иначе refetch в середине смены mode может закрыть drawer.
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: UpdateRecipeRequest }) =>
-      api.request<{ recipe: Recipe }>(`/v1/ttk/${id}`, { method: 'PATCH', body }),
+    mutationFn: ({ id, body }: { id: string; body: RecipeRequest }) =>
+      api.request<void>(`/v1/ttk/${id}`, { method: 'PATCH', body }),
+    onSuccess: invalidate,
   });
 }
 
+/**
+ * Как удалять карту: 'soft' — по конец периода, 'immediate' — сразу.
+ * Бэкенд принимает режим, но пока не различает.
+ */
 export type RecipeDeleteMode = 'soft' | 'immediate';
 
 export function useDeleteRecipe() {
@@ -132,16 +78,56 @@ export function useDeleteRecipe() {
   });
 }
 
-export function useImportCollections() {
-  const api = useApi();
-  const invalidate = useInvalidate();
+/*
+ * Мок-двойник карт для разделов, которые ещё на моках (меню, порционник):
+ * их мок-данные завязаны на мок-карты. Удаляется вместе с их моками — тогда
+ * они переходят на useRecipes.
+ */
 
-  return useMutation({
-    mutationFn: (body: ImportCollectionsRequest) =>
-      api.request<ImportCollectionsResponse>('/v1/ttk-collections/import', {
-        method: 'POST',
-        body,
-      }),
-    onSuccess: invalidate,
+export type MockRecipeSort = 'name' | 'price';
+
+interface MockRecipesParams {
+  search: string;
+  collectionId: string;
+  sort: MockRecipeSort;
+  ascending?: boolean;
+  pageSize?: number;
+}
+
+function mockQuery(params: MockRecipesParams, page: number): string {
+  const query = new URLSearchParams({
+    search: params.search,
+    collectionId: params.collectionId,
+    sort: params.sort,
+    order: (params.ascending ?? true) ? 'asc' : 'desc',
+    page: String(page),
+    pageSize: String(params.pageSize ?? 10),
+  });
+
+  return `/v1/mock/ttk?${query.toString()}`;
+}
+
+export function useMockRecipes(params: MockRecipesParams) {
+  const api = useApi();
+
+  return useQuery({
+    queryKey: [KEY, api.organizationId, 'mock', params],
+    queryFn: () => api.request<ListMockRecipesResponse>(mockQuery(params, 1)),
+    enabled: api.organizationId !== null,
+  });
+}
+
+export function useInfiniteMockRecipes(params: MockRecipesParams) {
+  const api = useApi();
+
+  return useInfiniteQuery({
+    queryKey: [KEY, api.organizationId, 'mock-pages', params],
+    queryFn: ({ pageParam }) => api.request<ListMockRecipesResponse>(mockQuery(params, pageParam)),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const maxPage = Math.max(1, Math.ceil(lastPage.total / lastPage.pageSize));
+      return lastPage.page < maxPage ? lastPage.page + 1 : undefined;
+    },
+    enabled: api.organizationId !== null,
   });
 }

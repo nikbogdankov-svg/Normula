@@ -44,7 +44,10 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
   };
 
   const submit = () => {
-    create.mutate(form.getBody(), {
+    const body = form.getBody();
+    if (!body) return;
+
+    create.mutate(body, {
       onSuccess: () => {
         toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
         requestClose();
