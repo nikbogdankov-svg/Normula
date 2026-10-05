@@ -77,7 +77,7 @@
 .write-off-drawer__body .admin-table thead th {
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid var(--g-color-line-generic);
+  border-bottom: none;
   font-weight: 600;
   background-color: var(--g-color-bg-secondary);
 }

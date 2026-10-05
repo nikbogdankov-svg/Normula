@@ -47,6 +47,7 @@
 /* Шапка вне прокручиваемого контейнера — всегда сверху. */
 .products-page__header .admin-table .g-table__head,
 .products-page__header .admin-table .g-table__head .g-table__cell {
+  border-block-end: none;
   background: var(--onemore-card-bg);
 }
 

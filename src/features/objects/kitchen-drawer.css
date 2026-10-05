@@ -96,17 +96,9 @@
   margin-inline: auto;
 }
 
-.kitchen-drawer__facility-block {
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid var(--g-color-line-generic);
-  background: var(--g-color-base-float);
-}
-
 .kitchen-drawer__department {
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid var(--g-color-line-generic);
   background: var(--g-color-base-float);
 }
 

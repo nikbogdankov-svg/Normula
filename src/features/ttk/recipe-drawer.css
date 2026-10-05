@@ -119,7 +119,6 @@
 .ttk-recipe-drawer__table-wrap {
   width: 100%;
   margin-bottom: 12px;
-  border: 1px solid var(--g-color-line-generic);
   border-radius: 12px;
   overflow: hidden;
   background: var(--g-color-base-float);

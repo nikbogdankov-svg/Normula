@@ -274,7 +274,7 @@ function SubObjectBlock({
   };
 
   return (
-    <Flex direction="column" gap={2} className="kitchen-drawer__facility-block">
+    <Flex direction="column" gap={3}>
       <Flex gap={2} alignItems="flex-end">
         <TextInput
           size="l"
@@ -282,12 +282,13 @@ function SubObjectBlock({
           placeholder="Школа №1"
           value={subObject.name}
           onUpdate={(value) => onUpdate(subObjectIndex, { name: value })}
+          autoFocus
           style={{ flex: 1 }}
         />
         <Flex direction="column" gap={1}>
           <Select
             size="l"
-            width={200}
+            width={240}
             value={[subObject.type]}
             options={[
               { value: 'school', content: 'Школа' },
@@ -336,8 +337,8 @@ function SubObjectBlock({
       ))}
 
       <Button
-        view="flat"
-        size="m"
+        view="normal-contrast"
+        size="l"
         onClick={() =>
           onUpdate(subObjectIndex, {
             departments: [...subObject.departments, emptyDepartment()],
@@ -900,17 +901,15 @@ export function SubObjectDrawer({
         </div>
 
         <div className="kitchen-drawer__body">
-          <Flex direction="column" gap={3}>
-            <SubObjectBlock
-              subObject={form}
-              subObjectIndex={0}
-              diets={diets}
-              dietsLoaded={dietsQuery.data !== undefined}
-              onUpdate={updateSubObject}
-              onRemove={removeDepartment}
-              canRemove={!isCreate}
-            />
-          </Flex>
+          <SubObjectBlock
+            subObject={form}
+            subObjectIndex={0}
+            diets={diets}
+            dietsLoaded={dietsQuery.data !== undefined}
+            onUpdate={updateSubObject}
+            onRemove={removeDepartment}
+            canRemove={!isCreate}
+          />
         </div>
 
         <div className="kitchen-drawer__footer">
