@@ -118,6 +118,7 @@ export function TtkRoute() {
             }}
             options={[
               { value: ALL_COLLECTIONS, content: 'Все' },
+              { value: 'none', content: 'Без сборника' },
               ...(collections.data?.collections ?? []).map((collection) => ({
                 value: collection.id,
                 content: collection.name,

@@ -162,69 +162,74 @@ export function AccountsRoute() {
   }
 
   return (
-    <div className="accounts-page">
-      <Card view="filled" style={{ padding: 0, margin: 16 }}>
-        <Flex
-          alignItems="center"
-          // justifyContent="space-between"
-          gap={2}
-          style={{ padding: '12px 16px' }}
-        >
+    <div
+      className="accounts-page"
+      style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+    >
+      <Card
+        view="filled"
+        style={{
+          padding: 0,
+          margin: 16,
+          overflow: 'hidden',
+          flex: '1 1 auto',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <Flex alignItems="center" gap={2} style={{ padding: '12px 16px' }}>
           <Icon data={Wallet} size={16} />
           <Text variant="subheader-2">Счета</Text>
         </Flex>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--g-color-line-generic)',
-            paddingTop: 4,
-            paddingBottom: 8,
-          }}
-        >
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
+        <div className="ttk-page" style={{ height: '100%' }}>
+          <div className="ttk-page__header" style={{ marginTop: 8 }}>
+            <table
+              className="admin-table g-table__table"
+              style={{ borderCollapse: 'separate', borderSpacing: 0, margin: 0 }}
+            >
+              <thead className="g-table__head">
                 <tr>
-                  <th>
-                    <Text variant="body-1" color="secondary">
-                      Дата
-                    </Text>
+                  <th className="g-table__cell">Дата</th>
+                  <th className="g-table__cell">Организация</th>
+                  <th className="g-table__cell" style={{ textAlign: 'right' }}>
+                    Прошли
                   </th>
-                  <th>
-                    <Text variant="body-1" color="secondary">
-                      Организация
-                    </Text>
+                  <th className="g-table__cell" style={{ textAlign: 'right' }}>
+                    Списано
                   </th>
-                  <th>
-                    <Text variant="body-1" color="secondary">
-                      Прошли
-                    </Text>
-                  </th>
-                  <th>
-                    <Text variant="body-1" color="secondary">
-                      Списано
-                    </Text>
-                  </th>
-                  <th>
-                    <Text variant="body-1" color="secondary">
-                      Выставлено
-                    </Text>
+                  <th className="g-table__cell" style={{ textAlign: 'right' }}>
+                    Выставлено
                   </th>
                 </tr>
               </thead>
-              <tbody>
+            </table>
+          </div>
+          <div className="admin-table-wrap" style={{ flex: '1 1 auto', minHeight: 0 }}>
+            <table
+              className="admin-table ttk-page__table-body g-table__table"
+              style={{ borderCollapse: 'separate', borderSpacing: '0 8px', margin: 0 }}
+            >
+              <tbody className="g-table__body">
                 {ACCOUNT_ROWS.map((row, index) => (
                   <tr
                     key={`${row.date}-${row.organization}`}
-                    className={index === ACCOUNT_ROWS.length - 1 ? 'admin-table__row_last' : ''}
+                    className={`g-table__row g-table__row_interactive ${index === ACCOUNT_ROWS.length - 1 ? 'admin-table__row_last' : ''}`}
                     style={{ cursor: 'pointer' }}
                     onClick={() => setSelected(row)}
                   >
-                    <td>{row.date}</td>
-                    <td>{row.organization}</td>
-                    <td>{row.passed} чел.</td>
-                    <td>{row.charged.toLocaleString('ru-RU')} ₽</td>
-                    <td>{row.invoiced.toLocaleString('ru-RU')} ₽</td>
+                    <td className="g-table__cell">{row.date}</td>
+                    <td className="g-table__cell">{row.organization}</td>
+                    <td className="g-table__cell" style={{ textAlign: 'right' }}>
+                      {row.passed} чел.
+                    </td>
+                    <td className="g-table__cell" style={{ textAlign: 'right' }}>
+                      {row.charged.toLocaleString('ru-RU')} ₽
+                    </td>
+                    <td className="g-table__cell" style={{ textAlign: 'right' }}>
+                      {row.invoiced.toLocaleString('ru-RU')} ₽
+                    </td>
                   </tr>
                 ))}
               </tbody>
