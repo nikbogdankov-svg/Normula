@@ -111,7 +111,7 @@
 }
 
 .ttk-recipe-drawer__meta-label {
-  width: 140px;
+  width: 80px;
   flex-shrink: 0;
   color: var(--g-color-text-secondary);
 }
