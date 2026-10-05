@@ -68,11 +68,12 @@ body,
 }
 
 /* Белые (в светлой теме) поверхности карточек поверх серой рабочей области.
-   view=filled в Gravity рисует серый base-generic; в макете карточки белые. */
+   view=filled в Gravity рисует серый base-generic; в макете карточки белые.
+   Внешней обводки нет: белый блок на сером фоне отделяется цветом. */
 .g-root .g-card_view_filled {
   --_--background-color: var(--onemore-card-bg);
   --_--border-color: var(--g-color-line-generic);
-  --_--border-width: 1px;
+  --_--border-width: 0;
 }
 
 /* Popup списков (Select, меню и пр.) всегда выше любого drawer (z-index: 100000),
