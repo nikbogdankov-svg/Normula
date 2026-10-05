@@ -1,0 +1,115 @@
+/* Страница счетов: строки таблицы — карточки, как в ТТК.
+   Скопировано из ttk-route.css с заменой префикса на ac-. */
+.ac-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px;
+  gap: 8px;
+}
+
+/* Карточка таблицы: шапка закреплена, скроллится только список строк. */
+.ac-page__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--g-color-base-generic-ultralight);
+  margin: 0;
+}
+
+/* Только .admin-table-wrap должен скроллиться. */
+.ac-page__scroll .admin-table-wrap .g-table,
+.ac-page__scroll .admin-table-wrap .g-table__scroll-container {
+  overflow: visible;
+}
+
+.ac-page__header {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.ac-page__header .admin-table .g-table__head,
+.ac-page__header .admin-table .g-table__head .g-table__cell {
+  border-block-end: none;
+  background: var(--ac-thead-bg, var(--onemore-card-bg));
+}
+
+.ac-page__header .admin-table .g-table__head .g-table__cell:first-child {
+  border-radius: 6px 0 0 6px;
+  background-clip: padding-box;
+  padding-inline-start: 12px;
+}
+
+.ac-page__header .admin-table .g-table__head .g-table__cell:last-child {
+  border-radius: 0 6px 6px 0;
+  background-clip: padding-box;
+  padding-inline-end: 12px;
+  text-align: end;
+}
+
+.ac-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+}
+
+.ac-page__scroll .ac-page__table-body .g-table__head {
+  display: none;
+}
+
+/* У шапки-таблицы нет данных — прячем её пустое тело. */
+.ac-page__header .admin-table .g-table__body {
+  display: none;
+}
+
+.ac-page__scroll .admin-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  /* Только снизу: зазор под последней карточкой. */
+  padding: 0 0 8px;
+  margin: 0;
+}
+
+/* Зазор между шапкой и первой карточкой — border-spacing первой строки. */
+.ac-page__scroll .ac-page__table-body .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: 0;
+  table-layout: fixed;
+}
+
+.ac-page__header .admin-table .g-table__table {
+  table-layout: fixed;
+}
+
+.ac-page__scroll .ac-page__table-body .g-table__cell {
+  border-block-end: none;
+}
+
+.ac-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell {
+  background: var(--onemore-card-bg);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.ac-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell:first-child {
+  border-radius: 8px 0 0 8px;
+  background-clip: padding-box;
+}
+
+.ac-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell:last-child {
+  border-radius: 0 8px 8px 0;
+  background-clip: padding-box;
+}
+
+.ac-page__scroll .admin-table .g-table__body .g-table__row_interactive:hover > .g-table__cell {
+  background-color: var(--g-color-base-generic);
+}

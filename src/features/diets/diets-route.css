@@ -47,6 +47,7 @@
 /* Шапка вне прокручиваемого контейнера — всегда сверху. */
 .diets-page__header .admin-table .g-table__head,
 .diets-page__header .admin-table .g-table__head .g-table__cell {
+  border-block-end: none;
   background: var(--onemore-card-bg);
 }
 

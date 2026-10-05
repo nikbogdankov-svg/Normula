@@ -64,6 +64,35 @@
   padding: 0;
 }
 
+/* Карточка приёма пищи: шапка с итогами + таблица диет внутри. */
+.accounts-drawer__meal-card {
+  background: var(--onemore-card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.accounts-drawer__meal-card + .accounts-drawer__meal-card {
+  margin-top: 12px;
+}
+
+.accounts-drawer__meal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--g-color-bg-secondary);
+  border-bottom: 1px solid var(--g-color-line-generic);
+  border-radius: 8px 8px 0 0;
+}
+
+.accounts-drawer__meal-totals {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .accounts-drawer__footer {
   width: 100%;
   border-top: 1px solid var(--g-color-line-generic);
@@ -86,10 +115,24 @@
   font-size: 14px;
 }
 
+/* Одинаковые ширины колонок во всех карточках приёмов пищи. */
+.accounts-drawer__diets {
+  table-layout: fixed;
+}
+
+.accounts-drawer__diets td:nth-child(1) {
+  width: 40%;
+}
+
+.accounts-drawer__diets td:nth-child(2),
+.accounts-drawer__diets td:nth-child(3) {
+  width: 30%;
+}
+
 .accounts-drawer__body .admin-table thead th {
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid var(--g-color-line-generic);
+  border-bottom: none;
   font-weight: var(--g-text-body-font-weight);
   background-color: var(--g-color-bg-secondary);
   font-size: var(--g-text-body-2-font-size);
@@ -101,6 +144,7 @@
   border-bottom: 1px solid var(--g-color-line-generic);
 }
 
+/* Строки таблиц в drawer не подсвечиваются: значения для чтения, не для клика. */
 .accounts-drawer__body .admin-table tbody tr:hover td {
   background-color: transparent;
 }
@@ -109,28 +153,12 @@
   padding: 12px 16px;
 }
 
-.accounts-drawer__body .admin-table tbody tr.accounts-drawer__department-row {
-  border-top: 2px solid var(--g-color-line-generic);
-}
-
 .accounts-drawer__body .admin-table tbody .admin-table__row_last {
   border-bottom: none;
 }
 
-.accounts-drawer__body .admin-table tbody tr.accounts-drawer__meal-row td {
-  background-color: var(--g-color-bg-secondary);
-  font-weight: 600;
-}
-
-.accounts-drawer__body .admin-table tbody tr.accounts-drawer__diet-row td {
-  padding-left: 40px;
-  color: var(--g-color-text-secondary);
-  font-size: 13px;
-}
-
-.accounts-drawer__body .admin-table tbody .admin-table__row_total {
-  border-top: 1px solid var(--g-color-line-generic);
+/* Последняя строка диет: нижний дивайдер не нужен. */
+.accounts-drawer__diets tbody tr:last-child,
+.accounts-drawer__diets tbody tr:last-child td {
   border-bottom: none;
-  font-weight: 600;
-  background-color: var(--g-color-bg-secondary);
 }
