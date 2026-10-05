@@ -9,7 +9,6 @@ import {
   TrashBin,
   Xmark,
 } from '@gravity-ui/icons';
-import { useImportCollections } from './api';
 import type { ExtractedCollection, ExtractedDish } from './extract-collection';
 import { useRecipeForm } from './recipe-form';
 import { useDrawerHeight } from './use-drawer-height';
@@ -34,27 +33,37 @@ function isAcceptedFile(file: File): boolean {
   return ACCEPT_EXTENSIONS.some((ext) => name.endsWith(ext));
 }
 
+/**
+ * Разобранное блюдо → карта для формы. Продукты из файла не связаны со
+ * справочником, поэтому строки идут с названием, но без productId; выход
+ * порции из «90/50» берётся первым числом.
+ */
 function dishToRecipe(dish: ExtractedDish, collectionName: string): Recipe {
+  const yieldNet = Number.parseInt(dish.portionYield, 10);
+
   return {
     id: dish.id,
     name: dish.name,
+    cardName: '',
     collectionName,
-    collectionId: '',
-    portionYield: dish.portionYield,
-    price: 0,
+    yieldNet: Number.isFinite(yieldNet) ? yieldNet : 0,
+    yieldLoss: 0,
+    technology: dish.recipe,
+    protein: 0,
+    fat: 0,
+    carbs: 0,
     kcal: 0,
-    recipe: dish.recipe,
-    ingredients: dish.ingredients.map((row) => ({
-      name: row.name,
-      grossPerPortion: row.grossPerPortion,
-      netPerPortion: row.netPerPortion,
-      grossPer100: '',
-      netPer100: '',
-      pricePerUnit: '',
+    ingredients: dish.ingredients.map((row, index) => ({
+      id: `${dish.id}-${index}`,
+      productId: row.productId ?? '',
+      productName: row.name,
+      unit: row.unit ?? '',
+      gross: Number(row.grossPerPortion.replace(',', '.')) || 0,
+      net: Number(row.netPerPortion.replace(',', '.')) || 0,
+      unitPrice: 0,
+      total: 0,
     })),
-    outputPerPortion: '',
-    outputPer100: '',
-    nutrition: { protein: '', fat: '', carbs: '', kcal: '', vitaminC: '' },
+    price: 0,
   };
 }
 
@@ -267,7 +276,6 @@ function ImportReviewDrawer({
   onClose: () => void;
 }) {
   const height = useDrawerHeight();
-  const importFiles = useImportCollections();
   const toaster = useToaster();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -327,7 +335,8 @@ function ImportReviewDrawer({
 
   const saveDish = () => {
     if (!editing) return;
-    const body = form.getBody();
+    // Черновик без проверок бэкенда: продукты из файла ещё не связаны.
+    const draft = form.getDraft();
     onCollectionsChange(
       collections.map((collection) => {
         if (collection.id !== editing.collectionId) return collection;
@@ -337,10 +346,16 @@ function ImportReviewDrawer({
             dish.id === editing.dish.id
               ? {
                   ...dish,
-                  name: body.name,
-                  portionYield: body.portionYield,
-                  recipe: body.recipe,
-                  ingredients: body.ingredients,
+                  name: draft.name,
+                  portionYield: draft.yieldNet,
+                  recipe: draft.technology,
+                  ingredients: draft.ingredients.map((row) => ({
+                    name: row.productName,
+                    productId: row.productId || undefined,
+                    grossPerPortion: row.gross,
+                    netPerPortion: row.net,
+                    unit: row.unit || undefined,
+                  })),
                 }
               : dish
           ),
@@ -350,23 +365,15 @@ function ImportReviewDrawer({
     setEditing(null);
   };
 
+  // Импорт на бэкенде ещё не подключён: разбор файла работает, а сохранить
+  // карты пока некуда.
   const submit = () => {
-    importFiles.mutate(
-      { fileNames: collections.map((collection) => collection.fileName) },
-      {
-        onSuccess: (result) => {
-          toaster.add({
-            name: 'ttk-imported',
-            title: 'Сборники импортированы',
-            content: `Добавлено карт: ${result.imported}`,
-            theme: 'success',
-          });
-          requestClose();
-        },
-        onError: (e) =>
-          toaster.add({ name: 'ttk-import', title: 'Ошибка', content: e.message, theme: 'danger' }),
-      }
-    );
+    toaster.add({
+      name: 'ttk-import',
+      title: 'Импорт сборников пока не подключён',
+      content: 'Карты из файла не сохранены. Заведите их вручную через «Создать ТТК».',
+      theme: 'warning',
+    });
   };
 
   if (!mounted) return null;
@@ -528,13 +535,7 @@ function ImportReviewDrawer({
             <Button view="outlined" size="l" onClick={requestClose}>
               Отмена
             </Button>
-            <Button
-              view="action"
-              size="l"
-              onClick={submit}
-              disabled={collections.length === 0}
-              loading={importFiles.isPending}
-            >
+            <Button view="action" size="l" onClick={submit} disabled={collections.length === 0}>
               <Icon data={ArrowUpFromSquare} size={16} />
               Импортировать
             </Button>

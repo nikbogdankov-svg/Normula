@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, Divider, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
 import { FloppyDisk, Magnifier, Plus, TrashBin } from '@gravity-ui/icons';
-import { useRecipes } from '@/features/ttk/api';
+import { useMockRecipes } from '@/features/ttk/api';
 import { formatMetric, parseRuNumber, sumDishes } from './norms';
 import type { MenuDishRef } from './types';
 
@@ -33,7 +33,7 @@ export function DishPickerDialog({
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<MenuDishRef[]>([]);
   const wasOpen = useRef(false);
-  const recipes = useRecipes({ search, collectionId: '', sort: 'name' });
+  const recipes = useMockRecipes({ search, collectionId: '', sort: 'name' });
 
   // Синхронизируем черновик только при открытии — иначе ререндер родителя сбрасывает добавления.
   useEffect(() => {

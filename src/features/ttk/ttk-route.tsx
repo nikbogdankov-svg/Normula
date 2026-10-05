@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   Flex,
@@ -25,51 +25,84 @@ import {
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
-import { useCollections, useInfiniteRecipes, type RecipeSort } from './api';
-import type { Recipe } from './types';
+import { formatMoney } from '@/features/warehouse/format';
+import { useRecipes } from './api';
+import type { RecipeSummary } from './types';
 import { RecipeDialog } from './recipe-dialog';
 import { CreateRecipeDialog } from './create-recipe-dialog';
 import { ImportCollectionsDialog } from './import-dialog';
 import './ttk-route.css';
 
 const ALL_COLLECTIONS = 'all';
-const PAGE_SIZE = 20;
+/** Пункт фильтра для карт с пустым названием сборника. */
+const NO_COLLECTION = 'none';
+
+type RecipeSort = 'name' | 'price';
+
+/** Карты по фильтрам и сортировке; всё на клиенте, список приходит целиком. */
+function filterRecipes(
+  recipes: RecipeSummary[],
+  search: string,
+  collection: string,
+  sort: RecipeSort,
+  ascending: boolean
+): RecipeSummary[] {
+  const query = search.trim().toLowerCase();
+
+  const found = recipes.filter((recipe) => {
+    if (collection === NO_COLLECTION && recipe.collectionName !== '') return false;
+    if (collection !== ALL_COLLECTIONS && collection !== NO_COLLECTION) {
+      if (recipe.collectionName !== collection) return false;
+    }
+    if (!query) return true;
+
+    return (
+      recipe.name.toLowerCase().includes(query) || recipe.cardName.toLowerCase().includes(query)
+    );
+  });
+
+  const direction = ascending ? 1 : -1;
+
+  return found.sort((a, b) => {
+    if (sort === 'price') return (a.price - b.price) * direction;
+
+    return a.name.localeCompare(b.name, 'ru') * direction;
+  });
+}
 
 /** Раздел ТТК: панель фильтров закреплена, скроллится таблица. */
 export function TtkRoute() {
   const { current } = useOrganizations();
   const [search, setSearch] = useState('');
-  const [collectionId, setCollectionId] = useState(ALL_COLLECTIONS);
+  const [collection, setCollection] = useState(ALL_COLLECTIONS);
   const [sort, setSort] = useState<RecipeSort>('name');
   const [ascending, setAscending] = useState(true);
-  const [opened, setOpened] = useState<Recipe | null>(null);
+  const [openedId, setOpenedId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const { data, isPending, isError, error, refetch } = useRecipes();
 
-  const collections = useCollections();
-  const {
-    data,
-    isPending,
-    isError,
-    error,
-    refetch,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteRecipes({
-    search,
-    collectionId: collectionId === ALL_COLLECTIONS ? '' : collectionId,
-    sort,
-    ascending,
-    pageSize: PAGE_SIZE,
-  });
+  const all = useMemo(() => data?.recipes ?? [], [data]);
 
-  const recipes = useMemo(() => data?.pages.flatMap((page) => page.recipes) ?? [], [data]);
-  const total = data?.pages[0]?.total ?? 0;
-  const hasFilters = search.trim() !== '' || collectionId !== ALL_COLLECTIONS;
+  const collectionOptions = useMemo(() => {
+    const names = [...new Set(all.map((recipe) => recipe.collectionName).filter(Boolean))].sort(
+      (a, b) => a.localeCompare(b, 'ru')
+    );
+    const hasEmpty = all.some((recipe) => recipe.collectionName === '');
+
+    return [
+      { value: ALL_COLLECTIONS, content: 'Все' },
+      ...(hasEmpty ? [{ value: NO_COLLECTION, content: 'Без сборника' }] : []),
+      ...names.map((name) => ({ value: name, content: name })),
+    ];
+  }, [all]);
+
+  const recipes = useMemo(
+    () => filterRecipes(all, search, collection, sort, ascending),
+    [all, search, collection, sort, ascending]
+  );
+  const hasFilters = search.trim() !== '' || collection !== ALL_COLLECTIONS;
 
   const onSort = (column: RecipeSort) => {
     if (sort === column) {
@@ -80,30 +113,6 @@ export function TtkRoute() {
     }
   };
 
-  // Сброс прокрутки при смене фильтров или сортировки.
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [search, collectionId, sort, ascending]);
-
-  // Бесконечный скролл: подгружаем следующую страницу при приближении к концу.
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    const root = scrollRef.current;
-    if (!sentinel || !root) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
-      },
-      { root, rootMargin: '200px' }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
   return (
     <div className="ttk-page">
       <Flex className="ttk-page__toolbar" direction="column" gap={3} wrap>
@@ -112,18 +121,9 @@ export function TtkRoute() {
             size="l"
             width={260}
             label="Сборник:"
-            value={[collectionId]}
-            onUpdate={(value) => {
-              setCollectionId(value[0] ?? ALL_COLLECTIONS);
-            }}
-            options={[
-              { value: ALL_COLLECTIONS, content: 'Все' },
-              { value: 'none', content: 'Без сборника' },
-              ...(collections.data?.collections ?? []).map((collection) => ({
-                value: collection.id,
-                content: collection.name,
-              })),
-            ]}
+            value={[collection]}
+            onUpdate={(value) => setCollection(value[0] ?? ALL_COLLECTIONS)}
+            options={collectionOptions}
           />
 
           <Flex alignItems="center" gap={2}>
@@ -140,11 +140,9 @@ export function TtkRoute() {
         <Flex direction="column" gap={2}>
           <TextInput
             size="xl"
-            placeholder="Поиск по имени"
+            placeholder="Поиск по названию блюда или карты"
             value={search}
-            onUpdate={(value) => {
-              setSearch(value);
-            }}
+            onUpdate={setSearch}
             hasClear
             startContent={
               <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
@@ -155,7 +153,7 @@ export function TtkRoute() {
           />
           {data && (
             <Text variant="body-1" color="secondary">
-              {hasFilters ? `Найдено: ${total} ТТК` : `Всего ТТК: ${total}`}
+              {hasFilters ? `Найдено: ${recipes.length} ТТК` : `Всего ТТК: ${all.length}`}
             </Text>
           )}
         </Flex>
@@ -168,7 +166,7 @@ export function TtkRoute() {
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
           {data && recipes.length === 0 && (
             <EmptyState
-              text={search ? `Ничего не нашли по запросу «${search}»` : 'Карт ТТК пока нет'}
+              text={hasFilters ? 'Ничего не нашли по заданным фильтрам' : 'Карт ТТК пока нет'}
             />
           )}
 
@@ -179,23 +177,17 @@ export function TtkRoute() {
               sort={sort}
               ascending={ascending}
               onSort={onSort}
-              onOpen={setOpened}
-              scrollRef={scrollRef}
-              sentinelRef={sentinelRef}
+              onOpen={(recipe) => setOpenedId(recipe.id)}
             />
           )}
         </div>
-
-        {isFetchingNextPage && (
-          <div className="ttk-page__loading-more">
-            <Text variant="body-2" color="secondary">
-              Загрузка…
-            </Text>
-          </div>
-        )}
       </div>
 
-      <RecipeDialog recipe={opened} onClose={() => setOpened(null)} onRecipeChange={setOpened} />
+      <RecipeDialog
+        recipeId={openedId}
+        onClose={() => setOpenedId(null)}
+        onRecipeChange={setOpenedId}
+      />
       <ImportCollectionsDialog open={importOpen} onClose={() => setImportOpen(false)} />
       <CreateRecipeDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
@@ -209,19 +201,15 @@ function RecipesTable({
   ascending,
   onSort,
   onOpen,
-  scrollRef,
-  sentinelRef,
 }: {
-  recipes: Recipe[];
+  recipes: RecipeSummary[];
   search: string;
   sort: RecipeSort;
   ascending: boolean;
   onSort: (column: RecipeSort) => void;
-  onOpen: (recipe: Recipe) => void;
-  scrollRef: RefObject<HTMLDivElement>;
-  sentinelRef: RefObject<HTMLDivElement>;
+  onOpen: (recipe: RecipeSummary) => void;
 }) {
-  const columns: TableColumnConfig<Recipe>[] = [
+  const columns: TableColumnConfig<RecipeSummary>[] = [
     {
       id: 'name',
       name: () => (
@@ -234,9 +222,16 @@ function RecipesTable({
         />
       ),
       template: (row) => (
-        <Text variant="body-2">
-          <HighlightText text={row.name} query={search} />
-        </Text>
+        <Flex direction="column">
+          <Text variant="body-2">
+            <HighlightText text={row.name} query={search} />
+          </Text>
+          {row.cardName && (
+            <Text variant="body-1" color="secondary">
+              <HighlightText text={row.cardName} query={search} />
+            </Text>
+          )}
+        </Flex>
       ),
     },
     {
@@ -261,7 +256,7 @@ function RecipesTable({
         />
       ),
       align: 'end',
-      template: (row) => <Text variant="body-2">{row.price} ₽</Text>,
+      template: (row) => <Text variant="body-2">{formatMoney(row.price)}</Text>,
     },
     {
       id: 'kcal',
@@ -282,7 +277,7 @@ function RecipesTable({
       <div className="ttk-page__header">
         <Table width="max" className="admin-table" data={[]} columns={columns} />
       </div>
-      <div className="admin-table-wrap" ref={scrollRef}>
+      <div className="admin-table-wrap">
         <Table
           width="max"
           className="admin-table ttk-page__table-body"
@@ -290,7 +285,6 @@ function RecipesTable({
           onRowClick={(row) => onOpen(row)}
           columns={columns}
         />
-        <div ref={sentinelRef} className="ttk-page__sentinel" />
       </div>
     </>
   );
