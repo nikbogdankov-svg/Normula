@@ -1,58 +1,138 @@
 import { useEffect, useState } from 'react';
 import { Button, Flex, Icon, Text, TextArea, TextInput } from '@gravity-ui/uikit';
 import { Plus, TrashBin } from '@gravity-ui/icons';
-import type { CreateRecipeIngredient, CreateRecipeRequest, Recipe } from './types';
 import { ProductPicker } from '@/features/products/product-picker';
+import { decimalToInput, parseDecimal } from '@/features/warehouse/format';
+import { RECIPE_DECIMALS, type Recipe, type RecipeRequest } from './types';
 
-const emptyIngredient = (): CreateRecipeIngredient => ({
-  name: '',
-  productId: undefined,
-  grossPerPortion: '',
-  netPerPortion: '',
+/** Строка ингредиента в форме: числа — строками, как их ввёл пользователь. */
+export interface IngredientDraft {
+  productId: string;
+  productName: string;
+  unit: string;
+  gross: string;
+  net: string;
+}
+
+/** Черновик карты целиком — для разбора файлов, где продукты ещё не связаны. */
+export interface RecipeDraft {
+  name: string;
+  cardName: string;
+  collectionName: string;
+  yieldNet: string;
+  yieldLoss: string;
+  technology: string;
+  protein: string;
+  fat: string;
+  carbs: string;
+  kcal: string;
+  ingredients: IngredientDraft[];
+}
+
+const emptyIngredient = (): IngredientDraft => ({
+  productId: '',
+  productName: '',
+  unit: '',
+  gross: '',
+  net: '',
 });
 
-function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
+function ingredientsFromRecipe(recipe: Recipe): IngredientDraft[] {
   if (recipe.ingredients.length === 0) return [emptyIngredient()];
 
   return recipe.ingredients.map((row) => ({
-    name: row.name,
-    productId: row.productId ?? undefined,
-    grossPerPortion: row.grossPerPortion,
-    netPerPortion: row.netPerPortion,
-    unit: row.unit ?? 'кг',
+    productId: row.productId,
+    productName: row.productName,
+    unit: row.unit,
+    gross: decimalToInput(row.gross),
+    net: decimalToInput(row.net),
   }));
+}
+
+/** Целое не меньше нуля; пусто — ноль. */
+function parseInteger(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === '') return 0;
+  if (!/^\d+$/.test(trimmed)) return null;
+
+  return Number(trimmed);
+}
+
+/** Число с точностью бэкенда; пусто — ноль. */
+function parseOptionalDecimal(value: string): number | null {
+  if (value.trim() === '') return 0;
+
+  return parseDecimal(value, RECIPE_DECIMALS);
+}
+
+/** Поле ввода, подсвечивающее значение, которое бэкенд не примет. */
+function NumberInput({
+  label,
+  value,
+  onUpdate,
+  invalid,
+  placeholder = '0',
+  endContent,
+  flex = 1,
+}: {
+  label: string;
+  value: string;
+  onUpdate: (value: string) => void;
+  invalid: boolean;
+  placeholder?: string;
+  endContent?: React.ReactNode;
+  flex?: number;
+}) {
+  return (
+    <TextInput
+      size="l"
+      label={label}
+      placeholder={placeholder}
+      value={value}
+      onUpdate={onUpdate}
+      validationState={invalid ? 'invalid' : undefined}
+      endContent={endContent}
+      style={{ flex }}
+    />
+  );
 }
 
 /** Состояние и разметка формы создания/редактирования ТТК. */
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
-  const [portionYield, setPortionYield] = useState('');
+  const [cardName, setCardName] = useState('');
   const [collectionName, setCollectionName] = useState('');
-  const [recipe, setRecipe] = useState('');
+  const [yieldNet, setYieldNet] = useState('');
+  const [yieldLoss, setYieldLoss] = useState('');
+  const [technology, setTechnology] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
   const [carbs, setCarbs] = useState('');
   const [kcal, setKcal] = useState('');
-  const [ingredients, setIngredients] = useState<CreateRecipeIngredient[]>([emptyIngredient()]);
+  const [ingredients, setIngredients] = useState<IngredientDraft[]>([emptyIngredient()]);
 
   useEffect(() => {
     if (initial) {
       setName(initial.name);
-      setPortionYield(initial.portionYield);
+      setCardName(initial.cardName);
       setCollectionName(initial.collectionName);
-      setRecipe(initial.recipe);
-      setProtein(initial.nutrition?.protein ?? '');
-      setFat(initial.nutrition?.fat ?? '');
-      setCarbs(initial.nutrition?.carbs ?? '');
-      setKcal(initial.nutrition?.kcal ?? '');
+      setYieldNet(initial.yieldNet ? String(initial.yieldNet) : '');
+      setYieldLoss(initial.yieldLoss ? String(initial.yieldLoss) : '');
+      setTechnology(initial.technology);
+      setProtein(decimalToInput(initial.protein));
+      setFat(decimalToInput(initial.fat));
+      setCarbs(decimalToInput(initial.carbs));
+      setKcal(decimalToInput(initial.kcal));
       setIngredients(ingredientsFromRecipe(initial));
       return;
     }
 
     setName('');
-    setPortionYield('');
+    setCardName('');
     setCollectionName('');
-    setRecipe('');
+    setYieldNet('');
+    setYieldLoss('');
+    setTechnology('');
     setProtein('');
     setFat('');
     setCarbs('');
@@ -62,45 +142,91 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resetKey задаёт момент предзаполнения
   }, [resetKey]);
 
-  const updateIngredient = (index: number, patch: Partial<CreateRecipeIngredient>) => {
+  const updateIngredient = (index: number, patch: Partial<IngredientDraft>) => {
     setIngredients((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  };
-
-  const updateIngredientProduct = (
-    index: number,
-    product: { id: string; name: string; unit?: string } | null
-  ) => {
-    setIngredients((rows) =>
-      rows.map((row, i) =>
-        i === index
-          ? {
-              ...row,
-              productId: product?.id ?? undefined,
-              name: product?.name ?? row.name,
-              unit: product?.unit ?? row.unit,
-            }
-          : row
-      )
-    );
   };
 
   const removeIngredient = (index: number) => {
     setIngredients((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   };
 
-  const getBody = (): CreateRecipeRequest => ({
-    name: name.trim(),
-    portionYield: portionYield.trim(),
-    collectionName: collectionName.trim(),
-    recipe: recipe.trim(),
-    ingredients: ingredients.filter((row) => row.name.trim()),
-    nutrition: {
-      protein: protein.trim(),
-      fat: fat.trim(),
-      carbs: carbs.trim(),
-      kcal: kcal.trim(),
-    },
+  // Пустая строка ингредиента (ничего не выбрано и не введено) не считается.
+  const activeIngredients = ingredients.filter(
+    (row) => row.productId || row.productName.trim() || row.gross.trim() || row.net.trim()
+  );
+
+  const ingredientProblem = (row: IngredientDraft): string | null => {
+    if (!row.productId) return 'Выберите продукт из справочника';
+
+    const gross = parseDecimal(row.gross, RECIPE_DECIMALS);
+    if (gross === null || gross <= 0) return 'Брутто должно быть больше нуля';
+
+    const net = parseOptionalDecimal(row.net);
+    if (net === null || net > gross) return 'Нетто от нуля до брутто';
+
+    if (activeIngredients.some((other) => other !== row && other.productId === row.productId)) {
+      return 'Этот продукт уже есть в карте';
+    }
+
+    return null;
+  };
+
+  const numbers = {
+    yieldNet: parseInteger(yieldNet),
+    yieldLoss: parseInteger(yieldLoss),
+    protein: parseOptionalDecimal(protein),
+    fat: parseOptionalDecimal(fat),
+    carbs: parseOptionalDecimal(carbs),
+    kcal: parseOptionalDecimal(kcal),
+  };
+
+  const canSubmit =
+    name.trim() !== '' &&
+    Object.values(numbers).every((value) => value !== null) &&
+    activeIngredients.every((row) => ingredientProblem(row) === null);
+
+  /** Тело запроса; null, пока форма не проходит проверки бэкенда. */
+  const getBody = (): RecipeRequest | null => {
+    if (!canSubmit) return null;
+
+    return {
+      name: name.trim(),
+      cardName: cardName.trim(),
+      collectionName: collectionName.trim(),
+      yieldNet: numbers.yieldNet ?? 0,
+      yieldLoss: numbers.yieldLoss ?? 0,
+      technology: technology.trim(),
+      protein: numbers.protein ?? 0,
+      fat: numbers.fat ?? 0,
+      carbs: numbers.carbs ?? 0,
+      kcal: numbers.kcal ?? 0,
+      ingredients: activeIngredients.map((row) => ({
+        productId: row.productId,
+        gross: parseDecimal(row.gross, RECIPE_DECIMALS) ?? 0,
+        net: parseOptionalDecimal(row.net) ?? 0,
+      })),
+    };
+  };
+
+  /** Черновик как есть, без проверок — для разбора файлов. */
+  const getDraft = (): RecipeDraft => ({
+    name,
+    cardName,
+    collectionName,
+    yieldNet,
+    yieldLoss,
+    technology,
+    protein,
+    fat,
+    carbs,
+    kcal,
+    ingredients: activeIngredients,
   });
+
+  const unitHint = (unit: string) =>
+    unit ? (
+      <span style={{ color: 'var(--g-color-text-secondary)', paddingInlineEnd: 4 }}>{unit}</span>
+    ) : undefined;
 
   const fields = (
     <Flex direction="column" gap={3}>
@@ -112,79 +238,92 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           value={name}
           onUpdate={setName}
           autoFocus
-          style={{ flex: 1 }}
+          style={{ flex: 2 }}
         />
         <TextInput
           size="l"
-          label="Выход порции:"
-          placeholder="00/00"
-          value={portionYield}
-          onUpdate={setPortionYield}
-          style={{ flex: 1 }}
+          label="Название ТТК:"
+          placeholder="Номер или название карты"
+          value={cardName}
+          onUpdate={setCardName}
+          endContent={
+            <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
+              <Text variant="body-1" color="secondary">
+                опционально
+              </Text>
+            </Flex>
+          }
+          style={{ flex: 2 }}
         />
       </Flex>
 
-      <TextInput
-        size="l"
-        label="Название сборника:"
-        placeholder="Название сборника"
-        value={collectionName}
-        onUpdate={setCollectionName}
-        endContent={
-          <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
-            <Text variant="body-1" color="secondary">
-              опционально
-            </Text>
-          </Flex>
-        }
-        style={{ width: '100%' }}
-      />
+      <Flex gap={2}>
+        <TextInput
+          size="l"
+          label="Название сборника:"
+          placeholder="Название сборника"
+          value={collectionName}
+          onUpdate={setCollectionName}
+          endContent={
+            <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
+              <Text variant="body-1" color="secondary">
+                опционально
+              </Text>
+            </Flex>
+          }
+          style={{ flex: 2 }}
+        />
+        <NumberInput
+          label="Выход порции:"
+          value={yieldNet}
+          onUpdate={setYieldNet}
+          invalid={numbers.yieldNet === null}
+        />
+        <NumberInput
+          label="Потери:"
+          value={yieldLoss}
+          onUpdate={setYieldLoss}
+          invalid={numbers.yieldLoss === null}
+        />
+      </Flex>
 
       <Flex direction="column" gap={2}>
         <Text variant="body-1">Технология приготовления</Text>
         <TextArea
           size="l"
           placeholder="Опишите технологию приготовления"
-          value={recipe}
-          onUpdate={setRecipe}
+          value={technology}
+          onUpdate={setTechnology}
           minRows={3}
         />
       </Flex>
 
       <Flex direction="column" gap={2}>
-        <Text variant="body-1">Пищевая ценность</Text>
+        <Text variant="body-1">Пищевая ценность на порцию</Text>
         <Flex gap={2} wrap>
-          <TextInput
-            size="l"
+          <NumberInput
             label="Белки, г:"
-            placeholder="0"
             value={protein}
             onUpdate={setProtein}
-            style={{ flex: 1 }}
+            invalid={numbers.protein === null}
           />
-          <TextInput
-            size="l"
+          <NumberInput
             label="Жиры, г:"
-            placeholder="0"
             value={fat}
             onUpdate={setFat}
-            style={{ flex: 1 }}
+            invalid={numbers.fat === null}
           />
-          <TextInput
-            size="l"
+          <NumberInput
             label="Углеводы, г:"
-            placeholder="0"
             value={carbs}
             onUpdate={setCarbs}
-            style={{ flex: 1 }}
+            invalid={numbers.carbs === null}
           />
-          <TextInput
-            size="l"
+          <NumberInput
             label="Калории, ккал:"
-            placeholder="0"
             value={kcal}
             onUpdate={setKcal}
-            style={{ flex: 1 }}
+            invalid={numbers.kcal === null}
           />
         </Flex>
       </Flex>
@@ -192,45 +331,63 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       <Flex direction="column" gap={2}>
         <Text variant="body-1">Ингредиенты</Text>
 
-        {ingredients.map((row, index) => (
-          <Flex key={index} gap={2} alignItems="flex-end">
-            <div style={{ flex: 2 }}>
-              <ProductPicker
-                value={row.productId}
-                valueLabel={row.name}
-                placeholder="Название продукта"
-                size="l"
-                onChange={(product) => updateIngredientProduct(index, product)}
-              />
-            </div>
-            <TextInput
-              size="l"
-              label="Брутто на 1 порц:"
-              placeholder="000"
-              value={row.grossPerPortion}
-              onUpdate={(value) => updateIngredient(index, { grossPerPortion: value })}
-              style={{ flex: 1 }}
-            />
-            <TextInput
-              size="l"
-              label="Нетто на 1 порц:"
-              placeholder="000"
-              value={row.netPerPortion}
-              onUpdate={(value) => updateIngredient(index, { netPerPortion: value })}
-              style={{ flex: 1 }}
-            />
-            <Button
-              view="flat"
-              size="l"
-              onClick={() => removeIngredient(index)}
-              title="Удалить ингредиент"
-              aria-label="Удалить ингредиент"
-              disabled={ingredients.length <= 1}
-            >
-              <Icon data={TrashBin} size={18} />
-            </Button>
-          </Flex>
-        ))}
+        {ingredients.map((row, index) => {
+          const active = activeIngredients.includes(row);
+          const problem = active ? ingredientProblem(row) : null;
+
+          return (
+            <Flex key={index} direction="column" gap={1}>
+              <Flex gap={2} alignItems="flex-end">
+                <div style={{ flex: 2 }}>
+                  <ProductPicker
+                    value={row.productId}
+                    valueLabel={row.productName}
+                    placeholder="Название продукта"
+                    size="l"
+                    onChange={(product) =>
+                      updateIngredient(index, {
+                        productId: product?.id ?? '',
+                        productName: product?.name ?? row.productName,
+                        unit: product?.unit ?? '',
+                      })
+                    }
+                  />
+                </div>
+                <NumberInput
+                  label="Брутто на 1 порц:"
+                  placeholder="000"
+                  value={row.gross}
+                  onUpdate={(value) => updateIngredient(index, { gross: value })}
+                  invalid={active && problem !== null && problem.startsWith('Брутто')}
+                  endContent={unitHint(row.unit)}
+                />
+                <NumberInput
+                  label="Нетто на 1 порц:"
+                  placeholder="000"
+                  value={row.net}
+                  onUpdate={(value) => updateIngredient(index, { net: value })}
+                  invalid={active && problem !== null && problem.startsWith('Нетто')}
+                  endContent={unitHint(row.unit)}
+                />
+                <Button
+                  view="flat"
+                  size="l"
+                  onClick={() => removeIngredient(index)}
+                  title="Удалить ингредиент"
+                  aria-label="Удалить ингредиент"
+                  disabled={ingredients.length <= 1}
+                >
+                  <Icon data={TrashBin} size={18} />
+                </Button>
+              </Flex>
+              {problem && (
+                <Text variant="body-1" color="danger">
+                  {problem}
+                </Text>
+              )}
+            </Flex>
+          );
+        })}
 
         <Button
           view="normal-contrast"
@@ -245,5 +402,5 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     </Flex>
   );
 
-  return { fields, getBody, canSubmit: Boolean(name.trim()) };
+  return { fields, getBody, getDraft, canSubmit };
 }
