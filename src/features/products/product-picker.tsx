@@ -43,7 +43,7 @@ export function ProductPicker({
   selectedHint?: ReactNode;
   /** Показывать единицу измерения рядом с названием в контроле (по умолчанию да). */
   showUnitInValue?: boolean;
-  onChange: (product: Product | null) => void;
+  onChange: (product: (Product & { unit?: string }) | null) => void;
 }) {
   const { data, isPending } = useProducts();
   const [filter, setFilter] = useState('');

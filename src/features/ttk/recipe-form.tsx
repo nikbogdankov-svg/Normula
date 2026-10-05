@@ -19,6 +19,7 @@ function ingredientsFromRecipe(recipe: Recipe): CreateRecipeIngredient[] {
     productId: row.productId ?? undefined,
     grossPerPortion: row.grossPerPortion,
     netPerPortion: row.netPerPortion,
+    unit: row.unit ?? 'кг',
   }));
 }
 
@@ -65,11 +66,19 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setIngredients((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
-  const updateIngredientProduct = (index: number, product: { id: string; name: string } | null) => {
+  const updateIngredientProduct = (
+    index: number,
+    product: { id: string; name: string; unit?: string } | null
+  ) => {
     setIngredients((rows) =>
       rows.map((row, i) =>
         i === index
-          ? { ...row, productId: product?.id ?? undefined, name: product?.name ?? row.name }
+          ? {
+              ...row,
+              productId: product?.id ?? undefined,
+              name: product?.name ?? row.name,
+              unit: product?.unit ?? row.unit,
+            }
           : row
       )
     );

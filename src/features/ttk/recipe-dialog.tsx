@@ -279,25 +279,49 @@ export function RecipeDialog({
                       id: 'grossPerPortion',
                       name: '1 порция, Брутто',
                       align: 'right',
-                      template: (row) => <Text variant="body-2">{row.grossPerPortion}</Text>,
+                      template: (row) => (
+                        <Text variant="body-2">
+                          {row.grossPerPortion}
+                          {row.grossPerPortion && row.name !== 'Выход' ? ` ${row.unit || 'г'}` : ''}
+                        </Text>
+                      ),
                     },
                     {
                       id: 'netPerPortion',
                       name: '1 порция, Нетто',
                       align: 'right',
-                      template: (row) => <Text variant="body-2">{row.netPerPortion}</Text>,
+                      template: (row) => (
+                        <Text variant="body-2">
+                          {row.netPerPortion}
+                          {row.netPerPortion && row.name !== 'Выход' ? ` ${row.unit || 'г'}` : ''}
+                        </Text>
+                      ),
                     },
                     {
                       id: 'grossPer100',
                       name: '100 порций, Брутто',
                       align: 'right',
-                      template: (row) => <Text variant="body-2">{row.grossPer100}</Text>,
+                      template: (row) => (
+                        <Text variant="body-2">
+                          {row.grossPer100}
+                          {row.grossPer100 && row.name !== 'Выход'
+                            ? ` ${row.unit === 'кг' ? 'кг' : row.unit || 'г'}`
+                            : ''}
+                        </Text>
+                      ),
                     },
                     {
                       id: 'netPer100',
                       name: '100 порций, Нетто',
                       align: 'right',
-                      template: (row) => <Text variant="body-2">{row.netPer100}</Text>,
+                      template: (row) => (
+                        <Text variant="body-2">
+                          {row.netPer100}
+                          {row.netPer100 && row.name !== 'Выход'
+                            ? ` ${row.unit === 'кг' ? 'кг' : row.unit || 'г'}`
+                            : ''}
+                        </Text>
+                      ),
                     },
                     {
                       id: 'pricePerUnit',
@@ -306,7 +330,7 @@ export function RecipeDialog({
                       template: (row) => (
                         <Text variant="body-2">
                           {row.pricePerUnit
-                            ? row.pricePerUnit.replace('р/ед', `р/${row.unit || 'кг'}`)
+                            ? `${row.pricePerUnit.replace('р/ед', '').replace('р', '').replace('₽', '')}₽/${row.unit || 'кг'}`
                             : ''}
                         </Text>
                       ),
@@ -318,7 +342,14 @@ export function RecipeDialog({
               <div className="ttk-recipe-drawer__table-wrap ttk-recipe-drawer__table-wrap_nutrition">
                 <Table
                   width="max"
-                  data={[view.nutrition]}
+                  data={[
+                    {
+                      protein: view.nutrition.protein,
+                      fat: view.nutrition.fat,
+                      carbs: view.nutrition.carbs,
+                      kcal: view.nutrition.kcal,
+                    },
+                  ]}
                   columns={[
                     {
                       id: 'protein',
@@ -343,12 +374,6 @@ export function RecipeDialog({
                       name: 'Энерг. ценность, ккал',
                       align: 'center',
                       template: (row) => <Text variant="body-2">{row.kcal}</Text>,
-                    },
-                    {
-                      id: 'vitaminC',
-                      name: 'Витамин С, мг',
-                      align: 'center',
-                      template: (row) => <Text variant="body-2">{row.vitaminC}</Text>,
                     },
                   ]}
                 />

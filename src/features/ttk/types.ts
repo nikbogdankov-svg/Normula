@@ -73,6 +73,8 @@ export interface CreateRecipeIngredient {
   productId?: string;
   grossPerPortion: string;
   netPerPortion: string;
+  /** Единица измерения закупки (кг, л, шт). */
+  unit?: string;
 }
 
 /** Поля пищевой ценности, которые заполняет форма ТТК (витамин С приходит из импорта). */

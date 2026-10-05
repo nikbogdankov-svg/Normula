@@ -1027,7 +1027,13 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
 
     let found = recipes.filter((r) => !deletedRecipeIds.has(r.id));
     if (query) found = found.filter((r) => r.name.toLowerCase().includes(query));
-    if (collectionId) found = found.filter((r) => r.collectionId === collectionId);
+    if (collectionId) {
+      if (collectionId === 'none') {
+        found = found.filter((r) => !r.collectionId);
+      } else {
+        found = found.filter((r) => r.collectionId === collectionId);
+      }
+    }
 
     const sorted = [...found].sort((a, b) => {
       const dir = ascending ? 1 : -1;
