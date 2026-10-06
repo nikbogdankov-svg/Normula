@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button, Flex, Icon, Text, TextArea, TextInput } from '@gravity-ui/uikit';
 import { Plus, TrashBin } from '@gravity-ui/icons';
 import { ProductPicker } from '@/features/products/product-picker';
@@ -65,6 +65,152 @@ function parseOptionalDecimal(value: string): number | null {
   return parseDecimal(value, RECIPE_DECIMALS);
 }
 
+/** Разбирает «90/50» на выход и потери; пустая часть — ноль. */
+function parseYieldInput(value: string): { yieldNet: number | null; yieldLoss: number | null } {
+  const [first = '', second = ''] = value.split('/');
+
+  return { yieldNet: parseInteger(first), yieldLoss: parseInteger(second) };
+}
+
+/** Максимум цифр в каждой части маски выхода, например «99/99». */
+const YIELD_DIGITS_PER_SIDE = 2;
+
+/**
+ * Поле выхода порции в виде маски «90/50»: слеш всегда на месте, пустые части
+ * серые и выглядят как placeholder. Реальный инпут прозрачен (видна только
+ * каретка), поверх него рисуем серые части и введённые цифры.
+ */
+function YieldMaskInput({
+  label,
+  value,
+  onUpdate,
+  invalid,
+}: {
+  label: string;
+  value: string;
+  onUpdate: (value: string) => void;
+  invalid: boolean;
+}) {
+  const controlRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    paddingStart: '12px',
+    paddingEnd: '12px',
+  });
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = controlRef.current;
+      const box = wrapperRef.current;
+      if (!el || !box) return;
+      const boxRect = box.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      setRect((prev) => {
+        const next = {
+          left: elRect.left - boxRect.left,
+          top: elRect.top - boxRect.top,
+          width: elRect.width,
+          height: elRect.height,
+          paddingStart: cs.paddingInlineStart,
+          paddingEnd: cs.paddingInlineEnd,
+        };
+        return prev &&
+          prev.left === next.left &&
+          prev.top === next.top &&
+          prev.width === next.width &&
+          prev.height === next.height &&
+          prev.paddingStart === next.paddingStart &&
+          prev.paddingEnd === next.paddingEnd
+          ? prev
+          : next;
+      });
+    };
+
+    measure();
+    // Gravity применяет сдвиг под лейбл асинхронно (ResizeObserver),
+    // поэтому промеряем ещё кадр, пока не осядет раскладка.
+    let raf = 0;
+    const loop = () => {
+      raf = requestAnimationFrame(() => {
+        measure();
+        loop();
+      });
+    };
+    loop();
+    const timer = window.setTimeout(() => cancelAnimationFrame(raf), 1000);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
+  const [left = '', right = ''] = value.split('/');
+  const digits = left + right;
+
+  const handleUpdate = (raw: string) => {
+    const clean = raw.replace(/\D/g, '');
+    let next: string;
+    if (clean === '') {
+      next = '';
+    } else if (clean.length < digits.length && digits.startsWith(clean)) {
+      next = digits.slice(0, -1);
+    } else if (digits.startsWith(clean)) {
+      next = digits;
+    } else {
+      next = clean.slice(0, YIELD_DIGITS_PER_SIDE * 2);
+    }
+    onUpdate(`${next.slice(0, YIELD_DIGITS_PER_SIDE)}/${next.slice(YIELD_DIGITS_PER_SIDE)}`);
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', width: 240, display: 'flex' }}>
+      <TextInput
+        size="l"
+        label={label}
+        value={value}
+        onUpdate={handleUpdate}
+        validationState={invalid ? 'invalid' : undefined}
+        controlRef={controlRef}
+        controlProps={{
+          inputMode: 'numeric',
+          autoComplete: 'off',
+          style: { color: 'transparent', caretColor: 'var(--g-color-text-primary)' },
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          display: 'flex',
+          alignItems: 'center',
+          paddingInline: `${rect.paddingStart} ${rect.paddingEnd}`,
+          pointerEvents: 'none',
+          fontFamily: 'var(--g-text-body-font-family)',
+          fontWeight: 'var(--g-text-body-font-weight)',
+          fontSize: 'var(--g-text-body-short-font-size)',
+          lineHeight: 'var(--g-text-body-short-line-height)',
+          color: 'var(--g-color-text-primary)',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ color: left ? undefined : 'var(--g-color-text-hint)' }}>{left || '0'}</span>
+        <span style={{ color: 'var(--g-color-text-hint)' }}>/</span>
+        <span style={{ color: right ? undefined : 'var(--g-color-text-hint)' }}>
+          {right || '0'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** Поле ввода, подсвечивающее значение, которое бэкенд не примет. */
 function NumberInput({
   label,
@@ -102,8 +248,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
   const [cardName, setCardName] = useState('');
   const [collectionName, setCollectionName] = useState('');
-  const [yieldNet, setYieldNet] = useState('');
-  const [yieldLoss, setYieldLoss] = useState('');
+  const [yieldValue, setYieldValue] = useState('');
   const [technology, setTechnology] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
@@ -116,8 +261,9 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       setName(initial.name);
       setCardName(initial.cardName);
       setCollectionName(initial.collectionName);
-      setYieldNet(initial.yieldNet ? String(initial.yieldNet) : '');
-      setYieldLoss(initial.yieldLoss ? String(initial.yieldLoss) : '');
+      setYieldValue(
+        initial.yieldNet || initial.yieldLoss ? `${initial.yieldNet}/${initial.yieldLoss}` : ''
+      );
       setTechnology(initial.technology);
       setProtein(decimalToInput(initial.protein));
       setFat(decimalToInput(initial.fat));
@@ -130,8 +276,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setName('');
     setCardName('');
     setCollectionName('');
-    setYieldNet('');
-    setYieldLoss('');
+    setYieldValue('');
     setTechnology('');
     setProtein('');
     setFat('');
@@ -172,8 +317,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   };
 
   const numbers = {
-    yieldNet: parseInteger(yieldNet),
-    yieldLoss: parseInteger(yieldLoss),
+    ...parseYieldInput(yieldValue),
     protein: parseOptionalDecimal(protein),
     fat: parseOptionalDecimal(fat),
     carbs: parseOptionalDecimal(carbs),
@@ -209,19 +353,23 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   };
 
   /** Черновик как есть, без проверок — для разбора файлов. */
-  const getDraft = (): RecipeDraft => ({
-    name,
-    cardName,
-    collectionName,
-    yieldNet,
-    yieldLoss,
-    technology,
-    protein,
-    fat,
-    carbs,
-    kcal,
-    ingredients: activeIngredients,
-  });
+  const getDraft = (): RecipeDraft => {
+    const [yieldNet = '', yieldLoss = ''] = yieldValue.split('/');
+
+    return {
+      name,
+      cardName,
+      collectionName,
+      yieldNet,
+      yieldLoss,
+      technology,
+      protein,
+      fat,
+      carbs,
+      kcal,
+      ingredients: activeIngredients,
+    };
+  };
 
   const unitHint = (unit: string) =>
     unit ? (
@@ -238,54 +386,47 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           value={name}
           onUpdate={setName}
           autoFocus
-          style={{ flex: 2 }}
+          style={{ flex: initial ? 2 : 1 }}
         />
-        <TextInput
-          size="l"
-          label="Название ТТК:"
-          placeholder="Номер или название карты"
-          value={cardName}
-          onUpdate={setCardName}
-          endContent={
-            <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
-              <Text variant="body-1" color="secondary">
-                опционально
-              </Text>
-            </Flex>
-          }
-          style={{ flex: 2 }}
+        {initial ? (
+          <TextInput
+            size="l"
+            label="Название ТТК:"
+            placeholder="Номер или название карты"
+            value={cardName}
+            onUpdate={setCardName}
+            endContent={
+              <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
+                <Text variant="body-1" color="secondary">
+                  опционально
+                </Text>
+              </Flex>
+            }
+            style={{ flex: 2 }}
+          />
+        ) : null}
+        <YieldMaskInput
+          label="Выход порции:"
+          value={yieldValue}
+          onUpdate={setYieldValue}
+          invalid={numbers.yieldNet === null || numbers.yieldLoss === null}
         />
       </Flex>
 
-      <Flex gap={2}>
-        <TextInput
-          size="l"
-          label="Название сборника:"
-          placeholder="Название сборника"
-          value={collectionName}
-          onUpdate={setCollectionName}
-          endContent={
-            <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
-              <Text variant="body-1" color="secondary">
-                опционально
-              </Text>
-            </Flex>
-          }
-          style={{ flex: 2 }}
-        />
-        <NumberInput
-          label="Выход порции:"
-          value={yieldNet}
-          onUpdate={setYieldNet}
-          invalid={numbers.yieldNet === null}
-        />
-        <NumberInput
-          label="Потери:"
-          value={yieldLoss}
-          onUpdate={setYieldLoss}
-          invalid={numbers.yieldLoss === null}
-        />
-      </Flex>
+      <TextInput
+        size="l"
+        label="Название сборника:"
+        placeholder="Название сборника"
+        value={collectionName}
+        onUpdate={setCollectionName}
+        endContent={
+          <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
+            <Text variant="body-1" color="secondary">
+              опционально
+            </Text>
+          </Flex>
+        }
+      />
 
       <Flex direction="column" gap={2}>
         <Text variant="body-1">Технология приготовления</Text>

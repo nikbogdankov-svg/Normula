@@ -1,0 +1,122 @@
+/* Нижний drawer деталей перемещения. */
+.transfer-drawer {
+  z-index: 100000;
+  background-color: rgba(0, 0, 0, 0.75);
+}
+
+.transfer-drawer[data-floating-ui-status='initial'],
+.transfer-drawer[data-floating-ui-status='close'] {
+  background-color: transparent;
+}
+
+/* Drawer панель. */
+.g-drawer__item.transfer-drawer__panel,
+.transfer-drawer__panel {
+  background: #f2f2f2 !important;
+  border-start-start-radius: 16px;
+  border-start-end-radius: 16px;
+  max-height: calc(90vh + 40px);
+  overflow: hidden !important;
+}
+
+.transfer-drawer__panel .g-drawer__item-content {
+  box-sizing: border-box;
+  height: 100%;
+  background: #f2f2f2;
+}
+
+.transfer-drawer__card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: calc(90vh + 40px);
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+/* Шапка drawer'а. */
+.transfer-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-block: 16px;
+  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
+
+/* Контент drawer'а. */
+.transfer-drawer__body {
+  width: 100%;
+  max-width: 1100px;
+  margin-inline: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 24px;
+  box-sizing: border-box;
+  background: #f2f2f2;
+}
+
+/* Стили таблицы как на основной странице. */
+.transfer-drawer__body .admin-table-wrap {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.transfer-drawer__body .admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.transfer-drawer__body .admin-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: none;
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
+}
+
+.transfer-drawer__body .admin-table tbody tr {
+  border-bottom: 1px solid var(--g-color-line-generic);
+}
+
+/* Отключаем ховер-эффект строк таблицы в drawer'е. */
+.transfer-drawer__body .admin-table tbody tr:hover td {
+  background-color: transparent;
+}
+
+.transfer-drawer__body .admin-table tbody td {
+  padding: 12px 16px;
+}
+
+/* Последняя строка без нижней границы. */
+.transfer-drawer__body .admin-table tbody .admin-table__row_last {
+  border-bottom: none;
+}
+
+/* Строка «Всего» в таблице drawer'а. */
+.transfer-drawer__body .admin-table tbody .admin-table__row_total {
+  border-top: 1px solid var(--g-color-line-generic);
+  border-bottom: none;
+  font-weight: 600;
+  background-color: var(--g-color-bg-secondary);
+}
+
+/* Подвал drawer'а с действиями — как у деталей накладной. */
+.transfer-drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-block: 16px;
+  padding-inline: max(24px, calc((100% - 1100px) / 2 + 24px));
+  border-top: 1px solid var(--g-color-line-generic);
+  background: #f2f2f2;
+}
