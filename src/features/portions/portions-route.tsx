@@ -22,6 +22,9 @@ import {
   Receipt,
   TriangleExclamation,
 } from '@gravity-ui/icons';
+import { jsPDF } from 'jspdf';
+import ptSansBoldUrl from './assets/PTSans-Bold.ttf';
+import ptSansRegularUrl from './assets/PTSans-Regular.ttf';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -156,6 +159,9 @@ export function PortionsRoute() {
     );
     return entry ? entry.headcount : null;
   };
+
+  // Сводка для печатного документа и скачивания — общая на оба сценария.
+  const printData = buildPortionsPrintRows(scopeSubObjects, parentObjectName, headcountOf);
 
   /** Копирует вчерашнюю численность на выбранную дату построчно. */
   const fillFromYesterday = () => {
@@ -294,7 +300,17 @@ export function PortionsRoute() {
                 />
               </>
             )}
-            <Button view="normal" onClick={() => window.print()} title="Печать">
+            <Button
+              view="normal"
+              onClick={() =>
+                void downloadPortionsDoc({
+                  date,
+                  rows: printData.rows,
+                  grand: printData.grand,
+                })
+              }
+              title="Печать (PDF)"
+            >
               <Icon data={Printer} size={16} />
             </Button>
           </Flex>
@@ -577,7 +593,7 @@ function SummaryPortionsTable({
         columns={[
           {
             id: 'subObjectName',
-            name: 'Подобъект',
+            name: 'Объект',
             width: '28%',
             template: (row) =>
               row.isTotal ? (
@@ -931,4 +947,260 @@ function DishesDistributionTable({
       />
     </div>
   );
+}
+
+/**
+ * Строка печатного документа «Порционник»: как таблица на экране, но без
+ * редактирования. Имя подобъекта/отделения показывается на первой строке
+ * группы, как в интерактивной таблице.
+ */
+type PortionsPrintRow = {
+  id: string;
+  subObjectName: string;
+  parentName: string;
+  departmentName: string;
+  tableName: string;
+  headcount: number | null;
+  showSubObject: boolean;
+  showDepartment: boolean;
+};
+
+/** Сводная численность для печатного документа (экран и скачанный файл). */
+function buildPortionsPrintRows(
+  subObjects: SubObject[],
+  parentObjectName: Record<string, string>,
+  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null
+): { rows: PortionsPrintRow[]; grand: number } {
+  const data: PortionsPrintRow[] = [];
+  let grand = 0;
+
+  for (const subObject of subObjects) {
+    const block: Omit<PortionsPrintRow, 'showSubObject' | 'showDepartment' | 'parentName'>[] = [];
+    for (const department of subObject.departments) {
+      for (const table of department.tables) {
+        const headcount = headcountOf(subObject.id, department.id, table.id);
+        grand += headcount ?? 0;
+        block.push({
+          id: `${subObject.id}-${department.id}-${table.id}`,
+          subObjectName: subObject.name,
+          departmentName: department.name,
+          tableName: table.name,
+          headcount,
+        });
+      }
+    }
+    block.forEach((row, index) => {
+      const prev = index > 0 ? block[index - 1] : null;
+      data.push({
+        ...row,
+        parentName: parentObjectName[subObject.id] ?? '',
+        showSubObject: index === 0,
+        showDepartment: !prev || prev.departmentName !== row.departmentName,
+      });
+    });
+  }
+
+  return { rows: data, grand };
+}
+
+const PDF_PAGE_WIDTH = 210;
+const PDF_PAGE_HEIGHT = 297;
+const PDF_MARGIN = 12;
+const PDF_CELL_PADDING = 1.6;
+const PDF_BODY_SIZE = 9.5;
+const PDF_LINE_HEIGHT = PDF_BODY_SIZE * 1.15 * (25.4 / 72);
+
+const PDF_COLUMN_WIDTHS = [78, 46, 36, 26];
+const PDF_COLUMN_X: number[] = (() => {
+  const xs = [PDF_MARGIN];
+  for (const width of PDF_COLUMN_WIDTHS) xs.push(xs[xs.length - 1] + width);
+  return xs;
+})();
+const PDF_CONTENT_WIDTH = PDF_PAGE_WIDTH - PDF_MARGIN * 2;
+
+const PDF_TEXT_COLOR: [number, number, number] = [0x1a, 0x1a, 0x1a];
+const PDF_TEXT_COLOR_MUTED: [number, number, number] = [0x64, 0x6e, 0x7b];
+const PDF_GRID_COLOR: [number, number, number] = [0xc8, 0xcc, 0xd4];
+const PDF_HEADER_FILL: [number, number, number] = [0xf0, 0xf1, 0xf4];
+
+/** Загружает встроенные шрифты с кириллицей; результат кэшируется на сеанс. */
+let ptSansFontsPromise: Promise<{ regular: string; bold: string }> | null = null;
+
+function readAsDataUrl(res: Response): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Не удалось прочитать файл шрифта'));
+    res.blob().then((blob) => reader.readAsDataURL(blob));
+  });
+}
+
+function loadPtSansFonts(): Promise<{ regular: string; bold: string }> {
+  ptSansFontsPromise ??= Promise.all([fetch(ptSansRegularUrl), fetch(ptSansBoldUrl)])
+    .then(async ([regularRes, boldRes]) => {
+      const [regular, bold] = await Promise.all([
+        readAsDataUrl(regularRes),
+        readAsDataUrl(boldRes),
+      ]);
+      return { regular: regular.split(',')[1] ?? '', bold: bold.split(',')[1] ?? '' };
+    })
+    .catch((error) => {
+      ptSansFontsPromise = null;
+      throw error;
+    });
+  return ptSansFontsPromise;
+}
+
+/** Рисует документ «Порционник» в переданный jsPDF (A4, миллиметры). */
+function writePortionsPdf(
+  doc: jsPDF,
+  data: { displayDate: string; rows: PortionsPrintRow[]; grand: number }
+): void {
+  const marginTop = 18;
+  const marginBottom = 16;
+  const bodyMaxY = PDF_PAGE_HEIGHT - marginBottom;
+
+  const wrap = (text: string, width: number): string[] => {
+    const lines = doc.splitTextToSize(text, width);
+    return lines.length ? lines : [''];
+  };
+
+  const drawCellLines = (
+    lines: string[],
+    colIndex: number,
+    cellTop: number,
+    rightAlign = false
+  ) => {
+    const leftX = PDF_COLUMN_X[colIndex] + PDF_CELL_PADDING;
+    const rightX = PDF_COLUMN_X[colIndex + 1] - PDF_CELL_PADDING;
+    let y = cellTop + PDF_CELL_PADDING + PDF_LINE_HEIGHT;
+    for (const line of lines) {
+      doc.text(line, rightAlign ? rightX : leftX, y, { align: rightAlign ? 'right' : 'left' });
+      y += PDF_LINE_HEIGHT;
+    }
+  };
+
+  const drawGridLine = (y: number) => {
+    doc.setDrawColor(...PDF_GRID_COLOR);
+    doc.line(PDF_MARGIN, y, PDF_MARGIN + PDF_CONTENT_WIDTH, y);
+  };
+
+  const drawVerticalLines = (top: number, bottom: number) => {
+    doc.setDrawColor(...PDF_GRID_COLOR);
+    for (let i = 1; i < PDF_COLUMN_X.length - 1; i++) {
+      doc.line(PDF_COLUMN_X[i], top, PDF_COLUMN_X[i], bottom);
+    }
+  };
+
+  /** Шапка таблицы; возвращает координату низа шапки (там же верх тела). */
+  const drawTableHeader = (top: number): number => {
+    const height = PDF_LINE_HEIGHT + PDF_CELL_PADDING * 2;
+    doc.setFillColor(...PDF_HEADER_FILL);
+    doc.rect(PDF_MARGIN, top, PDF_CONTENT_WIDTH, height, 'F');
+    doc.setFont('PTSans', 'bold');
+    doc.setFontSize(PDF_BODY_SIZE);
+    doc.setTextColor(...PDF_TEXT_COLOR);
+    drawCellLines(['Объект'], 0, top);
+    drawCellLines(['Отделение'], 1, top);
+    drawCellLines(['Стол'], 2, top);
+    drawCellLines(['Человек'], 3, top, true);
+    doc.setFont('PTSans', 'normal');
+    drawGridLine(top + height);
+    return top + height;
+  };
+
+  // Шапка документа: «Порционник» и дата.
+  doc.setFont('PTSans', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...PDF_TEXT_COLOR);
+  doc.text('Порционник', PDF_MARGIN, marginTop);
+  doc.text(data.displayDate, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop, { align: 'right' });
+
+  let y = marginTop + 10;
+  let tableTop = y;
+  y = drawTableHeader(y);
+
+  for (const row of data.rows) {
+    const subLabel = row.showSubObject
+      ? row.subObjectName === row.parentName
+        ? row.subObjectName
+        : `${row.subObjectName} · ${row.parentName}`
+      : '';
+    const deptLabel = row.showDepartment ? row.departmentName : '';
+    const cellLines = [
+      wrap(subLabel, PDF_COLUMN_WIDTHS[0] - PDF_CELL_PADDING * 2),
+      wrap(deptLabel, PDF_COLUMN_WIDTHS[1] - PDF_CELL_PADDING * 2),
+      wrap(row.tableName, PDF_COLUMN_WIDTHS[2] - PDF_CELL_PADDING * 2),
+    ];
+    const rowHeight =
+      Math.max(...cellLines.map((lines) => lines.length * PDF_LINE_HEIGHT)) + PDF_CELL_PADDING * 2;
+
+    if (y + rowHeight > bodyMaxY) {
+      drawVerticalLines(tableTop, y);
+      doc.addPage();
+      tableTop = y = marginTop;
+      y = drawTableHeader(y);
+    }
+
+    doc.setFont('PTSans', 'normal');
+    doc.setFontSize(PDF_BODY_SIZE);
+    doc.setTextColor(...PDF_TEXT_COLOR);
+    drawCellLines(cellLines[0], 0, y);
+    drawCellLines(cellLines[1], 1, y);
+    drawCellLines(cellLines[2], 2, y);
+    drawCellLines([row.headcount == null ? '' : String(row.headcount)], 3, y, true);
+
+    y += rowHeight;
+    drawGridLine(y);
+  }
+
+  // Итоговая строка.
+  const grandRowHeight = PDF_LINE_HEIGHT + PDF_CELL_PADDING * 2;
+  if (y + grandRowHeight > bodyMaxY) {
+    drawVerticalLines(tableTop, y);
+    doc.addPage();
+    tableTop = y = marginTop;
+    y = drawTableHeader(y);
+  }
+  doc.setFont('PTSans', 'bold');
+  doc.setTextColor(...PDF_TEXT_COLOR);
+  doc.setLineWidth(0.6);
+  doc.setDrawColor(...PDF_TEXT_COLOR);
+  doc.line(PDF_MARGIN, y, PDF_MARGIN + PDF_CONTENT_WIDTH, y);
+  doc.setLineWidth(0.2);
+  drawCellLines(['Всего'], 0, y);
+  drawCellLines([String(data.grand)], 3, y, true);
+  y += grandRowHeight;
+  drawGridLine(y);
+
+  drawVerticalLines(tableTop, y);
+
+  // Подвал: ответственный и дата.
+  if (y + 24 > bodyMaxY) {
+    doc.addPage();
+    y = marginTop;
+  }
+  y += 8;
+  doc.setFont('PTSans', 'normal');
+  doc.setFontSize(PDF_BODY_SIZE);
+  doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
+  doc.text('Ответственный за питание: ______________________', PDF_MARGIN, y + PDF_LINE_HEIGHT);
+  doc.text(data.displayDate, PDF_PAGE_WIDTH - PDF_MARGIN, y + PDF_LINE_HEIGHT, { align: 'right' });
+}
+
+/** Скачивает документ порционника как PDF. */
+async function downloadPortionsDoc(data: {
+  date: string;
+  rows: PortionsPrintRow[];
+  grand: number;
+}): Promise<void> {
+  const displayDate = data.date.split('-').reverse().join('.');
+  const fonts = await loadPtSansFonts();
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  doc.addFileToVFS('PTSans-Regular.ttf', fonts.regular);
+  doc.addFont('PTSans-Regular.ttf', 'PTSans', 'normal');
+  doc.addFileToVFS('PTSans-Bold.ttf', fonts.bold);
+  doc.addFont('PTSans-Bold.ttf', 'PTSans', 'bold');
+  writePortionsPdf(doc, { ...data, displayDate });
+  doc.save(`Порционник_${displayDate}.pdf`);
 }

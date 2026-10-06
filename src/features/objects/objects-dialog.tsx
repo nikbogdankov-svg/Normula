@@ -790,7 +790,8 @@ export function SubObjectDrawer({
       setVisible(false);
       return;
     }
-    setForm(subObject ? toForm(subObject) : emptySubObject());
+    // For new sub‑object, inherit type from parent object.
+    setForm(subObject ? toForm(subObject) : { ...emptySubObject(), type: parent.type });
     setConfirmingDelete(false);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
