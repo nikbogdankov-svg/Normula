@@ -26,6 +26,7 @@ const FACILITY_TYPE_LABELS: Record<string, string> = {
   school: 'Школа',
   kindergarten: 'Детский сад',
   hospital: 'Больница',
+  warehouse: 'Склад',
 };
 
 function formatAppliesTo(diet: Diet): string {

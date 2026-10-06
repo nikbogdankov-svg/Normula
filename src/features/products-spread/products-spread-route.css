@@ -1,5 +1,5 @@
-/* Раскладка продуктов: таблица как в ТТК — тулбар закреплён,
-   шапка отдельным блоком, скроллится только список строк-карточек. */
+/* Раскладка продуктов: лента секций по приёмам пищи (завтрак/обед/…).
+   Тулбар закреплён, ниже — единственная скроллящаяся область. */
 
 .products-spread-page {
   box-sizing: border-box;
@@ -18,7 +18,7 @@
   margin: 0;
 }
 
-/* Область таблицы: серый фон, шапка и список не выходят на края страницы. */
+/* Область под тулбаром: серый фон, секции не выходят на края страницы. */
 .products-spread-page__scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -39,8 +39,21 @@
   margin: 0;
 }
 
-/* У Gravity UI внутренние контейнеры создают свои scroll-контексты и ломают
-   sticky-шапку — переводим их в visible, оставляя один скролл на wrap. */
+/* Единственная скроллируемая область: лента секций приёмов пищи. */
+.products-spread-sections {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 0 8px;
+}
+
+/* === Режим «По продуктам»: шапка отдельным блоком, скроллится тело. === */
+
+/* Gravity UI внутренние контейнеры создают свои scroll-контексты и ломают
+   единый скролл — переводим их в visible. */
 .products-spread-page__scroll .admin-table-wrap .g-table,
 .products-spread-page__scroll .admin-table-wrap .g-table__scroll-container {
   overflow: visible;
@@ -69,6 +82,31 @@
   display: none;
 }
 
+/* Единственная скроллируемая область в этом режиме. */
+.products-spread-page__scroll .admin-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  padding: 0 0 8px;
+  margin: 0;
+}
+
+.products-spread-page__scroll .admin-table {
+  flex: 1 1 auto;
+  height: auto;
+  margin: 0;
+}
+
+.products-spread-page__scroll .products-spread-page__table-body {
+  margin-top: 0;
+}
+
+.products-spread-page__scroll .admin-table .g-table__table,
+.products-spread-page__scroll .admin-table .g-table__table_width_max {
+  height: auto;
+}
+
 /* Строки-карточки: вертикальные зазоры между строками. */
 .products-spread-page__scroll
   .products-spread-page__list
@@ -79,13 +117,30 @@
   margin: 0;
 }
 
-/* Линии ячеек не нужны — их место заняли зазоры. Шапка живёт отдельным
-   блоком, ей нижняя линия нужна. */
+/* Линии ячеек не нужны — их место заняли зазоры. */
 .products-spread-page__scroll
   .products-spread-page__list
   .products-spread-page__table-body
   .g-table__cell {
   border-block-end: none;
+}
+
+/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело): колонки
+   шапки не разъезжаются с колонками карточек. */
+.products-spread-page__header .admin-table .g-table__table,
+.products-spread-page__scroll .products-spread-page__table-body .g-table__table {
+  table-layout: fixed;
+}
+
+.products-spread-page__header {
+  flex-shrink: 0;
+  margin-block-end: 0;
+}
+
+.products-spread-page__header .admin-table .g-table__table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
 }
 
 /* Прочие колонки (приёмы пищи) — фиксированные ширины. */
@@ -110,17 +165,6 @@
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
   padding-inline-end: 12px;
-}
-
-.products-spread-page__header {
-  flex-shrink: 0;
-  margin-block-end: 0;
-}
-
-.products-spread-page__header .admin-table .g-table__table {
-  border-collapse: separate;
-  border-spacing: 0;
-  margin: 0;
 }
 
 /* Белые карточки-строки со скруглением углов. */
@@ -166,38 +210,6 @@
   background-color: var(--g-color-base-generic);
 }
 
-/* Единственная скроллируемая область. */
-.products-spread-page__scroll .admin-table-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-  overflow: auto;
-  padding: 0 0 8px;
-  margin: 0;
-}
-
-.products-spread-page__scroll .admin-table {
-  flex: 1 1 auto;
-  height: auto;
-  margin: 0;
-}
-
-.products-spread-page__scroll .products-spread-page__table-body {
-  margin-top: 0;
-}
-
-.products-spread-page__scroll .admin-table .g-table__table,
-.products-spread-page__scroll .admin-table .g-table__table_width_max {
-  height: auto;
-}
-
-/* Фиксированная раскладка колонок у обеих таблиц (шапка и тело): колонки
-   шапки не разъезжаются с колонками карточек. */
-.products-spread-page__header .admin-table .g-table__table,
-.products-spread-page__scroll .products-spread-page__table-body .g-table__table {
-  table-layout: fixed;
-}
-
 /* Фиксированная высота строк, чтобы при малом числе записей они не тянулись. */
 .products-spread-page__scroll .admin-table .g-table__body .g-table__row .g-table__cell {
   height: 24px;
@@ -222,6 +234,67 @@
 .products-spread-page__scroll .admin-table .g-table__cell:last-child {
   width: 27%;
   padding-inline-end: 0;
+}
+
+.products-spread-section {
+  /* Не даём flex-колонке сжимать секцию при переполнении: иначе карточка
+     уменьшается и строки обрезаются. Секция всегда полной высоты, а скроллит
+     контейнер .products-spread-sections. */
+  flex: 0 0 auto;
+  background: var(--onemore-card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.products-spread-section__header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--g-color-line-generic);
+  background: var(--ttk-thead-bg, var(--onemore-card-bg));
+}
+
+.products-spread-section__rows {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Строка-карточка продукта внутри секции: имя слева, кол-во справа.
+   Разделители — только между строками (соседний селектор), поэтому
+   после последней строки секции линии нет. */
+.products-spread-row {
+  /* font/line-height наследуются, иначе сырой <button> получает браузерный
+     шрифт 13.33px с line-height: normal — строки пляшут по высоте. */
+  font: inherit;
+  line-height: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--g-color-text-primary);
+}
+
+.products-spread-row + .products-spread-row {
+  border-top: 1px solid var(--g-color-line-generic);
+}
+
+.products-spread-row:hover,
+.products-spread-row:focus-visible {
+  background: var(--g-color-base-generic);
+}
+
+.products-spread-row__name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 /* Попап: таблица разбивки по блюдам. */

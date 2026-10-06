@@ -104,13 +104,15 @@ function toForm(object: ObjectItem): ObjectForm {
 
 function isObjectFormReady(form: ObjectForm): boolean {
   if (!form.name.trim()) return false;
+  // Склад — без групп и отделений: заполнять их не нужно.
+  if (form.type === 'warehouse') return true;
   return form.departments.every(
     (department) => department.name.trim() !== '' && department.dietIds.length > 0
   );
 }
 
 function isSubObjectFormReady(form: SubObjectForm): boolean {
-  return form.departments.length > 0 && isObjectFormReady(form);
+  return isObjectFormReady(form) && (form.type === 'warehouse' || form.departments.length > 0);
 }
 
 /** Одинаковые ли группы: порядок диет в группе значения не имеет. */
@@ -294,17 +296,22 @@ function SubObjectBlock({
               { value: 'school', content: 'Школа' },
               { value: 'kindergarten', content: 'Детский сад' },
               { value: 'hospital', content: 'Больница' },
+              { value: 'warehouse', content: 'Склад' },
             ]}
             onUpdate={(newValue) => {
               const nextType = newValue[0] as FacilityType;
               onUpdate(subObjectIndex, {
                 type: nextType,
-                departments: subObject.departments.map((department) => ({
-                  ...department,
-                  dietIds: department.dietIds.filter((id) =>
-                    diets.find((item) => item.id === id)?.appliesTo?.includes(nextType)
-                  ),
-                })),
+                // У склада нет групп и отделений.
+                departments:
+                  nextType === 'warehouse'
+                    ? []
+                    : subObject.departments.map((department) => ({
+                        ...department,
+                        dietIds: department.dietIds.filter((id) =>
+                          diets.find((item) => item.id === id)?.appliesTo?.includes(nextType)
+                        ),
+                      })),
               });
             }}
           />
@@ -322,37 +329,41 @@ function SubObjectBlock({
         )}
       </Flex>
 
-      {subObject.departments.map((department, deptIndex) => (
-        <DepartmentBlock
-          key={department.key}
-          variant={subObject.type}
-          department={department}
-          diets={diets}
-          dietsLoaded={dietsLoaded}
-          index={deptIndex}
-          onUpdate={updateDepartment}
-          onRemove={removeDepartment}
-          canRemove={subObject.departments.length > 1}
-        />
-      ))}
+      {subObject.type !== 'warehouse' && (
+        <>
+          {subObject.departments.map((department, deptIndex) => (
+            <DepartmentBlock
+              key={department.key}
+              variant={subObject.type}
+              department={department}
+              diets={diets}
+              dietsLoaded={dietsLoaded}
+              index={deptIndex}
+              onUpdate={updateDepartment}
+              onRemove={removeDepartment}
+              canRemove={subObject.departments.length > 1}
+            />
+          ))}
 
-      <Button
-        view="normal-contrast"
-        size="l"
-        onClick={() =>
-          onUpdate(subObjectIndex, {
-            departments: [...subObject.departments, emptyDepartment()],
-          })
-        }
-        style={{ alignSelf: 'flex-start' }}
-      >
-        <Icon data={Plus} size={16} />
-        {subObject.type === 'school'
-          ? 'Добавить класс'
-          : subObject.type === 'kindergarten'
-            ? 'Добавить группу'
-            : 'Добавить отделение'}
-      </Button>
+          <Button
+            view="normal-contrast"
+            size="l"
+            onClick={() =>
+              onUpdate(subObjectIndex, {
+                departments: [...subObject.departments, emptyDepartment()],
+              })
+            }
+            style={{ alignSelf: 'flex-start' }}
+          >
+            <Icon data={Plus} size={16} />
+            {subObject.type === 'school'
+              ? 'Добавить класс'
+              : subObject.type === 'kindergarten'
+                ? 'Добавить группу'
+                : 'Добавить отделение'}
+          </Button>
+        </>
+      )}
     </Flex>
   );
 }
@@ -648,44 +659,58 @@ export function ObjectDrawer({
                     { value: 'school', content: 'Школа' },
                     { value: 'kindergarten', content: 'Детский сад' },
                     { value: 'hospital', content: 'Больница' },
+                    { value: 'warehouse', content: 'Склад' },
                   ]}
                   onUpdate={(newValue) => {
                     const nextType = newValue[0] as FacilityType;
-                    setForm((current) => (current ? { ...current, type: nextType } : current));
+                    setForm((current) =>
+                      current
+                        ? {
+                            ...current,
+                            type: nextType,
+                            // У склада нет групп и отделений.
+                            departments: nextType === 'warehouse' ? [] : current.departments,
+                          }
+                        : current
+                    );
                   }}
                 />
               </Flex>
             </Flex>
 
-            {form.departments.map((department, departmentIndex) => (
-              <DepartmentBlock
-                key={department.key}
-                variant="object"
-                department={department}
-                diets={diets}
-                dietsLoaded={dietsQuery.data !== undefined}
-                index={departmentIndex}
-                onUpdate={updateDepartment}
-                onRemove={removeDepartment}
-                canRemove={form.departments.length > 1}
-              />
-            ))}
+            {form.type !== 'warehouse' && (
+              <>
+                {form.departments.map((department, departmentIndex) => (
+                  <DepartmentBlock
+                    key={department.key}
+                    variant="object"
+                    department={department}
+                    diets={diets}
+                    dietsLoaded={dietsQuery.data !== undefined}
+                    index={departmentIndex}
+                    onUpdate={updateDepartment}
+                    onRemove={removeDepartment}
+                    canRemove={form.departments.length > 1}
+                  />
+                ))}
 
-            <Button
-              view="normal-contrast"
-              size="l"
-              onClick={() =>
-                setForm((current) =>
-                  current
-                    ? { ...current, departments: [...current.departments, emptyDepartment()] }
-                    : current
-                )
-              }
-              style={{ alignSelf: 'flex-start' }}
-            >
-              <Icon data={Plus} size={16} />
-              Добавить группу/отделение
-            </Button>
+                <Button
+                  view="normal-contrast"
+                  size="l"
+                  onClick={() =>
+                    setForm((current) =>
+                      current
+                        ? { ...current, departments: [...current.departments, emptyDepartment()] }
+                        : current
+                    )
+                  }
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Icon data={Plus} size={16} />
+                  Добавить группу/отделение
+                </Button>
+              </>
+            )}
           </Flex>
         </div>
 

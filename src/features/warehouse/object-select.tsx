@@ -39,12 +39,14 @@ export function ObjectSelect({
   value,
   onUpdate,
   options,
+  label = 'Объект:',
   width = 280,
   disabled,
 }: {
   value: string;
   onUpdate: (id: string) => void;
   options: ObjectOption[];
+  label?: string;
   width?: number | 'max';
   disabled?: boolean;
 }) {
@@ -52,7 +54,7 @@ export function ObjectSelect({
     <Select
       size="l"
       width={width}
-      label="Объект:"
+      label={label}
       placeholder="Выберите объект"
       value={value ? [value] : []}
       options={options}

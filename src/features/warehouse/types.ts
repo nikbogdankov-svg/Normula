@@ -150,6 +150,59 @@ export interface GetWriteOffResponse {
   writeOff: WriteOff;
 }
 
+/** Перемещение в списке, без строк. */
+export interface TransferSummary {
+  id: string;
+  fromObjectId: string;
+  toObjectId: string;
+  date: string;
+  itemsCount: number;
+}
+
+/** Строка перемещения. */
+export interface TransferItem {
+  id: string;
+  /** Партия — строка накладной. */
+  batchId: string;
+  receiptId: string;
+  invoiceNumber: string;
+  productId: string;
+  productName: string;
+  unit: string;
+  quantity: number;
+}
+
+/** Перемещение целиком. */
+export interface Transfer {
+  id: string;
+  fromObjectId: string;
+  toObjectId: string;
+  date: string;
+  items: TransferItem[];
+}
+
+export interface TransferItemInput {
+  batchId: string;
+  quantity: number;
+}
+
+/** Тело POST и PATCH /v1/warehouse/transfers. */
+export interface TransferRequest {
+  fromObjectId: string;
+  toObjectId: string;
+  date: string;
+  items: TransferItemInput[];
+}
+
+export interface ListTransfersResponse {
+  transfers: TransferSummary[];
+  nextCursor: string;
+}
+
+export interface GetTransferResponse {
+  transfer: Transfer;
+}
+
 /** Партия с остатком — для экрана остатков и диалога списания. */
 export interface Batch {
   id: string;

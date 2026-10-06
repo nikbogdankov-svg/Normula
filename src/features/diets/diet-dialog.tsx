@@ -12,6 +12,7 @@ const FACILITY_TYPE_LABELS: Record<string, string> = {
   school: 'Школа',
   kindergarten: 'Детский сад',
   hospital: 'Больница',
+  warehouse: 'Склад',
 };
 
 /** Строка «подпись — значение» в блоке нормы на день. */
