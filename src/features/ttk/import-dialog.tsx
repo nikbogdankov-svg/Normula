@@ -44,7 +44,6 @@ function dishToRecipe(dish: ExtractedDish, collectionName: string): Recipe {
   return {
     id: dish.id,
     name: dish.name,
-    cardName: '',
     collectionName,
     yieldNet: Number.isFinite(yieldNet) ? yieldNet : 0,
     yieldLoss: 0,
