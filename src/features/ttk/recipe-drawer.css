@@ -97,6 +97,41 @@
   overflow: visible;
 }
 
+/* Составное поле ввода выхода порции и потерь */
+.ttk-recipe-drawer__yield-input {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: stretch !important;
+  align-self: center;
+  width: 260px;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  border: 1px solid var(--g-color-line-generic);
+  border-radius: var(--g-border-radius-l);
+  background-color: var(--g-color-bg-input);
+  overflow: hidden;
+}
+
+.ttk-recipe-drawer__yield-input .g-text-input {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ttk-recipe-drawer__yield-input .g-text-input__content {
+  height: 100%;
+  border-block: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.ttk-recipe-drawer__yield-input .g-text-input__control {
+  height: 100% !important;
+  padding-block: 0 !important;
+  line-height: normal !important;
+}
+
 .ttk-recipe-drawer__meta {
   display: flex;
   flex-direction: column;
