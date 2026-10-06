@@ -15,8 +15,6 @@ export interface RecipeSummary {
   id: string;
   /** Название блюда. */
   name: string;
-  /** Название (номер) карты; пусто, если не задано. */
-  cardName: string;
   /** Название сборника; пусто — карта без сборника. */
   collectionName: string;
   /** Выход порции: чистый выход и потери, целые. */
@@ -46,7 +44,6 @@ export interface Ingredient {
 export interface Recipe {
   id: string;
   name: string;
-  cardName: string;
   collectionName: string;
   yieldNet: number;
   yieldLoss: number;
@@ -68,7 +65,6 @@ export interface IngredientInput {
 /** Тело POST и PATCH /v1/ttk. */
 export interface RecipeRequest {
   name: string;
-  cardName: string;
   collectionName: string;
   yieldNet: number;
   yieldLoss: number;

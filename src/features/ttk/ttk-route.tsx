@@ -56,9 +56,7 @@ function filterRecipes(
     }
     if (!query) return true;
 
-    return (
-      recipe.name.toLowerCase().includes(query) || recipe.cardName.toLowerCase().includes(query)
-    );
+    return recipe.name.toLowerCase().includes(query);
   });
 
   const direction = ascending ? 1 : -1;
@@ -226,11 +224,6 @@ function RecipesTable({
           <Text variant="body-2">
             <HighlightText text={row.name} query={search} />
           </Text>
-          {row.cardName && (
-            <Text variant="body-1" color="secondary">
-              <HighlightText text={row.cardName} query={search} />
-            </Text>
-          )}
         </Flex>
       ),
     },
