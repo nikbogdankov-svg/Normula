@@ -254,7 +254,6 @@ function SubObjectBlock({
   onUpdate,
   onRemove,
   canRemove,
-  isCreate,
 }: {
   subObject: SubObjectForm;
   subObjectIndex: number;
@@ -263,7 +262,6 @@ function SubObjectBlock({
   onUpdate: (index: number, patch: Partial<SubObjectForm>) => void;
   onRemove: (index: number) => void;
   canRemove: boolean;
-  isCreate: boolean;
 }) {
   const updateDepartment = (deptIndex: number, patch: Partial<DepartmentForm>) => {
     onUpdate(subObjectIndex, {
