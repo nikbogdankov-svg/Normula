@@ -221,7 +221,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   /** Черновик как есть, без проверок — для разбора файлов. */
   const getDraft = (): RecipeDraft => ({
     name,
-    cardName,
     collectionName,
     yieldNet,
     yieldLoss,
@@ -250,23 +249,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           autoFocus
           style={{ flex: 1 }}
         />
-        {initial ? (
-          <TextInput
-            size="l"
-            label="Название ТТК:"
-            placeholder="Номер или название карты"
-            value={cardName}
-            onUpdate={setCardName}
-            endContent={
-              <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
-                <Text variant="body-1" color="secondary">
-                  опционально
-                </Text>
-              </Flex>
-            }
-            style={{ flex: 2 }}
-          />
-        ) : null}
         <div
           className="ttk-recipe-drawer__yield-input"
           style={{
