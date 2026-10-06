@@ -11,9 +11,10 @@ import type { MockCollection, MockIngredient, MockRecipe } from '@/features/ttk/
 import type { Diet } from '@/features/diets/types';
 import type { CycleMenu, MealId, MenuDishRef } from '@/features/menu/types';
 import { MEALS } from '@/features/menu/types';
-import type { CateringObject } from '@/features/objects/types';
+import type { CateringObject, ObjectItem } from '@/features/objects/types';
 import { todayIso, type DishDistributionRow, type PortionEntry } from '@/features/portions/types';
 import type { ProductSpreadItem, ProductSpreadMealId } from '@/features/products-spread/types';
+import type { Transfer } from '@/features/warehouse/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -43,6 +44,9 @@ export const MOCKED_PREFIXES = [
   '/v1/portions',
   '/v1/mock/diets',
   '/v1/products-spread',
+  // Перемещения: ручки на бэке ещё нет, списочно-просмотровая часть
+  // обслуживается из памяти (см. transfers).
+  '/v1/warehouse/transfers',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -1340,6 +1344,30 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return { objects } as T;
   }
 
+  // Раздел «Объекты» — на бэке (v1/objects). Плоский список из сид-дерева
+  // отдаём только в полностью офлайновом режиме, чтобы мок-разделам
+  // (перемещения, склад) было откуда брать имена и опции.
+  if (route === '/v1/objects' && method === 'GET') {
+    const flat: ObjectItem[] = objects.flatMap((unit) => [
+      {
+        id: unit.id,
+        parentObjectId: '',
+        name: unit.name,
+        type: unit.type,
+        groups: [],
+      },
+      ...unit.subObjects.map((subObject) => ({
+        id: subObject.id,
+        parentObjectId: unit.id,
+        name: subObject.name,
+        type: subObject.type,
+        groups: [],
+      })),
+    ]);
+
+    return { objects: flat } as T;
+  }
+
   // --- Порционник (численность на дату + раздача по блюдам) ---
   if (route === '/v1/portions' && method === 'GET') {
     const date = params.get('date') ?? '';
@@ -1391,10 +1419,61 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return buildProductSpread(date, objectId) as T;
   }
 
+  // Перемещения между складами: list и get из памяти. Создание и изменение
+  // живут на бэке (v1/warehouse/transfers, WarehouseService): создать в
+  // mock-режиме нельзя — нет открытых партий, и это ожидаемо.
+  if (route === '/v1/warehouse/transfers' && method === 'GET') {
+    const objectId = params.get('objectId') ?? '';
+    const query = (params.get('search') ?? '').trim().toLowerCase();
+    const pageSize = Number(params.get('pageSize')) || 50;
+    const offset = Number(params.get('cursor')) || 0;
+    const nameOf = (id: string) => objects.find((o) => o.id === id)?.name ?? '';
+
+    const found = transfers
+      .filter((t) => !objectId || t.fromObjectId === objectId || t.toObjectId === objectId)
+      .filter(
+        (t) =>
+          !query ||
+          t.date.includes(query) ||
+          nameOf(t.fromObjectId).toLowerCase().includes(query) ||
+          nameOf(t.toObjectId).toLowerCase().includes(query)
+      )
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((t) => ({
+        id: t.id,
+        fromObjectId: t.fromObjectId,
+        toObjectId: t.toObjectId,
+        date: t.date,
+        itemsCount: t.items.length,
+      }));
+    const slice = found.slice(offset, offset + pageSize);
+
+    return {
+      transfers: slice,
+      nextCursor: offset + pageSize < found.length ? String(offset + pageSize) : '',
+    } as T;
+  }
+
+  const transfer = match('/v1/warehouse/transfers/:id', route);
+  if (transfer && method === 'GET') {
+    const found = transfers.find((t) => t.id === transfer.id);
+    if (!found) throw new Error('mock: перемещение не найдено');
+
+    return { transfer: found } as T;
+  }
+
   throw new Error(`mock: нет обработчика для ${method} ${path} — добавь в mock-handlers.ts`);
 }
 
 const objects: CateringObject[] = [
+  {
+    id: 'object-0',
+    name: 'Центральный склад',
+    type: 'warehouse',
+    mealIds: [],
+    departments: [],
+    subObjects: [],
+  },
   {
     id: 'object-1',
     name: 'Больница №1',
@@ -1594,6 +1673,84 @@ const objects: CateringObject[] = [
             ],
           },
         ],
+      },
+    ],
+  },
+];
+
+/** Перемещения между складами: список и просмотр из памяти. */
+const transfers: Transfer[] = [
+  {
+    id: 'tr-1',
+    fromObjectId: 'object-0',
+    toObjectId: 'object-1',
+    date: '2026-09-18',
+    items: [
+      {
+        id: 'tr-1-i-1',
+        batchId: 'batch-1-1',
+        receiptId: 'rc-1-1',
+        invoiceNumber: 'НА-2026-114',
+        productId: 'prod-potato',
+        productName: 'Картофель свежий',
+        unit: 'кг',
+        quantity: 120,
+      },
+      {
+        id: 'tr-1-i-2',
+        batchId: 'batch-1-2',
+        receiptId: 'rc-1-2',
+        invoiceNumber: 'НА-2026-118',
+        productId: 'prod-carrot',
+        productName: 'Морковь столовая',
+        unit: 'кг',
+        quantity: 45,
+      },
+    ],
+  },
+  {
+    id: 'tr-2',
+    fromObjectId: 'object-0',
+    toObjectId: 'object-2',
+    date: '2026-09-15',
+    items: [
+      {
+        id: 'tr-2-i-1',
+        batchId: 'batch-2-1',
+        receiptId: 'rc-2-1',
+        invoiceNumber: 'НА-2026-102',
+        productId: 'prod-onion',
+        productName: 'Лук репчатый',
+        unit: 'кг',
+        quantity: 60,
+      },
+      {
+        id: 'tr-2-i-2',
+        batchId: 'batch-2-2',
+        receiptId: 'rc-2-2',
+        invoiceNumber: 'НА-2026-105',
+        productId: 'prod-cabbage',
+        productName: 'Капуста белокочанная',
+        unit: 'кг',
+        quantity: 75,
+      },
+    ],
+  },
+  {
+    id: 'tr-3',
+    fromObjectId: 'object-1',
+    toObjectId: 'object-0',
+    date: '2026-09-12',
+    items: [
+      {
+        id: 'tr-3-i-1',
+        batchId: 'batch-3-1',
+        receiptId: 'rc-3-1',
+        invoiceNumber: 'НА-2026-095',
+        productId: 'prod-milk',
+        productName: 'Молоко 3,2%',
+        unit: 'л',
+        quantity: 95,
       },
     ],
   },

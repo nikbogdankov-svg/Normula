@@ -3,12 +3,15 @@ import { useApi } from '@/shared/api/use-api';
 import {
   PAGE_SIZE,
   type GetReceiptResponse,
+  type GetTransferResponse,
   type GetWriteOffResponse,
   type ListOpenBatchesResponse,
   type ListParams,
   type ListReceiptsResponse,
+  type ListTransfersResponse,
   type ListWriteOffsResponse,
   type ReceiptRequest,
+  type TransferRequest,
   type WriteOffRequest,
 } from './types';
 
@@ -78,6 +81,36 @@ export function useWriteOff(id: string | null) {
   });
 }
 
+/** Страницы перемещений: всё, что между складами организации. */
+export function useTransfers(search: string) {
+  const api = useApi();
+
+  return useInfiniteQuery({
+    queryKey: [KEY, api.organizationId, 'transfers', search],
+    queryFn: ({ pageParam }) => {
+      const query = new URLSearchParams({ pageSize: String(PAGE_SIZE) });
+      if (search) query.set('search', search);
+      if (pageParam) query.set('cursor', pageParam);
+
+      return api.request<ListTransfersResponse>(`/v1/warehouse/transfers?${query.toString()}`);
+    },
+    initialPageParam: '',
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    enabled: api.organizationId !== null,
+  });
+}
+
+/** Перемещение целиком, со строками. */
+export function useTransfer(id: string | null) {
+  const api = useApi();
+
+  return useQuery({
+    queryKey: [KEY, api.organizationId, 'transfer', id],
+    queryFn: () => api.request<GetTransferResponse>(`/v1/warehouse/transfers/${id}`),
+    enabled: api.organizationId !== null && id !== null,
+  });
+}
+
 /** Партии объекта с ненулевым остатком. */
 export function useOpenBatches(objectId: string) {
   const api = useApi();
@@ -138,6 +171,28 @@ export function useUpdateWriteOff() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: WriteOffRequest }) =>
       api.request<void>(`/v1/warehouse/write-offs/${id}`, { method: 'PATCH', body }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useCreateTransfer() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: (body: TransferRequest) =>
+      api.request<{ id: string }>('/v1/warehouse/transfers', { method: 'POST', body }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateTransfer() {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: TransferRequest }) =>
+      api.request<void>(`/v1/warehouse/transfers/${id}`, { method: 'PATCH', body }),
     onSuccess: invalidate,
   });
 }

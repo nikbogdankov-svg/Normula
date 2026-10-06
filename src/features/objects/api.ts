@@ -32,6 +32,12 @@ export function useMockCateringObjects() {
     queryKey: [KEY, api.organizationId, 'mock'],
     queryFn: () => api.request<CateringObjectsResponse>('/v1/mock/objects'),
     enabled: api.organizationId !== null,
+    // Склады (тип 'warehouse') в планировании не участвуют: у них нет
+    // численности, меню и приёмов пищи. Меню/порционник/раскладка их не ждут.
+    select: (data) => ({
+      ...data,
+      objects: data.objects.filter((object) => object.type !== 'warehouse'),
+    }),
   });
 }
 

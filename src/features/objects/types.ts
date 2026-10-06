@@ -7,8 +7,8 @@
  */
 import type { MealId } from '@/features/menu/types';
 
-/** Тип подобъекта, например школа / детский сад / больница. */
-export const FACILITY_TYPES = ['school', 'kindergarten', 'hospital'] as const;
+/** Тип объекта, например школа / детский сад / больница / склад. */
+export const FACILITY_TYPES = ['school', 'kindergarten', 'hospital', 'warehouse'] as const;
 export type FacilityType = (typeof FACILITY_TYPES)[number];
 
 /** Диета, выбранная рационом группы. */

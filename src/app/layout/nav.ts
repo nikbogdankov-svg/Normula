@@ -1,6 +1,7 @@
 import {
   Archive,
   ArrowLeftFromLine,
+  ArrowRightArrowLeft,
   ArrowRightToLine,
   Box,
   Cubes3Overlap,
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/app/warehouse-receipts', label: 'Приход', icon: ArrowRightToLine },
       { to: '/app/warehouse-balances', label: 'Остатки', icon: Archive },
       { to: '/app/write-offs', label: 'Списание', icon: ArrowLeftFromLine },
+      { to: '/app/warehouse-transfers', label: 'Перемещение', icon: ArrowRightArrowLeft },
     ],
   },
   {

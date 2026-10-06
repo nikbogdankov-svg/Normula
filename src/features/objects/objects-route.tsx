@@ -18,6 +18,7 @@ const FACILITY_TYPE_LABELS: Record<FacilityType, string> = {
   school: 'Школа',
   kindergarten: 'Детский сад',
   hospital: 'Больница',
+  warehouse: 'Склад',
 };
 
 function groupRowClassNames(row: {

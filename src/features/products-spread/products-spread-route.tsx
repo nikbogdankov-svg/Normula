@@ -2,7 +2,17 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
-import { Button, Dialog, Flex, Icon, Select, Text, TextInput, Table } from '@gravity-ui/uikit';
+import {
+  Button,
+  Dialog,
+  Flex,
+  Icon,
+  SegmentedRadioGroup,
+  Select,
+  Text,
+  TextInput,
+  Table,
+} from '@gravity-ui/uikit';
 import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, Magnifier, Printer } from '@gravity-ui/icons';
 import { useMockCateringObjects } from '@/features/objects/api';
@@ -19,6 +29,9 @@ import { MEALS, type ProductSpreadItem } from './types';
 import './products-spread-route.css';
 
 const ALL_OBJECTS = '__all';
+
+/** Как показывать раскладку: секциями по приёмам пищи или таблицей по продуктам. */
+type SpreadView = 'meals' | 'products';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -56,6 +69,7 @@ export function ProductsSpreadRoute() {
   };
 
   const [selectedObjectId, setSelectedObjectId] = useState<string>(ALL_OBJECTS);
+  const [viewMode, setViewMode] = useState<SpreadView>('meals');
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ProductSpreadItem | null>(null);
 
@@ -126,10 +140,21 @@ export function ProductsSpreadRoute() {
               />
             )}
           </Flex>
-          <Button size="l" view="normal-contrast" onClick={() => window.print()} title="Печать">
-            <Icon data={Printer} size={16} />
-            Печать
-          </Button>
+          <Flex alignItems="center" gap={3}>
+            <SegmentedRadioGroup
+              name="spread-view"
+              size="l"
+              value={viewMode}
+              onUpdate={(value) => setViewMode(value as SpreadView)}
+            >
+              <SegmentedRadioGroup.Option value="meals">По приёмам пищи</SegmentedRadioGroup.Option>
+              <SegmentedRadioGroup.Option value="products">По продуктам</SegmentedRadioGroup.Option>
+            </SegmentedRadioGroup>
+            <Button size="l" view="normal-contrast" onClick={() => window.print()} title="Печать">
+              <Icon data={Printer} size={16} />
+              Печать
+            </Button>
+          </Flex>
         </Flex>
         <Flex direction="column" gap={2}>
           <TextInput
@@ -161,9 +186,17 @@ export function ProductsSpreadRoute() {
           {spread.data && items.length === 0 && (
             <EmptyState text="Раскладки нет: заполните порционник на эту дату" />
           )}
-          {spread.data && items.length > 0 && (
-            <ProductsSpreadTable items={items} searchQuery={searchQuery} onSelect={setSelected} />
-          )}
+          {spread.data &&
+            items.length > 0 &&
+            (viewMode === 'meals' ? (
+              <ProductsSpreadSections
+                items={items}
+                searchQuery={searchQuery}
+                onSelect={setSelected}
+              />
+            ) : (
+              <ProductsSpreadTable items={items} searchQuery={searchQuery} onSelect={setSelected} />
+            ))}
         </div>
       </div>
 
@@ -172,6 +205,8 @@ export function ProductsSpreadRoute() {
   );
 }
 
+/** Таблица «По продуктам»: строки-карточки продуктов, колонки — приёмы пищи.
+ *  Шапка живёт отдельным блоком (всегда наверху), скроллится только тело. */
 function ProductsSpreadTable({
   items,
   searchQuery,
@@ -242,6 +277,60 @@ function ProductsSpreadTable({
   );
 }
 
+/** Секции по приёмам пищи: завтрак/обед/… → продукты этого приёма. */
+function ProductsSpreadSections({
+  items,
+  searchQuery,
+  onSelect,
+}: {
+  items: ProductSpreadItem[];
+  searchQuery: string;
+  onSelect: (item: ProductSpreadItem) => void;
+}) {
+  const sections = useMemo(
+    () =>
+      MEALS.map((meal) => ({
+        meal,
+        rows: items.filter((item) => (item.byMeal[meal.id] ?? 0) > 0),
+      })).filter((section) => section.rows.length > 0),
+    [items]
+  );
+
+  return (
+    <div className="products-spread-sections">
+      {sections.map(({ meal, rows }) => (
+        <section key={meal.id} className="products-spread-section">
+          <div className="products-spread-section__header">
+            <Text variant="subheader-2">{meal.label}</Text>
+          </div>
+          <div className="products-spread-section__rows">
+            {rows.map((row) => (
+              <button
+                key={row.productId}
+                type="button"
+                className="products-spread-row"
+                onClick={() => onSelect(row)}
+              >
+                <span className="products-spread-row__name">
+                  <Text variant="body-2" ellipsis>
+                    <HighlightText text={row.productName} query={searchQuery} />
+                  </Text>
+                  <Text variant="body-1" color="secondary">
+                    {row.unit}
+                  </Text>
+                </span>
+                <Text variant="body-2" style={{ whiteSpace: 'nowrap', fontWeight: 500 }}>
+                  {formatQuantity(row.byMeal[meal.id], row.unit)}
+                </Text>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 /** Попап с авторазбивкой выбранного продукта между блюдами. */
 function ProductSpreadDialog({
   item,
@@ -258,9 +347,6 @@ function ProductSpreadDialog({
           <Dialog.Divider />
           <Dialog.Body>
             <Flex direction="column" gap={3}>
-              <Text variant="body-2" color="secondary">
-                Авторазбивка {formatQuantity(item.total, item.unit)} между блюдами дня
-              </Text>
               <table className="products-spread-dishes">
                 <thead>
                   <tr>
