@@ -294,7 +294,6 @@ export function RecipeDialog({
               {view && (
                 <>
                   <div className="ttk-recipe-drawer__meta">
-                    <MetaRow title="Название ТТК:">{view.cardName || '—'}</MetaRow>
                     <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
                     <MetaRow title="Технология:">{view.technology || '—'}</MetaRow>
                   </div>

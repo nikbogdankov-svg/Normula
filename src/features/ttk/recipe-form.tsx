@@ -17,7 +17,6 @@ export interface IngredientDraft {
 /** Черновик карты целиком — для разбора файлов, где продукты ещё не связаны. */
 export interface RecipeDraft {
   name: string;
-  cardName: string;
   collectionName: string;
   yieldNet: string;
   yieldLoss: string;
@@ -246,7 +245,6 @@ function NumberInput({
 /** Состояние и разметка формы создания/редактирования ТТК. */
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
-  const [cardName, setCardName] = useState('');
   const [collectionName, setCollectionName] = useState('');
   const [yieldValue, setYieldValue] = useState('');
   const [technology, setTechnology] = useState('');
@@ -259,7 +257,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   useEffect(() => {
     if (initial) {
       setName(initial.name);
-      setCardName(initial.cardName);
       setCollectionName(initial.collectionName);
       setYieldValue(
         initial.yieldNet || initial.yieldLoss ? `${initial.yieldNet}/${initial.yieldLoss}` : ''
@@ -274,7 +271,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     }
 
     setName('');
-    setCardName('');
     setCollectionName('');
     setYieldValue('');
     setTechnology('');
@@ -335,7 +331,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
     return {
       name: name.trim(),
-      cardName: cardName.trim(),
       collectionName: collectionName.trim(),
       yieldNet: numbers.yieldNet ?? 0,
       yieldLoss: numbers.yieldLoss ?? 0,
@@ -358,7 +353,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
     return {
       name,
-      cardName,
       collectionName,
       yieldNet,
       yieldLoss,
@@ -386,25 +380,8 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           value={name}
           onUpdate={setName}
           autoFocus
-          style={{ flex: initial ? 2 : 1 }}
+          style={{ flex: 1 }}
         />
-        {initial ? (
-          <TextInput
-            size="l"
-            label="Название ТТК:"
-            placeholder="Номер или название карты"
-            value={cardName}
-            onUpdate={setCardName}
-            endContent={
-              <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
-                <Text variant="body-1" color="secondary">
-                  опционально
-                </Text>
-              </Flex>
-            }
-            style={{ flex: 2 }}
-          />
-        ) : null}
         <YieldMaskInput
           label="Выход порции:"
           value={yieldValue}
