@@ -15,7 +15,8 @@
 
 .warehouse-balances-page__toolbar {
   flex-shrink: 0;
-  margin: 0 0 8px;
+  /* Ровно 12px между тулбаром и таблицей: 8px gap контейнера + 4px margin. */
+  margin: 0 0 4px;
 }
 
 /* Карточка таблицы: без обводки; шапка фиксируется, скроллится только список. */
@@ -46,7 +47,7 @@
 .warehouse-balances-table__header .admin-table th {
   background: var(--onemore-card-bg);
   border-block-end: none;
-  padding: 12px 16px;
+  padding: 12px 12px;
   text-align: left;
   color: var(--g-color-text-secondary);
   font-weight: var(--g-text-body-font-weight);
@@ -56,13 +57,13 @@
 .warehouse-balances-table__header .admin-table th:first-child {
   border-radius: 6px 0 0 6px;
   background-clip: padding-box;
-  padding-inline-start: 16px;
+  padding-inline-start: 12px;
 }
 
 .warehouse-balances-table__header .admin-table th:last-child {
   border-radius: 0 6px 6px 0;
   background-clip: padding-box;
-  padding-inline-end: 16px;
+  padding-inline-end: 12px;
 }
 
 /* Список строк — единственная скроллируемая область. */
@@ -126,10 +127,10 @@
 
 .warehouse-balances-card__name {
   min-width: 0;
-  padding: 12px 16px;
+  padding: 12px 12px;
 }
 
-/* Название — точно по центру высоты строки (ellipsis-текст инлайн-блоком
+/* Название — точно по центру высоты строки (ellipsis-текст инлайновым блоком
    опускает базовую линию и сдвигает название вниз). */
 .warehouse-balances-card__name .g-text {
   vertical-align: middle;
@@ -137,7 +138,7 @@
 
 .warehouse-balances-card__price,
 .warehouse-balances-card__rest {
-  padding: 12px 16px;
+  padding: 12px 12px;
   text-align: right;
   white-space: nowrap;
 }
@@ -146,7 +147,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 12px;
   border-radius: var(--g-border-radius-s);
   transition: background-color 0.12s ease-out;
 }

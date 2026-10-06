@@ -17,6 +17,12 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [formKey, setFormKey] = useState(0);
+
+  const requestClose = () => {
+    setVisible(false);
+    onClose();
+  };
+
   const form = useRecipeForm(null, String(formKey));
 
   useEffect(() => {
@@ -37,11 +43,6 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
     const timer = window.setTimeout(() => setMounted(false), 220);
     return () => window.clearTimeout(timer);
   }, [visible, open, mounted]);
-
-  const requestClose = () => {
-    setVisible(false);
-    onClose();
-  };
 
   const submit = () => {
     const body = form.getBody();
@@ -75,7 +76,7 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
       <div className="ttk-recipe-drawer__card">
         <div className="ttk-recipe-drawer__header">
           <div className="ttk-recipe-drawer__title-row">
-            <Text variant="subheader-2">Создать ТТК</Text>
+            <Text variant="subheader-3">Создать ТТК</Text>
           </div>
           <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
             <Icon data={Xmark} size={20} />

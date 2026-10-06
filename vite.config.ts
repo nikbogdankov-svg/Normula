@@ -106,6 +106,14 @@ export default defineConfig(() => {
   return {
     plugins: [react(), runtimeConfigPlugin()],
     resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+    optimizeDeps: {
+      // Gravity date-* должны пре-бандлиться одной сборкой и делиться одним
+      // экземпляром date-utils. Иначе esbuild заинлайнивает копию date-utils
+      // в date-components, классы DateTime из двух копий не совпадают, и
+      // DatePicker падает в dev: "Cannot read properties of undefined
+      // (reading 'isSame')".
+      include: ['@gravity-ui/date-components', '@gravity-ui/date-utils'],
+    },
     // Карты исходников нужны для отладки стенда, в прод-бандл их не кладём.
     build: { sourcemap: APP_ENV !== 'prod' },
     server: {
