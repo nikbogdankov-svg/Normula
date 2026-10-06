@@ -18,7 +18,6 @@ export interface IngredientDraft {
 /** Черновик карты целиком — для разбора файлов, где продукты ещё не связаны. */
 export interface RecipeDraft {
   name: string;
-  cardName: string;
   collectionName: string;
   yieldNet: string;
   yieldLoss: string;
@@ -115,7 +114,6 @@ function NumberInput({
 /** Состояние и разметка формы создания/редактирования ТТК. */
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const [name, setName] = useState('');
-  const [cardName, setCardName] = useState('');
   const [collectionName, setCollectionName] = useState('');
   const [yieldNet, setYieldNet] = useState('');
   const [yieldLoss, setYieldLoss] = useState('');
@@ -129,7 +127,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   useEffect(() => {
     if (initial) {
       setName(initial.name);
-      setCardName(initial.cardName);
       setCollectionName(initial.collectionName);
       setYieldNet(String(initial.yieldNet) || '');
       setYieldLoss(String(initial.yieldLoss) || '');
@@ -143,7 +140,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     }
 
     setName('');
-    setCardName('');
     setCollectionName('');
     setYieldNet('');
     setYieldLoss('');
@@ -206,7 +202,6 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
     return {
       name: name.trim(),
-      cardName: cardName.trim(),
       collectionName: collectionName.trim(),
       yieldNet: numbers.yieldNet ?? 0,
       yieldLoss: numbers.yieldLoss ?? 0,
@@ -253,7 +248,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           value={name}
           onUpdate={setName}
           autoFocus
-          style={{ flex: initial ? 2 : 1 }}
+          style={{ flex: 1 }}
         />
         {initial ? (
           <TextInput
