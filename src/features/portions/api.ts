@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
 import type {
+  CopyPortionsDayRequest,
   DishDistributionResponse,
   PortionsDayResponse,
   UpdatePortionHeadcountRequest,
 } from './types';
+
+/** API раздела «Порционник». Данные организационные — токен по умолчанию. */
 
 const KEY = 'portions';
 
@@ -59,9 +62,27 @@ export function useUpdatePortionHeadcount() {
         queryClient.setQueryData(context.key, context.previous);
       }
     },
-    onSuccess: () => {
+    onSuccess: (day) => {
+      queryClient.setQueryData([KEY, api.organizationId, 'day', day.date], day);
       void queryClient.invalidateQueries({
-        queryKey: [KEY, api.organizationId],
+        queryKey: [KEY, api.organizationId, 'dishes'],
+      });
+    },
+  });
+}
+
+/** Копирует численность дня `from` в день `to`; ответ — день `to`. */
+export function useCopyPortionsDay() {
+  const api = useApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CopyPortionsDayRequest) =>
+      api.request<PortionsDayResponse>('/v1/portions/copy', { method: 'POST', body }),
+    onSuccess: (day) => {
+      queryClient.setQueryData([KEY, api.organizationId, 'day', day.date], day);
+      void queryClient.invalidateQueries({
+        queryKey: [KEY, api.organizationId, 'dishes'],
       });
     },
   });
@@ -71,20 +92,20 @@ function upsertEntry(
   day: PortionsDayResponse,
   body: UpdatePortionHeadcountRequest
 ): PortionsDayResponse {
-  const rest = day.entries.filter(
+  const rest = (day.entries ?? []).filter(
     (entry) =>
-      entry.subObjectId !== body.subObjectId ||
-      entry.departmentId !== body.departmentId ||
-      entry.tableId !== body.tableId
+      entry.objectId !== body.objectId ||
+      entry.groupId !== body.groupId ||
+      entry.dietId !== body.dietId
   );
   return {
     ...day,
     entries: [
       ...rest,
       {
-        subObjectId: body.subObjectId,
-        departmentId: body.departmentId,
-        tableId: body.tableId,
+        objectId: body.objectId,
+        groupId: body.groupId,
+        dietId: body.dietId,
         headcount: body.headcount,
       },
     ],

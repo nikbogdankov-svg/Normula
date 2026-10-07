@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   Button,
   Dialog,
@@ -12,13 +12,19 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eye } from '@gravity-ui/icons';
-import { useApi } from '@/shared/api/use-api';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
-import { useCreateMenu, useMenu, useMenus, useUpdateMenu, useUpdateMenuSlot } from './api';
-import { useMockCateringObjects } from '@/features/objects/api';
-import type { CateringObject } from '@/features/objects/types';
-import { useMockDiets } from '@/features/diets/api';
+import {
+  useAllowViolation,
+  useCreateMenu,
+  useFillSchedule,
+  useMenus,
+  useSchedule,
+  useUpdateSlot,
+} from './api';
+import { useObjects } from '@/features/objects/api';
+import type { GroupDiet, ObjectItem } from '@/features/objects/types';
+import { useDiets } from '@/features/diets/api';
 import type { Diet } from '@/features/diets/types';
 import {
   formatDateRange,
@@ -31,105 +37,67 @@ import {
   toIsoDate,
   todayIsoDate,
 } from './dates';
-import { DishPickerDialog } from './dish-picker-dialog';
+import { DishPickerDialog, type PickedDish } from './dish-picker-dialog';
 import {
-  comparePriceToLimit,
-  compareToNorm,
+  dietNorm,
   formatMetric,
-  normForDiet,
+  statusOf,
   sumDishes,
+  sumPrice,
   type DayNorm,
   type DayTotals,
   type NormStatus,
 } from './norms';
-import { MEALS, type CycleMenu, type MealId, type MenuDishRef } from './types';
+import { MEALS, type Dish, type MealId, type Violation, type ViolationMetric } from './types';
 import './menu-route.css';
 
-const EMPTY_DISHES: MenuDishRef[] = [];
+const EMPTY_DISHES: Dish[] = [];
 
+/** Окно сетки: бэкенд работает с любым отрезком дат, 14 дней — выбор экрана. */
 const CYCLE_DAYS = 14;
 
-/** Находит диету в справочнике по имени (меню пока хранит dietName строкой). */
-function findDietByName(diets: Diet[] | undefined, name: string): Diet | undefined {
-  return diets?.find((diet) => diet.name === name);
+/** Подписи метрик нарушения в попапе «Нарушения за день». */
+const METRIC_LABELS: Record<ViolationMetric, { label: string; unit: string }> = {
+  kcal: { label: 'Калорийность', unit: 'ккал' },
+  protein: { label: 'Белки', unit: 'г' },
+  fat: { label: 'Жиры', unit: 'г' },
+  carbs: { label: 'Углеводы', unit: 'г' },
+  price: { label: 'Цена', unit: '₽' },
+};
+
+/** Объекты планирования: у складов нет ни численности, ни меню. */
+function planningObjects(objects: ObjectItem[] | undefined): ObjectItem[] {
+  return (objects ?? []).filter((object) => object.type !== 'warehouse');
 }
 
-/** Норма на день из справочника диет; если диета не найдена — фолбэк на отдел нормы. */
-function resolveDietNorm(diet: Diet | undefined, fallback: DayNorm): DayNorm {
-  if (!diet) return fallback;
-  return {
-    kcal: diet.kcal,
-    protein: diet.protein,
-    fat: diet.fat,
-    carbs: diet.carbs,
-    price: diet.pricePerDay,
-  };
+/** Диеты групп объекта или подобъекта, без повторов, в порядке групп. */
+function objectDiets(object: ObjectItem | undefined): GroupDiet[] {
+  const seen = new Set<string>();
+  const out: GroupDiet[] = [];
+  for (const group of object?.groups ?? []) {
+    for (const diet of group.diets ?? []) {
+      if (seen.has(diet.id)) continue;
+      seen.add(diet.id);
+      out.push(diet);
+    }
+  }
+  return out;
 }
 
-/**
- * Приёмы пищи в зависимости от выбора объекта/подобъекта.
- * Пустой mealIds у подобъекта — как у объекта, пустой mealIds у объекта — все.
- */
-function resolveActiveMeals(
-  allObjects: CateringObject[] | undefined,
-  objectId: string | null,
-  subObjectId: string | null
-): MealId[] {
-  const object = allObjects?.find((candidate) => candidate.id === objectId);
-  let source: MealId[] | undefined = subObjectId
-    ? object?.subObjects.find((candidate) => candidate.id === subObjectId)?.mealIds
-    : undefined;
-  if (!source || source.length === 0) source = object?.mealIds;
-  if (!source || source.length === 0) source = MEALS.map((meal) => meal.id);
+/** Приёмы пищи сетки — из диеты; пустой mealIds у диеты — все приёмы. */
+function resolveActiveMeals(diet: Diet | undefined): MealId[] {
+  const source = diet?.mealIds ?? [];
+  if (source.length === 0) return MEALS.map((meal) => meal.id);
   const active = new Set(source);
   return MEALS.filter((meal) => active.has(meal.id)).map((meal) => meal.id);
 }
 
 /**
  * Раздел «Меню»: сразу сетка приёмов по датам (без списка циклов).
- * Меню организации подхватывается автоматически; если нет — создаётся.
+ * Расписание берётся по объекту, диете и окну дат.
  */
 export function MenuRoute() {
   const { current } = useOrganizations();
-  const menus = useMenus();
-  const create = useCreateMenu();
-  const toaster = useToaster();
-  const creating = useRef(false);
-  const [menuId, setMenuId] = useState<string | null>(null);
-  const [localMenus, setLocalMenus] = useState<CycleMenu[]>([]);
-
-  useEffect(() => {
-    if (!menus.data || create.isPending) return;
-
-    if (menus.data.menus.length > 0) {
-      setMenuId((currentId) => currentId ?? menus.data.menus[0].id);
-      creating.current = false;
-      return;
-    }
-
-    if (creating.current) return;
-    creating.current = true;
-    create.mutate(
-      {
-        name: 'Меню',
-        dietName: 'Основная',
-        startDate: startOfWeekMonday(),
-        cycleDays: CYCLE_DAYS,
-      },
-      {
-        onSuccess: (result) => setMenuId(result.menu.id),
-        onError: (e) => {
-          creating.current = false;
-          toaster.add({
-            name: 'menu-bootstrap',
-            title: 'Не удалось открыть меню',
-            content: e.message,
-            theme: 'danger',
-          });
-        },
-      }
-    );
-  }, [menus.data, create, toaster]);
 
   if (current === null) {
     return (
@@ -139,59 +107,21 @@ export function MenuRoute() {
     );
   }
 
-  if (menus.isPending || !menuId) {
-    return (
-      <div className="menu-page">
-        <LoadingState />
-      </div>
-    );
-  }
-
-  if (menus.isError) {
-    return (
-      <div className="menu-page">
-        <ErrorState error={menus.error} onRetry={() => void menus.refetch()} />
-      </div>
-    );
-  }
-
-  const menuOptions = [
-    ...localMenus,
-    ...menus.data.menus.filter((item) => !localMenus.some((local) => local.id === item.id)),
-  ];
-
-  return (
-    <MenuByDates
-      menuId={menuId}
-      menus={menuOptions}
-      onMenuCreated={(newMenu) => {
-        setLocalMenus((current) => [newMenu, ...current.filter((item) => item.id !== newMenu.id)]);
-        setMenuId(newMenu.id);
-      }}
-    />
-  );
+  return <MenuByDates />;
 }
 
-function MenuByDates({
-  menuId,
-  menus,
-  onMenuCreated,
-}: {
-  menuId: string;
-  menus: CycleMenu[];
-  onMenuCreated: (menu: CycleMenu) => void;
-}) {
-  const api = useApi();
-  const create = useCreateMenu();
-  const { data, isPending, isError, error, refetch } = useMenu(menuId);
-  const updateMenu = useUpdateMenu(menuId);
-  const updateSlot = useUpdateMenuSlot(menuId);
-  const diets = useMockDiets();
-  const objects = useMockCateringObjects();
+function MenuByDates() {
+  const objects = useObjects();
+  const diets = useDiets();
+  const menus = useMenus();
+  const updateSlot = useUpdateSlot();
+  const allowViolation = useAllowViolation();
+  const fillSchedule = useFillSchedule();
+  const createMenu = useCreateMenu();
   const toaster = useToaster();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
   const [objectId, setObjectId] = useState<string | null>(null);
-  const [subObjectId, setSubObjectId] = useState<string | null>(null);
+  const [dietId, setDietId] = useState<string | null>(null);
   const [fillMenuOpen, setFillMenuOpen] = useState(false);
   const [fillMenuSourceId, setFillMenuSourceId] = useState<string | null>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
@@ -199,30 +129,50 @@ function MenuByDates({
   const [fillMenuSubmitting, setFillMenuSubmitting] = useState(false);
   /** День, для которого открыт попап нарушений. */
   const [violationDay, setViolationDay] = useState<number | null>(null);
-  /** Дни, для которых нарушение разрешено (кнопка-глаз в обычном стиле). */
-  const [allowedViolationDays, setAllowedViolationDays] = useState<ReadonlySet<number>>(
-    () => new Set()
+  /** Окно просмотра — стрелки обновляют только его, данные подтягиваются запросом. */
+  const [startDate, setStartDate] = useState(() => startOfWeekMonday());
+  const endDate = shiftIsoDate(startDate, CYCLE_DAYS - 1);
+
+  const objectsList = useMemo(() => planningObjects(objects.data?.objects), [objects.data]);
+  const topLevelObjects = objectsList.filter((object) => !object.parentObjectId);
+  const selectedObject = objectsList.find((object) => object.id === objectId);
+
+  useEffect(() => {
+    if (topLevelObjects.length === 0) return;
+    setObjectId((current) => current ?? topLevelObjects[0].id);
+  }, [topLevelObjects]);
+
+  /** Рационы селекта — диеты групп выбранного объекта; без групп — весь справочник. */
+  const groupDiets = objectDiets(selectedObject);
+  const dietOptions: GroupDiet[] =
+    groupDiets.length > 0
+      ? groupDiets
+      : (diets.data?.diets ?? []).map((diet) => ({ id: diet.id, name: diet.name }));
+
+  useEffect(() => {
+    if (dietOptions.length === 0) {
+      setDietId(null);
+      return;
+    }
+    setDietId((current) =>
+      current && dietOptions.some((option) => option.id === current) ? current : dietOptions[0].id
+    );
+  }, [dietOptions]);
+
+  const diet = diets.data?.diets.find((item) => item.id === dietId);
+  /** Приёмы пищи сетки — зависят от выбранной диеты. */
+  const activeMeals = resolveActiveMeals(diet);
+  const norm = dietNorm(diet);
+  const priceLimit = norm.price;
+
+  const scheduleParams = useMemo(
+    () => (objectId && dietId ? { objectId, dietId, from: startDate, to: endDate } : null),
+    [objectId, dietId, startDate, endDate]
   );
-  /** Локальная неделя просмотра — стрелки обновляют только календарь. */
-  const [viewStartDate, setViewStartDate] = useState<string | null>(null);
-  const [weekLoading, setWeekLoading] = useState(false);
-  const pendingWeekRef = useRef<string | null>(null);
-  const weekTimerRef = useRef<number | null>(null);
-  const persistTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setViewStartDate(null);
-    setAllowedViolationDays(new Set());
-  }, [menuId]);
-
-  useEffect(() => {
-    const list = objects.data?.objects ?? [];
-    if (list.length === 0) return;
-    setObjectId((current) => current ?? list[0].id);
-  }, [objects.data]);
-
-  /** Приёмы пищи сетки — зависят от выбранного объекта/подобъекта. */
-  const activeMeals = resolveActiveMeals(objects.data?.objects, objectId, subObjectId);
+  const schedule = useSchedule(scheduleParams);
+  /** Пока в данных предыдущее окно — слоты ещё от другого периода. */
+  const periodSynced = schedule.data !== undefined && !schedule.isPlaceholderData;
+  const weekLoading = scheduleParams !== null && (schedule.isPending || schedule.isPlaceholderData);
 
   useEffect(() => {
     if (!picker || activeMeals.includes(picker.mealId)) return;
@@ -230,63 +180,53 @@ function MenuByDates({
   }, [picker, activeMeals]);
 
   useEffect(() => {
-    const weekTimer = weekTimerRef;
-    const persistTimer = persistTimerRef;
-    return () => {
-      if (weekTimer.current !== null) window.clearTimeout(weekTimer.current);
-      if (persistTimer.current !== null) window.clearTimeout(persistTimer.current);
-    };
-  }, []);
-
-  const menu = data?.menu;
-  const startDate = viewStartDate ?? menu?.startDate ?? startOfWeekMonday();
-  /** Пока startDate на сервере не совпал с просматриваемым — слоты ещё от другого периода. */
-  const periodSynced = menu?.startDate === startDate;
-
-  useEffect(() => {
-    if (!menu || menu.cycleDays === CYCLE_DAYS) return;
-    updateMenu.mutate({ cycleDays: CYCLE_DAYS });
-  }, [menu, updateMenu]);
-
-  useEffect(() => {
     if (!periodSynced) setPicker(null);
   }, [periodSynced]);
 
   const slotMap = useMemo(() => {
-    const map = new Map<string, MenuDishRef[]>();
-    for (const slot of menu?.slots ?? []) {
-      map.set(slotKey(slot.day, slot.mealId), periodSynced ? slot.dishes : EMPTY_DISHES);
-    }
+    const map = new Map<string, Dish[]>();
+    if (!periodSynced) return map;
+    schedule.data.days.forEach((day, index) => {
+      for (const slot of day.slots ?? []) {
+        map.set(slotKey(index + 1, slot.mealId), slot.dishes ?? EMPTY_DISHES);
+      }
+    });
     return map;
-  }, [menu?.slots, periodSynced]);
+  }, [schedule.data, periodSynced]);
+
+  /** Дни, для которых нарушение разрешено (кнопка-глаз в обычном стиле). */
+  const allowedViolationDays = useMemo(() => {
+    const set = new Set<number>();
+    if (!periodSynced) return set;
+    schedule.data.days.forEach((day, index) => {
+      if (day.violationAllowed) set.add(index + 1);
+    });
+    return set;
+  }, [schedule.data, periodSynced]);
 
   const dayTotals = useMemo(() => {
-    if (!menu) return new Map<number, DayTotals>();
     const map = new Map<number, DayTotals>();
     for (let day = 1; day <= CYCLE_DAYS; day += 1) {
-      const dishes: MenuDishRef[] = [];
+      const dishes: Dish[] = [];
       for (const meal of activeMeals) {
         dishes.push(...(slotMap.get(slotKey(day, meal)) ?? []));
       }
       map.set(day, sumDishes(dishes));
     }
     return map;
-  }, [menu, slotMap, activeMeals]);
+  }, [slotMap, activeMeals]);
 
-  const hasDayViolation = (day: number): boolean => {
-    const totals = dayTotals.get(day) ?? sumDishes([]);
-    const base = resolveDietNorm(
-      findDietByName(diets.data?.diets, menu?.dietName ?? 'Основная'),
-      normForDiet(menu?.dietName ?? 'Основная')
-    );
-    return (
-      compareToNorm(totals.kcal, base.kcal) !== 'ok' ||
-      compareToNorm(totals.protein, base.protein) !== 'ok' ||
-      compareToNorm(totals.fat, base.fat) !== 'ok' ||
-      compareToNorm(totals.carbs, base.carbs) !== 'ok' ||
-      comparePriceToLimit(totals.price, base.price) !== 'ok'
-    );
-  };
+  /** Нарушения норм по дням — считает бэкенд. */
+  const dayViolations = useMemo(() => {
+    const map = new Map<number, Violation[]>();
+    if (!periodSynced) return map;
+    schedule.data.days.forEach((day, index) => {
+      map.set(index + 1, day.violations ?? []);
+    });
+    return map;
+  }, [schedule.data, periodSynced]);
+
+  const hasDayViolation = (day: number): boolean => (dayViolations.get(day) ?? []).length > 0;
 
   const pickerDishes = useMemo(() => {
     if (!picker) return EMPTY_DISHES;
@@ -306,31 +246,16 @@ function MenuByDates({
       )
     : '';
 
-  const fillMenuOptions = useMemo(
-    () => (menu ? [menu, ...menus.filter((item) => item.id !== menu.id)] : menus),
-    [menu, menus]
-  );
+  const fillMenuOptions = useMemo(() => menus.data?.menus ?? [], [menus.data]);
 
   useEffect(() => {
     if (!fillMenuOpen) return;
-    if (fillMenuOptions.length === 0) {
-      setFillMenuSourceId(null);
-      return;
-    }
-
-    const weekIsEmpty = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1).every((day) =>
-      activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
+    setFillMenuSourceId((current) =>
+      current && fillMenuOptions.some((option) => option.id === current) ? current : null
     );
+  }, [fillMenuOpen, fillMenuOptions]);
 
-    if (weekIsEmpty) {
-      setFillMenuSourceId(null);
-      return;
-    }
-
-    setFillMenuSourceId((current) => current ?? menuId ?? fillMenuOptions[0].id);
-  }, [fillMenuOpen, fillMenuOptions, menuId, slotMap, activeMeals]);
-
-  if (isPending && !menu) {
+  if (objects.isPending || diets.isPending) {
     return (
       <div className="menu-page">
         <LoadingState />
@@ -338,83 +263,62 @@ function MenuByDates({
     );
   }
 
-  if (isError || !menu) {
+  if (objects.isError) {
     return (
       <div className="menu-page">
-        <ErrorState error={error ?? new Error('Меню не найдено')} onRetry={() => void refetch()} />
+        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
+      </div>
+    );
+  }
+
+  if (diets.isError) {
+    return (
+      <div className="menu-page">
+        <ErrorState error={diets.error} onRetry={() => void diets.refetch()} />
+      </div>
+    );
+  }
+
+  if (schedule.isError) {
+    return (
+      <div className="menu-page">
+        <ErrorState error={schedule.error} onRetry={() => void schedule.refetch()} />
       </div>
     );
   }
 
   const days = Array.from({ length: CYCLE_DAYS }, (_, index) => index + 1);
-  const norm = resolveDietNorm(
-    findDietByName(diets.data?.diets, menu.dietName),
-    normForDiet(menu.dietName)
-  );
-  const priceLimit = norm.price;
-  const objectsList = objects.data?.objects ?? [];
-  const selectedDietNames = new Set(
-    (subObjectId
-      ? objectsList
-          .find((object) => object.subObjects.some((subObject) => subObject.id === subObjectId))
-          ?.subObjects.find((subObject) => subObject.id === subObjectId)
-      : objectsList.find((object) => object.id === objectId)
-    )?.departments.flatMap((department) => department.tables.map((table) => table.name)) ?? []
-  );
-  const dietOptions =
-    selectedDietNames.size > 0
-      ? [...selectedDietNames].map((name) => ({ value: name, content: name }))
-      : diets.data?.diets && diets.data.diets.length > 0
-        ? diets.data.diets.map((diet) => ({ value: diet.name, content: diet.name }))
-        : [
-            { value: 'Основная', content: 'Основная' },
-            { value: 'Щадящая', content: 'Щадящая' },
-            { value: 'Диабетическая', content: 'Диабетическая' },
-          ];
   const isEmptyWeek = days.every((day) =>
     activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
   );
-  const objectOptions = objectsList.map((object) => ({
+  const objectOptions = topLevelObjects.map((object) => ({
     label: object.name,
     options: [
-      { value: `object:${object.id}`, content: object.name },
-      ...object.subObjects.map((subObject) => ({
-        value: `subobject:${subObject.id}`,
-        content: subObject.name,
-      })),
+      { value: object.id, content: object.name },
+      ...objectsList
+        .filter((candidate) => candidate.parentObjectId === object.id)
+        .map((subObject) => ({ value: subObject.id, content: subObject.name })),
     ],
   }));
-  const selectedObjectValue = subObjectId
-    ? `subobject:${subObjectId}`
-    : objectId
-      ? `object:${objectId}`
-      : null;
+  /** Имя меню по умолчанию — по окну, которое сохраняем. */
+  const defaultMenuName = `Меню ${formatDateRange(startDate, CYCLE_DAYS)}`;
+
   const fillFromSourceMenu = async (sourceMenuId: string) => {
     const sourceMenu = fillMenuOptions.find((candidate) => candidate.id === sourceMenuId);
-    if (!sourceMenu) return;
-
-    const sourceSlots = new Map(
-      sourceMenu.slots.map((slot) => [slotKey(slot.day, slot.mealId), slot.dishes] as const)
-    );
-    const currentSlots = new Map(
-      menu.slots.map((slot) => [slotKey(slot.day, slot.mealId), slot.dishes] as const)
-    );
-    const today = todayIsoDate();
+    if (!sourceMenu || !objectId || !dietId) return;
 
     setFillMenuSubmitting(true);
     try {
-      const payloads = days.flatMap((day) =>
-        activeMeals.map((mealId) => ({
-          day,
-          mealId,
-          dishes:
-            sourceMenu.id === menuId || toIsoDate(dateForCycleDay(startDate, day)) > today
-              ? (sourceSlots.get(slotKey(day, mealId)) ?? [])
-              : (currentSlots.get(slotKey(day, mealId)) ?? []),
-        }))
-      );
-
-      await Promise.all(payloads.map((payload) => updateSlot.mutateAsync(payload)));
+      // Уже прошедшие дни и сегодняшний не перезаписываются — меню
+      // применяется со следующего дня.
+      await fillSchedule.mutateAsync({
+        objectId,
+        dietId,
+        menuId: sourceMenu.id,
+        from: startDate,
+        to: endDate,
+        keepThrough: todayIsoDate(),
+      });
       setFillMenuOpen(false);
       setFillMenuSourceId(null);
       toaster.add({
@@ -423,43 +327,24 @@ function MenuByDates({
         content: `Скопировано из меню «${sourceMenu.name}».`,
         theme: 'success',
       });
+    } catch (error) {
+      toaster.add({
+        name: 'menu-fill-error',
+        title: 'Не удалось заполнить меню',
+        content: error instanceof Error ? error.message : 'Попробуйте ещё раз.',
+        theme: 'danger',
+      });
     } finally {
       setFillMenuSubmitting(false);
     }
   };
 
   const createAndFillNewMenu = async () => {
-    const name = createMenuName.trim() || `${menu.name} (копия)`;
+    if (!objectId || !dietId) return;
+    const name = createMenuName.trim() || defaultMenuName;
     setFillMenuSubmitting(true);
     try {
-      const created = await create.mutateAsync({
-        name,
-        dietName: menu.dietName,
-        startDate: startOfWeekMonday(startDate),
-        cycleDays: CYCLE_DAYS,
-      });
-
-      const payloads = days.flatMap((day) =>
-        activeMeals.map((mealId) => ({
-          day,
-          mealId,
-          dishes:
-            menu.slots.find((slot) => slotKey(slot.day, slot.mealId) === slotKey(day, mealId))
-              ?.dishes ?? [],
-        }))
-      );
-
-      await Promise.all(
-        payloads.map((payload) =>
-          api.request<{ menu: { id: string } }>(`/v1/menus/${created.menu.id}/slots`, {
-            method: 'PUT',
-            body: payload,
-          })
-        )
-      );
-
-      const newMenu = { ...created.menu, slots: payloads };
-      onMenuCreated(newMenu);
+      await createMenu.mutateAsync({ name, objectId, dietId, from: startDate, to: endDate });
       setFillMenuOpen(false);
       setCreateMenuOpen(false);
       setCreateMenuName('');
@@ -467,7 +352,7 @@ function MenuByDates({
       toaster.add({
         name: 'menu-created-and-filled',
         title: 'Новое меню создано',
-        content: `Меню «${name}» создано и выбрано на текущую неделю.`,
+        content: `Меню «${name}» сохранено из текущего периода.`,
         theme: 'success',
       });
     } catch (error) {
@@ -482,52 +367,81 @@ function MenuByDates({
     }
   };
 
-  const patchMenu = (patch: { startDate?: string; dietName?: string }) => {
-    updateMenu.mutate(patch, {
-      onError: (e) =>
-        toaster.add({
-          name: 'menu-patch',
-          title: 'Ошибка',
-          content: e.message,
-          theme: 'danger',
-        }),
-    });
-  };
-
   const goToWeek = (iso: string) => {
     const next = startOfWeekMonday(iso);
     if (next === startDate || weekLoading) return;
-
-    pendingWeekRef.current = next;
-    setWeekLoading(true);
     setPicker(null);
-
-    if (weekTimerRef.current !== null) window.clearTimeout(weekTimerRef.current);
-    if (persistTimerRef.current !== null) window.clearTimeout(persistTimerRef.current);
-
-    weekTimerRef.current = window.setTimeout(() => {
-      const pending = pendingWeekRef.current;
-      pendingWeekRef.current = null;
-      if (!pending) {
-        setWeekLoading(false);
-        return;
-      }
-
-      // Сначала переключаем период на сервере (свои слоты), потом обновляем календарь.
-      updateMenu.mutate(
-        { startDate: pending },
-        {
-          onSettled: () => {
-            setViewStartDate(pending);
-            setWeekLoading(false);
-          },
-        }
-      );
-    }, 180);
+    setStartDate(next);
   };
 
   const shiftPeriod = (direction: -1 | 1) => {
     goToWeek(shiftIsoDate(startDate, direction * CYCLE_DAYS));
+  };
+
+  const allowDayViolation = (day: number) => {
+    if (!objectId || !dietId) return;
+    allowViolation.mutate(
+      { objectId, dietId, date: toIsoDate(dateForCycleDay(startDate, day)) },
+      {
+        onSuccess: () => {
+          toaster.add({
+            name: 'menu-violation-allowed',
+            title: 'Нарушение разрешено',
+            content: `День ${day} сохранён с нарушением нормы.`,
+            theme: 'warning',
+          });
+          setViolationDay(null);
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'menu-violation-error',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
+  const saveSlot = (picked: PickedDish[]) => {
+    if (!picker || !objectId || !dietId) return;
+    const dayPrice =
+      (dayTotals.get(picker.day)?.price ?? 0) - sumDishes(pickerDishes).price + sumPrice(picked);
+    updateSlot.mutate(
+      {
+        objectId,
+        dietId,
+        date: toIsoDate(dateForCycleDay(startDate, picker.day)),
+        mealId: picker.mealId,
+        recipeIds: picked.map((dish) => dish.recipeId),
+      },
+      {
+        onSuccess: () => {
+          if (dayPrice > priceLimit) {
+            toaster.add({
+              name: 'menu-price-warning',
+              title: 'Ячейка сохранена с превышением цены',
+              content: `Цена дня ${Math.round(dayPrice)} ₽ выше лимита ${priceLimit} ₽.`,
+              theme: 'warning',
+            });
+          } else {
+            toaster.add({
+              name: 'menu-slot-saved',
+              title: 'Ячейка сохранена',
+              theme: 'success',
+            });
+          }
+          setPicker(null);
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'menu-slot-error',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
   };
 
   return (
@@ -538,29 +452,9 @@ function MenuByDates({
             size="l"
             label="Объект:"
             width={280}
-            value={selectedObjectValue ? [selectedObjectValue] : []}
+            value={objectId ? [objectId] : []}
             placeholder="Выберите объект"
-            onUpdate={(values) => {
-              const raw = values[0];
-              if (!raw) {
-                setObjectId(null);
-                setSubObjectId(null);
-                return;
-              }
-              const sep = raw.indexOf(':');
-              const kind = sep === -1 ? '' : raw.slice(0, sep);
-              const id = sep === -1 ? raw : raw.slice(sep + 1);
-              if (kind === 'subobject') {
-                const parent = objectsList.find((object) =>
-                  object.subObjects.some((subObject) => subObject.id === id)
-                );
-                setObjectId(parent?.id ?? null);
-                setSubObjectId(id);
-                return;
-              }
-              setObjectId(id);
-              setSubObjectId(null);
-            }}
+            onUpdate={(values) => setObjectId(values[0] ?? null)}
             options={objectOptions}
             disabled={objectsList.length === 0}
           />
@@ -568,9 +462,11 @@ function MenuByDates({
             size="l"
             label="Рацион:"
             width={200}
-            value={[menu.dietName]}
-            onUpdate={(value) => patchMenu({ dietName: value[0] ?? 'Основная' })}
-            options={dietOptions}
+            value={dietId ? [dietId] : []}
+            placeholder="Выберите рацион"
+            onUpdate={(values) => setDietId(values[0] ?? null)}
+            options={dietOptions.map((option) => ({ value: option.id, content: option.name }))}
+            disabled={dietOptions.length === 0}
           />
         </Flex>
 
@@ -612,7 +508,7 @@ function MenuByDates({
             view={isEmptyWeek ? 'action' : 'normal-contrast'}
             size="l"
             onClick={() => setFillMenuOpen(true)}
-            disabled={weekLoading}
+            disabled={weekLoading || !periodSynced}
           >
             Заполнение меню
           </Button>
@@ -723,6 +619,7 @@ function MenuByDates({
                     day={day}
                     totals={totals}
                     norm={norm}
+                    violations={dayViolations.get(day) ?? []}
                     onInspect={setViolationDay}
                     allowed={allowedViolationDays.has(day)}
                   />
@@ -762,7 +659,7 @@ function MenuByDates({
             <TextInput
               size="l"
               label="Название меню:"
-              placeholder={`${menu.name} (копия)`}
+              placeholder={defaultMenuName}
               value={createMenuName}
               onUpdate={setCreateMenuName}
               autoFocus
@@ -794,7 +691,7 @@ function MenuByDates({
                   Создать новое из текущего
                 </Button>
               )}
-              {fillMenuSourceId && fillMenuSourceId !== menuId && (
+              {fillMenuSourceId && (
                 <Text variant="body-2" color="secondary">
                   При выборе другого меню изменения будут применены только со следующего дня.
                 </Text>
@@ -860,52 +757,13 @@ function MenuByDates({
         <Dialog.Body>
           {violationDay !== null && (
             <Flex direction="column" gap={3}>
-              {(() => {
-                const totals = dayTotals.get(violationDay) ?? sumDishes([]);
-                const violations = [
-                  {
-                    label: 'Калорийность',
-                    actual: totals.kcal,
-                    norm: norm.kcal,
-                    unit: 'ккал',
-                    status: compareToNorm(totals.kcal, norm.kcal),
-                  },
-                  {
-                    label: 'Белки',
-                    actual: totals.protein,
-                    norm: norm.protein,
-                    unit: 'г',
-                    status: compareToNorm(totals.protein, norm.protein),
-                  },
-                  {
-                    label: 'Жиры',
-                    actual: totals.fat,
-                    norm: norm.fat,
-                    unit: 'г',
-                    status: compareToNorm(totals.fat, norm.fat),
-                  },
-                  {
-                    label: 'Углеводы',
-                    actual: totals.carbs,
-                    norm: norm.carbs,
-                    unit: 'г',
-                    status: compareToNorm(totals.carbs, norm.carbs),
-                  },
-                  {
-                    label: 'Цена',
-                    actual: totals.price,
-                    norm: norm.price,
-                    unit: '₽',
-                    status: comparePriceToLimit(totals.price, norm.price),
-                  },
-                ].filter((item) => item.status !== 'ok');
-                return violations.map((item) => (
-                  <Text key={item.label} variant="body-2">
-                    {item.label}: {formatMetric(item.actual)} / {formatMetric(item.norm)}{' '}
-                    {item.unit} - {item.status === 'low' ? 'ниже' : 'выше'} нормы
-                  </Text>
-                ));
-              })()}
+              {(dayViolations.get(violationDay) ?? []).map((item) => (
+                <Text key={item.metric} variant="body-2">
+                  {METRIC_LABELS[item.metric].label}: {formatMetric(item.actual)} /{' '}
+                  {formatMetric(item.norm)} {METRIC_LABELS[item.metric].unit} -{' '}
+                  {item.status === 'low' ? 'ниже' : 'выше'} нормы
+                </Text>
+              ))}
               <Text variant="body-2" color="secondary">
                 Вы можете разрешить нарушение или изменить состав блюд в приёмах.
               </Text>
@@ -923,16 +781,8 @@ function MenuByDates({
                 type="button"
                 view="outlined"
                 size="l"
-                onClick={() => {
-                  setAllowedViolationDays((prev) => new Set(prev).add(violationDay));
-                  toaster.add({
-                    name: 'menu-violation-allowed',
-                    title: 'Нарушение разрешено',
-                    content: `День ${violationDay} сохранён с нарушением нормы.`,
-                    theme: 'warning',
-                  });
-                  setViolationDay(null);
-                }}
+                loading={allowViolation.isPending}
+                onClick={() => allowDayViolation(violationDay)}
               >
                 Разрешить нарушение
               </Button>
@@ -948,44 +798,7 @@ function MenuByDates({
         dayPriceWithoutSlot={pickerDayPriceWithoutSlot}
         saving={updateSlot.isPending}
         onClose={() => setPicker(null)}
-        onSave={(dishes, force) => {
-          if (!picker) return;
-          const dayPrice =
-            (dayTotals.get(picker.day)?.price ?? 0) -
-            sumDishes(pickerDishes).price +
-            sumDishes(dishes).price;
-          updateSlot.mutate(
-            { day: picker.day, mealId: picker.mealId, dishes },
-            {
-              onSuccess: () => {
-                if (dayPrice > priceLimit) {
-                  toaster.add({
-                    name: force ? 'menu-price-allowed' : 'menu-price-warning',
-                    title: force
-                      ? 'Превышение разрешено и ячейка сохранена'
-                      : 'Ячейка сохранена с превышением цены',
-                    content: `Цена дня ${Math.round(dayPrice)} ₽ выше лимита ${priceLimit} ₽.`,
-                    theme: 'warning',
-                  });
-                } else {
-                  toaster.add({
-                    name: 'menu-slot-saved',
-                    title: 'Ячейка сохранена',
-                    theme: 'success',
-                  });
-                }
-                setPicker(null);
-              },
-              onError: (e) =>
-                toaster.add({
-                  name: 'menu-slot-error',
-                  title: 'Ошибка',
-                  content: e.message,
-                  theme: 'danger',
-                }),
-            }
-          );
-        }}
+        onSave={saveSlot}
       />
     </div>
   );
@@ -995,23 +808,20 @@ function DayTotalCell({
   day,
   totals,
   norm,
+  violations,
   onInspect,
   allowed,
 }: {
   day: number;
   totals: DayTotals;
   norm: DayNorm;
+  /** Нарушения норм за день с бэкенда; пусто — день в норме. */
+  violations: Violation[];
   onInspect: (day: number) => void;
   /** Нарушение дня было разрешено — кнопка-глаз в обычном стиле. */
   allowed?: boolean;
 }) {
-  const kcalStatus = compareToNorm(totals.kcal, norm.kcal);
-  const anyViolation =
-    kcalStatus !== 'ok' ||
-    compareToNorm(totals.protein, norm.protein) !== 'ok' ||
-    compareToNorm(totals.fat, norm.fat) !== 'ok' ||
-    compareToNorm(totals.carbs, norm.carbs) !== 'ok' ||
-    comparePriceToLimit(totals.price, norm.price) !== 'ok';
+  const anyViolation = violations.length > 0;
 
   return (
     <div className="menu-grid__total-stack">
@@ -1021,13 +831,31 @@ function DayTotalCell({
           norm={norm.kcal}
           digits={0}
           unit=" ккал"
-          compare={compareToNorm}
+          status={statusOf(violations, 'kcal')}
         />
       </div>
       <div className="menu-grid__metric">
-        <NormValue actual={totals.protein} norm={norm.protein} digits={0} prefix="Б " />
-        <NormValue actual={totals.fat} norm={norm.fat} digits={0} prefix="Ж " />
-        <NormValue actual={totals.carbs} norm={norm.carbs} digits={0} prefix="У " />
+        <NormValue
+          actual={totals.protein}
+          norm={norm.protein}
+          digits={0}
+          prefix="Б "
+          status={statusOf(violations, 'protein')}
+        />
+        <NormValue
+          actual={totals.fat}
+          norm={norm.fat}
+          digits={0}
+          prefix="Ж "
+          status={statusOf(violations, 'fat')}
+        />
+        <NormValue
+          actual={totals.carbs}
+          norm={norm.carbs}
+          digits={0}
+          prefix="У "
+          status={statusOf(violations, 'carbs')}
+        />
       </div>
       <div className="menu-grid__metric">
         <MetricLine
@@ -1036,7 +864,7 @@ function DayTotalCell({
           digits={0}
           unit=""
           normUnit=" ₽"
-          compare={comparePriceToLimit}
+          status={statusOf(violations, 'price')}
         />
       </div>
       {anyViolation && (
@@ -1061,7 +889,7 @@ function MetricLine({
   digits,
   unit,
   normUnit,
-  compare = compareToNorm,
+  status,
 }: {
   label?: string;
   actual: number;
@@ -1069,9 +897,8 @@ function MetricLine({
   digits: number;
   unit: string;
   normUnit?: string;
-  compare?: (actual: number, norm: number) => NormStatus;
+  status: NormStatus;
 }) {
-  const status = compare(actual, norm);
   return (
     <div className="menu-grid__metric">
       {label && <span className="menu-grid__metric-label">{label}</span>}
@@ -1089,13 +916,14 @@ function NormValue({
   norm,
   digits,
   prefix,
+  status,
 }: {
   actual: number;
   norm: number;
   digits: number;
   prefix: string;
+  status: NormStatus;
 }) {
-  const status = compareToNorm(actual, norm);
   return (
     <span className={metricClass(status)}>
       {prefix}
