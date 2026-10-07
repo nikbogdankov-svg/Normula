@@ -15,7 +15,7 @@ import {
 } from '@gravity-ui/uikit';
 import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, Magnifier, Printer } from '@gravity-ui/icons';
-import { useMockCateringObjects } from '@/features/objects/api';
+import { useObjects } from '@/features/objects/api';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -59,7 +59,7 @@ function formatQuantity(quantity: number, unit: string): string {
 /** Раскладка продуктов на день: тулбар закреплён, скроллится таблица. */
 export function ProductsSpreadRoute() {
   const { current } = useOrganizations();
-  const objects = useMockCateringObjects();
+  const objects = useObjects();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawDate = searchParams.get('date');
   const date = ISO_DATE_RE.test(rawDate ?? '') ? (rawDate as string) : todayIso();
@@ -73,7 +73,15 @@ export function ProductsSpreadRoute() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ProductSpreadItem | null>(null);
 
-  const objectsList = useMemo(() => objects.data?.objects ?? [], [objects.data]);
+  // Объекты верхнего уровня, кроме складов: раскладка идёт по объекту вместе
+  // с его подобъектами.
+  const objectsList = useMemo(
+    () =>
+      (objects.data?.objects ?? []).filter(
+        (object) => !object.parentObjectId && object.type !== 'warehouse'
+      ),
+    [objects.data]
+  );
   const activeObjectId = selectedObjectId === ALL_OBJECTS ? null : selectedObjectId;
 
   const spread = useProductSpread(date, activeObjectId);
@@ -238,8 +246,8 @@ function ProductsSpreadTable({
       width: '9%',
       align: 'end' as const,
       template: (row: ProductSpreadItem) =>
-        row.byMeal[meal.id] > 0 ? (
-          <Text variant="body-2">{formatQuantity(row.byMeal[meal.id], row.unit)}</Text>
+        (row.byMeal[meal.id] ?? 0) > 0 ? (
+          <Text variant="body-2">{formatQuantity(row.byMeal[meal.id] ?? 0, row.unit)}</Text>
         ) : (
           <Text variant="body-2" color="hint">
             —
@@ -320,7 +328,7 @@ function ProductsSpreadSections({
                   </Text>
                 </span>
                 <Text variant="body-2" style={{ whiteSpace: 'nowrap', fontWeight: 500 }}>
-                  {formatQuantity(row.byMeal[meal.id], row.unit)}
+                  {formatQuantity(row.byMeal[meal.id] ?? 0, row.unit)}
                 </Text>
               </button>
             ))}

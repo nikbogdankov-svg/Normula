@@ -88,16 +88,11 @@ export interface GetRecipeResponse {
 export const RECIPE_DECIMALS = 3;
 
 /*
- * Ниже — то, что ещё не на бэкенде.
- *
- * 1. Мок-двойник карт для разделов на моках (меню, порционник, раскладка
- *    продуктов): их мок-данные завязаны на мок-карты. См. useMockRecipes.
- *    Удаляется вместе с их моками.
- * 2. Разбор файлов сборников в браузере: результат пока никуда не
- *    отправляется, импорт на бэкенде — отдельная задача.
+ * Ниже — разбор файлов сборников в браузере: результат пока никуда не
+ * отправляется, импорт на бэкенде — отдельная задача.
  */
 
-/** Ингредиент мок-карты и разобранного из файла блюда. */
+/** Ингредиент разобранного из файла блюда. */
 export interface CreateRecipeIngredient {
   name: string;
   /** id продукта из общего справочника; пусто — не связан. */
@@ -106,55 +101,4 @@ export interface CreateRecipeIngredient {
   netPerPortion: string;
   /** Единица измерения закупки (кг, л, шт). */
   unit?: string;
-}
-
-/** Строка раскладки мок-карты. */
-export interface MockIngredient extends CreateRecipeIngredient {
-  grossPer100: string;
-  netPer100: string;
-  pricePerUnit: string;
-}
-
-export interface MockNutrition {
-  protein: string;
-  fat: string;
-  carbs: string;
-  kcal: string;
-}
-
-/** Мок-сборник для мок-карт. */
-export interface MockCollection {
-  id: string;
-  name: string;
-}
-
-/** Мок-сборник для мок-карт. */
-export interface MockCollection {
-  id: string;
-  name: string;
-}
-
-/** Мок-карта в прежней форме макета — для меню и порционника. */
-export interface MockRecipe {
-  id: string;
-  name: string;
-  collectionName: string;
-  collectionId: string;
-  /** Выход порции, например «90/50». */
-  portionYield: string;
-  price: number;
-  kcal: number;
-  recipe: string;
-  ingredients: MockIngredient[];
-  outputPerPortion: string;
-  outputPer100: string;
-  nutrition: MockNutrition;
-}
-
-export interface ListMockRecipesResponse {
-  recipes: MockRecipe[];
-  total: number;
-  /** Текущая страница (1-based). */
-  page: number;
-  pageSize: number;
 }

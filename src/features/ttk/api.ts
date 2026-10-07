@@ -1,11 +1,6 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
-import type {
-  GetRecipeResponse,
-  ListMockRecipesResponse,
-  ListRecipesResponse,
-  RecipeRequest,
-} from './types';
+import type { GetRecipeResponse, ListRecipesResponse, RecipeRequest } from './types';
 
 /** API раздела ТТК. Данные организационные — токен по умолчанию. */
 
@@ -75,59 +70,5 @@ export function useDeleteRecipe() {
     mutationFn: ({ id, mode }: { id: string; mode: RecipeDeleteMode }) =>
       api.request<void>(`/v1/ttk/${id}?mode=${mode}`, { method: 'DELETE' }),
     onSuccess: invalidate,
-  });
-}
-
-/*
- * Мок-двойник карт для разделов, которые ещё на моках (меню, порционник):
- * их мок-данные завязаны на мок-карты. Удаляется вместе с их моками — тогда
- * они переходят на useRecipes.
- */
-
-export type MockRecipeSort = 'name' | 'price';
-
-interface MockRecipesParams {
-  search: string;
-  collectionId: string;
-  sort: MockRecipeSort;
-  ascending?: boolean;
-  pageSize?: number;
-}
-
-function mockQuery(params: MockRecipesParams, page: number): string {
-  const query = new URLSearchParams({
-    search: params.search,
-    collectionId: params.collectionId,
-    sort: params.sort,
-    order: (params.ascending ?? true) ? 'asc' : 'desc',
-    page: String(page),
-    pageSize: String(params.pageSize ?? 10),
-  });
-
-  return `/v1/mock/ttk?${query.toString()}`;
-}
-
-export function useMockRecipes(params: MockRecipesParams) {
-  const api = useApi();
-
-  return useQuery({
-    queryKey: [KEY, api.organizationId, 'mock', params],
-    queryFn: () => api.request<ListMockRecipesResponse>(mockQuery(params, 1)),
-    enabled: api.organizationId !== null,
-  });
-}
-
-export function useInfiniteMockRecipes(params: MockRecipesParams) {
-  const api = useApi();
-
-  return useInfiniteQuery({
-    queryKey: [KEY, api.organizationId, 'mock-pages', params],
-    queryFn: ({ pageParam }) => api.request<ListMockRecipesResponse>(mockQuery(params, pageParam)),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => {
-      const maxPage = Math.max(1, Math.ceil(lastPage.total / lastPage.pageSize));
-      return lastPage.page < maxPage ? lastPage.page + 1 : undefined;
-    },
-    enabled: api.organizationId !== null,
   });
 }

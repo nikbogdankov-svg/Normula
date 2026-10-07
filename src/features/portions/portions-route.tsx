@@ -32,10 +32,14 @@ import {
   LoadingState,
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
-import { useMockCateringObjects } from '@/features/objects/api';
-import type { SubObject } from '@/features/objects/types';
-import { useInfiniteMockRecipes } from '@/features/ttk/api';
-import { useDishDistribution, usePortionsDay, useUpdatePortionHeadcount } from './api';
+import { useObjects } from '@/features/objects/api';
+import type { ObjectGroup, ObjectItem } from '@/features/objects/types';
+import {
+  useCopyPortionsDay,
+  useDishDistribution,
+  usePortionsDay,
+  useUpdatePortionHeadcount,
+} from './api';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
 
@@ -43,15 +47,46 @@ const ALL_SUBOBJECTS = '__all';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Вес одной порции (граммы) из ТТК: берём первое число из «выхода», «90/50» → 90. */
-function portionGramsOf(portionYield: string): number | null {
-  const grams = Number((portionYield.split('/')[0] ?? '').trim());
-  return Number.isFinite(grams) && grams > 0 ? grams : null;
+/** Килограммы на строку: порции × выход порции из ТТК (граммы); 0 — выход не задан. */
+function kilogramsOf(portions: number, yieldNet: number): number | null {
+  return yieldNet > 0 ? (portions * yieldNet) / 1000 : null;
 }
 
-/** Килограммы на строку: порции × вес порции из ТТК. */
-function kilogramsOf(portions: number, grams: number | null): number | null {
-  return grams === null ? null : (portions * grams) / 1000;
+/**
+ * Единица порционника: объект или подобъект, у которого есть группы.
+ * Отделение таблицы — группа, стол — диета группы.
+ */
+interface PortionUnit {
+  id: string;
+  name: string;
+  /** Объект верхнего уровня: сам объект или родитель подобъекта. */
+  parentId: string;
+  parentName: string;
+  groups: ObjectGroup[];
+}
+
+/** Объекты верхнего уровня, кроме складов: у них нет численности и меню. */
+function topLevelObjects(objects: ObjectItem[]): ObjectItem[] {
+  return objects.filter((object) => !object.parentObjectId && object.type !== 'warehouse');
+}
+
+/** Единицы порционника в порядке объектов: объект, за ним его подобъекты. */
+function portionUnits(objects: ObjectItem[]): PortionUnit[] {
+  const units: PortionUnit[] = [];
+  for (const parent of topLevelObjects(objects)) {
+    const family = [parent, ...objects.filter((object) => object.parentObjectId === parent.id)];
+    for (const unit of family) {
+      if (unit.type === 'warehouse' || (unit.groups ?? []).length === 0) continue;
+      units.push({
+        id: unit.id,
+        name: unit.name,
+        parentId: parent.id,
+        parentName: parent.name,
+        groups: unit.groups ?? [],
+      });
+    }
+  }
+  return units;
 }
 
 /**
@@ -60,7 +95,7 @@ function kilogramsOf(portions: number, grams: number | null): number | null {
  */
 export function PortionsRoute() {
   const { current } = useOrganizations();
-  const objects = useMockCateringObjects();
+  const objects = useObjects();
   // Дата живёт в адресе страницы: перезагрузка или редирект (например,
   // обновление токена Logto) не сбрасывают выбор на сегодня.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -78,36 +113,16 @@ export function PortionsRoute() {
   const portions = usePortionsDay(date);
   // Вчерашние данные нужны только на будущей дате — иначе запрос выключен.
   const yesterday = usePortionsDay(date > todayIso() ? shiftIso(date, -1) : '');
-  const update = useUpdatePortionHeadcount();
+  const copyDay = useCopyPortionsDay();
   const toaster = useToaster();
 
-  // Объекты организации; селект готов к произвольному числу.
-  const objectsList = useMemo(() => objects.data?.objects ?? [], [objects.data]);
+  // Объекты верхнего уровня; селект готов к произвольному числу.
+  const objectsList = useMemo(() => topLevelObjects(objects.data?.objects ?? []), [objects.data]);
+  const units = useMemo(() => portionUnits(objects.data?.objects ?? []), [objects.data]);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
 
   const dishes = useDishDistribution(date, activeObjectId);
-
-  // Веса порций блюд из ТТК — для килограммов в раздаче. Отдаём всё одной
-  // выгрузкой; ключ кэша совпадает с ТТК, поэтому повторных запросов нет.
-  const recipes = useInfiniteMockRecipes({
-    search: '',
-    collectionId: '',
-    sort: 'name',
-    pageSize: 100,
-  });
-  const weightGramsByDish = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const page of recipes.data?.pages ?? []) {
-      for (const recipe of page.recipes) {
-        const grams = portionGramsOf(recipe.portionYield);
-        if (grams === null) continue;
-        const current = map.get(recipe.name);
-        if (current === undefined || grams > current) map.set(recipe.name, grams);
-      }
-    }
-    return map;
-  }, [recipes.data]);
 
   if (current === null) {
     return (
@@ -133,29 +148,26 @@ export function PortionsRoute() {
     );
   }
 
-  const subObjects = objects.data.objects.flatMap((unit) => unit.subObjects);
+  const subObjects = units;
   const query = searchQuery.trim().toLowerCase();
-  const objectOptions = objects.data.objects
+  const objectOptions = objectsList
     .filter((unit) => !query || unit.name.toLowerCase().includes(query))
     .map((unit) => ({ value: `object:${unit.id}`, content: unit.name }));
   const selectedUnit = selectedId.startsWith('object:')
-    ? (objects.data.objects.find((unit) => `object:${unit.id}` === selectedId) ?? null)
+    ? (objectsList.find((unit) => `object:${unit.id}` === selectedId) ?? null)
     : null;
-  const scopeSubObjects = selectedUnit ? selectedUnit.subObjects : subObjects;
+  const scopeSubObjects = selectedUnit
+    ? units.filter((unit) => unit.parentId === selectedUnit.id)
+    : units;
   // Подобъект → его главный объект (для подписи в таблице).
   const parentObjectName: Record<string, string> = {};
-  for (const unit of objects.data.objects) {
-    for (const subObject of unit.subObjects) parentObjectName[subObject.id] = unit.name;
-  }
+  for (const unit of units) parentObjectName[unit.id] = unit.parentName;
 
   const isFutureDate = date > todayIso();
   /** null — записи ещё нет (например, будущая дата): инпут показываем пустым. */
-  const headcountOf = (subObjectId: string, departmentId: string, tableId: string) => {
-    const entry = portions.data?.entries.find(
-      (item) =>
-        item.subObjectId === subObjectId &&
-        item.departmentId === departmentId &&
-        item.tableId === tableId
+  const headcountOf = (objectId: string, groupId: string, dietId: string) => {
+    const entry = (portions.data?.entries ?? []).find(
+      (item) => item.objectId === objectId && item.groupId === groupId && item.dietId === dietId
     );
     return entry ? entry.headcount : null;
   };
@@ -163,29 +175,20 @@ export function PortionsRoute() {
   // Сводка для печатного документа и скачивания — общая на оба сценария.
   const printData = buildPortionsPrintRows(scopeSubObjects, parentObjectName, headcountOf);
 
-  /** Копирует вчерашнюю численность на выбранную дату построчно. */
+  /** Копирует вчерашнюю численность на выбранную дату одним запросом. */
   const fillFromYesterday = () => {
-    const entries = yesterday.data?.entries ?? [];
-    for (const entry of entries) {
-      update.mutate(
-        {
-          date,
-          subObjectId: entry.subObjectId,
-          departmentId: entry.departmentId,
-          tableId: entry.tableId,
-          headcount: entry.headcount,
-        },
-        {
-          onError: (e) =>
-            toaster.add({
-              name: 'portions-fill',
-              title: 'Не удалось заполнить',
-              content: e.message,
-              theme: 'danger',
-            }),
-        }
-      );
-    }
+    copyDay.mutate(
+      { from: shiftIso(date, -1), to: date },
+      {
+        onError: (e) =>
+          toaster.add({
+            name: 'portions-fill',
+            title: 'Не удалось заполнить',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
   };
 
   return (
@@ -338,13 +341,13 @@ export function PortionsRoute() {
                   </Button>
                   {/* Кнопку заполнения показываем, пока день пуст; после
                       заполнения остаются только надпись и переход на сегодня. */}
-                  {subObjects.length > 0 && (portions.data?.entries.length ?? 0) === 0 && (
+                  {subObjects.length > 0 && (portions.data?.entries?.length ?? 0) === 0 && (
                     <Button
                       size="s"
                       view="action"
                       style={{ marginLeft: 'auto' }}
-                      loading={update.isPending}
-                      disabled={!yesterday.data || yesterday.data.entries.length === 0}
+                      loading={copyDay.isPending}
+                      disabled={!yesterday.data || (yesterday.data.entries?.length ?? 0) === 0}
                       onClick={fillFromYesterday}
                     >
                       Заполнить вчерашними данными
@@ -384,7 +387,6 @@ export function PortionsRoute() {
                   : (dishes.data?.rows ?? [])
               }
               totalPortions={dishes.data?.totalPortions ?? 0}
-              weightGramsByDish={weightGramsByDish}
             />
           )}
         </div>
@@ -442,9 +444,9 @@ function SummaryPortionsTable({
   headcountOf,
 }: {
   date: string;
-  subObjects: SubObject[];
+  subObjects: PortionUnit[];
   parentObjectName: Record<string, string>;
-  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null;
+  headcountOf: (objectId: string, groupId: string, dietId: string) => number | null;
 }) {
   const update = useUpdatePortionHeadcount();
   const toaster = useToaster();
@@ -456,9 +458,9 @@ function SummaryPortionsTable({
     update.mutate(
       {
         date,
-        subObjectId: row.subObjectId,
-        departmentId: row.departmentId,
-        tableId: row.tableId,
+        objectId: row.subObjectId,
+        groupId: row.departmentId,
+        dietId: row.tableId,
         headcount,
       },
       {
@@ -507,8 +509,8 @@ function SummaryPortionsTable({
         headcount: number | null;
         defaultHeadcount: number;
       }[] = [];
-      for (const department of subObject.departments) {
-        for (const table of department.tables) {
+      for (const department of subObject.groups) {
+        for (const table of department.diets ?? []) {
           const headcount = headcountOf(subObject.id, department.id, table.id);
           grand += headcount ?? 0;
           subObjectRows.push({
@@ -520,7 +522,8 @@ function SummaryPortionsTable({
             departmentName: department.name,
             tableName: table.name,
             headcount,
-            defaultHeadcount: table.headcount,
+            // Численности «по умолчанию» у диеты группы нет — плейсхолдер 0.
+            defaultHeadcount: 0,
           });
         }
       }
@@ -693,7 +696,6 @@ function DishesDistributionTable({
   onFill,
   rows,
   totalPortions,
-  weightGramsByDish,
 }: {
   loading: boolean;
   error: Error | null;
@@ -701,8 +703,6 @@ function DishesDistributionTable({
   onFill: () => void;
   rows: DishDistributionRow[];
   totalPortions: number;
-  /** Вес порции блюда (граммы) из ТТК по имени блюда. */
-  weightGramsByDish: ReadonlyMap<string, number>;
 }) {
   const tableRows = useMemo(() => {
     type DistRow = DishDistributionRow & {
@@ -744,7 +744,7 @@ function DishesDistributionTable({
         const sameSubObjectAsNext = next !== null && next.subObjectName === row.subObjectName;
         const sameDepartmentAsNext =
           sameSubObjectAsNext && next !== null && next.departmentName === row.departmentName;
-        const weightKg = kilogramsOf(row.portions, weightGramsByDish.get(row.dishName) ?? null);
+        const weightKg = kilogramsOf(row.portions, row.yieldNet ?? 0);
         dishPortions += row.portions;
         if (weightKg !== null) {
           dishKg += weightKg;
@@ -774,7 +774,8 @@ function DishesDistributionTable({
       result.push({
         id: `__dish-total-${dishName}`,
         dishName,
-        mealType: '',
+        mealId: dishRows[0].mealId,
+        yieldNet: 0,
         objectName: '',
         subObjectName: '',
         departmentName: '',
@@ -797,7 +798,8 @@ function DishesDistributionTable({
       result.push({
         id: '__grand-total',
         dishName: 'Общее количество всех блюд',
-        mealType: '',
+        mealId: rows[0].mealId,
+        yieldNet: 0,
         objectName: '',
         subObjectName: '',
         departmentName: '',
@@ -825,7 +827,7 @@ function DishesDistributionTable({
     }
 
     return result;
-  }, [rows, totalPortions, weightGramsByDish]);
+  }, [rows, totalPortions]);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
@@ -967,17 +969,17 @@ type PortionsPrintRow = {
 
 /** Сводная численность для печатного документа (экран и скачанный файл). */
 function buildPortionsPrintRows(
-  subObjects: SubObject[],
+  subObjects: PortionUnit[],
   parentObjectName: Record<string, string>,
-  headcountOf: (subObjectId: string, departmentId: string, tableId: string) => number | null
+  headcountOf: (objectId: string, groupId: string, dietId: string) => number | null
 ): { rows: PortionsPrintRow[]; grand: number } {
   const data: PortionsPrintRow[] = [];
   let grand = 0;
 
   for (const subObject of subObjects) {
     const block: Omit<PortionsPrintRow, 'showSubObject' | 'showDepartment' | 'parentName'>[] = [];
-    for (const department of subObject.departments) {
-      for (const table of department.tables) {
+    for (const department of subObject.groups) {
+      for (const table of department.diets ?? []) {
         const headcount = headcountOf(subObject.id, department.id, table.id);
         grand += headcount ?? 0;
         block.push({
