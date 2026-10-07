@@ -11,7 +11,7 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eye } from '@gravity-ui/icons';
+import { ArrowLeft, ArrowRotateLeft, ChevronLeft, ChevronRight, Eye } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
@@ -457,6 +457,7 @@ function MenuByDates() {
             onUpdate={(values) => setObjectId(values[0] ?? null)}
             options={objectOptions}
             disabled={objectsList.length === 0}
+            popupClassName="menu-object-select-popup"
           />
           <Select
             size="l"
@@ -485,6 +486,17 @@ function MenuByDates() {
             size="l"
             value={formatDateRange(startDate, CYCLE_DAYS)}
             readOnly
+            endContent={
+              <Button
+                view="normal"
+                size="s"
+                title="Вернуться к текущей неделе"
+                disabled={weekLoading}
+                onClick={() => goToWeek(startOfWeekMonday())}
+              >
+                <Icon data={ArrowRotateLeft} size={14} />
+              </Button>
+            }
           />
           <Button
             view="outlined"
@@ -494,14 +506,6 @@ function MenuByDates() {
             onClick={() => shiftPeriod(1)}
           >
             <Icon data={ChevronRight} size={16} />
-          </Button>
-          <Button
-            view="outlined"
-            size="l"
-            disabled={weekLoading}
-            onClick={() => goToWeek(startOfWeekMonday())}
-          >
-            Сегодня
           </Button>
           <Button
             type="button"

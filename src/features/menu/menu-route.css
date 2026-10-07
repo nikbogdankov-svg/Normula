@@ -5,9 +5,25 @@
   overflow-x: auto;
 }
 
+/* Панель выбора объекта: видно ~9.5 строк (size l — 36px на строку) плюс
+   поля списка 4+4px; при большем количестве объектов список скроллится внутри. */
+.g-select-popup.menu-object-select-popup {
+  max-height: calc(36px * 9.5 + 8px);
+}
+
+.g-select-popup.menu-object-select-popup .g-select-list {
+  min-height: 0;
+}
+
 .menu-week-field {
-  width: 210px;
+  width: 220px;
   flex-shrink: 0;
+}
+
+/* Иконка-кнопка в поле дат: правый отступ такой же, как у текста слева (12px),
+   а не дефолтные 3px у endContent. */
+.menu-week-field.g-text-input_size_l .g-text-input__additional-content_placement_end {
+  padding-inline-end: 12px;
 }
 
 .menu-week-field .g-text-input__control {
