@@ -1,9 +1,11 @@
 /**
- * Контракт раздела «Раскладка продуктов» (продукты на день).
+ * Контракт раздела «Раскладка продуктов» — GetProductSpread в
+ * portions.v1.PortionsService (api/portions/v1/portions.proto).
  *
- * Бэкенд считает из порционника (численность на дату), меню (приёмы пищи)
- * и ТТК (раскладка на порцию): сколько какого продукта идёт на каждое блюдо
- * и сколько всего надо выдать на кухню в этот день.
+ * Бэкенд считает из порционника (численность на дату), меню (расписание
+ * объекта и диеты) и ТТК (брутто ингредиентов на порцию): сколько какого
+ * продукта идёт на каждое блюдо и сколько всего надо выдать на кухню в этот
+ * день. Поиск по продуктам — на клиенте.
  */
 
 import type { MealId } from '@/features/menu/types';
@@ -31,15 +33,15 @@ export interface ProductSpreadItem {
   unit: string;
   /** Всего на день. */
   total: number;
-  /** Сколько на каждый приём пищи. */
-  byMeal: Record<ProductSpreadMealId, number>;
+  /** Сколько на каждый приём пищи; приёмов без расхода в ответе нет. */
+  byMeal: Partial<Record<ProductSpreadMealId, number>>;
   /** Авторазбивка между блюдами: 10 л молока → 3 л на кашу, 5 л на перловую… */
   dishes: ProductSpreadDishRow[];
 }
 
 export interface ProductSpreadResponse {
   date: string;
-  /** null — раскладка по всем объектам организации. */
-  objectId: string | null;
+  /** Объект из запроса; пусто — раскладка по всей организации. */
+  objectId?: string;
   items: ProductSpreadItem[];
 }

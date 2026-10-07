@@ -16,20 +16,6 @@ export function useDiets() {
   });
 }
 
-/**
- * Мок-диеты для меню, которое ещё на моках: его мок-меню ссылаются на
- * мок-диеты. Удаляется вместе с моками меню — тогда оно переходит на useDiets.
- */
-export function useMockDiets() {
-  const api = useApi();
-
-  return useQuery({
-    queryKey: [KEY, api.organizationId, 'mock'],
-    queryFn: () => api.request<ListDietsResponse>('/v1/mock/diets'),
-    enabled: api.organizationId !== null,
-  });
-}
-
 function useInvalidate() {
   const queryClient = useQueryClient();
 

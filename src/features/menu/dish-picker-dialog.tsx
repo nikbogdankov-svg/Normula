@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, Divider, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
 import { FloppyDisk, Magnifier, Plus, TrashBin } from '@gravity-ui/icons';
-import { useMockRecipes } from '@/features/ttk/api';
-import { formatMetric, parseRuNumber, sumDishes } from './norms';
-import type { MenuDishRef } from './types';
+import { useRecipes } from '@/features/ttk/api';
+import { formatMetric, sumPrice } from './norms';
+import type { Dish } from './types';
 
 /**
- * Выбор блюд из ТТК для одной ячейки меню (день + приём пищи).
+ * Блюдо в черновике ячейки: то, что есть и у блюда расписания, и у карты
+ * из списка ТТК. БЖУ у списка ТТК нет — после сохранения их отдаст бэкенд.
+ */
+export type PickedDish = Pick<Dish, 'recipeId' | 'name' | 'kcal' | 'price'>;
+
+/**
+ * Выбор блюд из ТТК для одной ячейки меню (дата + приём пищи).
  * Лимит цены можно превысить — показывается предупреждение.
  */
 export function DishPickerDialog({
@@ -21,41 +27,50 @@ export function DishPickerDialog({
 }: {
   open: boolean;
   title: string;
-  dishes: MenuDishRef[];
+  dishes: Dish[];
   /** Суточный лимит цены, ₽. */
   priceLimit: number;
   /** Сумма цен по другим приёмам этого дня (без текущей ячейки). */
   dayPriceWithoutSlot: number;
-  onSave: (dishes: MenuDishRef[], force?: boolean) => void;
+  onSave: (dishes: PickedDish[]) => void;
   onClose: () => void;
   saving?: boolean;
 }) {
   const [search, setSearch] = useState('');
-  const [draft, setDraft] = useState<MenuDishRef[]>([]);
+  const [draft, setDraft] = useState<PickedDish[]>([]);
   const wasOpen = useRef(false);
-  const recipes = useMockRecipes({ search, collectionId: '', sort: 'name' });
+  const recipes = useRecipes();
 
   // Синхронизируем черновик только при открытии — иначе ререндер родителя сбрасывает добавления.
   useEffect(() => {
     if (open && !wasOpen.current) {
       setSearch('');
-      setDraft(dishes.map((dish) => ({ ...dish })));
+      setDraft(
+        dishes.map((dish) => ({
+          recipeId: dish.recipeId,
+          name: dish.name,
+          kcal: dish.kcal,
+          price: dish.price,
+        }))
+      );
     }
     wasOpen.current = open;
   }, [open, dishes]);
 
-  const draftPrice = useMemo(() => sumDishes(draft).price, [draft]);
+  const draftPrice = useMemo(() => sumPrice(draft), [draft]);
   const dayPrice = dayPriceWithoutSlot + draftPrice;
   const overLimit = dayPrice > priceLimit;
   const remaining = priceLimit - dayPrice;
 
-  const available = useMemo(
-    () =>
-      (recipes.data?.recipes ?? []).filter(
-        (recipe) => !draft.some((dish) => dish.recipeId === recipe.id)
-      ),
-    [recipes.data?.recipes, draft]
-  );
+  /** Карты ТТК по поиску, по алфавиту, без уже выбранных. */
+  const available = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return (recipes.data?.recipes ?? [])
+      .filter((recipe) => !query || recipe.name.toLowerCase().includes(query))
+      .filter((recipe) => !draft.some((dish) => dish.recipeId === recipe.id))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  }, [recipes.data?.recipes, draft, search]);
 
   const add = (recipeId: string) => {
     const recipe = recipes.data?.recipes.find((item) => item.id === recipeId);
@@ -64,16 +79,7 @@ export function DishPickerDialog({
       if (current.some((dish) => dish.recipeId === recipe.id)) return current;
       return [
         ...current,
-        {
-          recipeId: recipe.id,
-          name: recipe.name,
-          kcal: recipe.kcal,
-          price: recipe.price,
-          protein: parseRuNumber(recipe.nutrition.protein),
-          fat: parseRuNumber(recipe.nutrition.fat),
-          carbs: parseRuNumber(recipe.nutrition.carbs),
-          portionYield: recipe.portionYield,
-        },
+        { recipeId: recipe.id, name: recipe.name, kcal: recipe.kcal, price: recipe.price },
       ];
     });
   };
@@ -99,7 +105,7 @@ export function DishPickerDialog({
                       {dish.name}
                     </Text>
                     <Text variant="body-1" color="secondary">
-                      {dish.kcal} ккал · {dish.price} ₽
+                      {formatMetric(dish.kcal)} ккал · {formatMetric(dish.price)} ₽
                     </Text>
                   </Flex>
                   <Button
@@ -163,8 +169,9 @@ export function DishPickerDialog({
                       <Text variant="body-2" ellipsis>
                         {recipe.name}
                       </Text>
-                      <Text variant="body-1" color={wouldExceed ? 'secondary' : 'secondary'}>
-                        {recipe.kcal} ккал · {recipe.price} ₽{wouldExceed && ' · превысит лимит'}
+                      <Text variant="body-1" color="secondary">
+                        {formatMetric(recipe.kcal)} ккал · {formatMetric(recipe.price)} ₽
+                        {wouldExceed && ' · превысит лимит'}
                       </Text>
                     </Flex>
                     <Button type="button" view="flat" size="s" onClick={() => add(recipe.id)}>

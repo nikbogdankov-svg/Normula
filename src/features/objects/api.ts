@@ -1,11 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
-import type {
-  CateringObjectsResponse,
-  CreateObjectRequest,
-  ListObjectsResponse,
-  UpdateObjectRequest,
-} from './types';
+import type { CreateObjectRequest, ListObjectsResponse, UpdateObjectRequest } from './types';
 
 const KEY = 'objects';
 
@@ -17,27 +12,6 @@ export function useObjects() {
     queryKey: [KEY, api.organizationId],
     queryFn: () => api.request<ListObjectsResponse>('/v1/objects'),
     enabled: api.organizationId !== null,
-  });
-}
-
-/**
- * Мок-объекты для разделов, которые ещё на моках (меню, порционник,
- * раскладка продуктов): их мок-данные завязаны на мок-объекты. Удаляется
- * вместе с их моками — тогда они переходят на useObjects, как склад.
- */
-export function useMockCateringObjects() {
-  const api = useApi();
-
-  return useQuery({
-    queryKey: [KEY, api.organizationId, 'mock'],
-    queryFn: () => api.request<CateringObjectsResponse>('/v1/mock/objects'),
-    enabled: api.organizationId !== null,
-    // Склады (тип 'warehouse') в планировании не участвуют: у них нет
-    // численности, меню и приёмов пищи. Меню/порционник/раскладка их не ждут.
-    select: (data) => ({
-      ...data,
-      objects: data.objects.filter((object) => object.type !== 'warehouse'),
-    }),
   });
 }
 

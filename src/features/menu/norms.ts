@@ -1,6 +1,7 @@
-import type { MenuDishRef } from './types';
+import type { Diet } from '@/features/diets/types';
+import type { Violation, ViolationMetric } from './types';
 
-/** Суточная норма на 1 человека (мок, пока нет справочника «Нормы»). */
+/** Суточная норма на 1 человека — из выбранной диеты: показывается рядом с итогом. */
 export interface DayNorm {
   kcal: number;
   protein: number;
@@ -19,31 +20,27 @@ export interface DayTotals {
 
 export type NormStatus = 'ok' | 'low' | 'high';
 
-/** Допуск относительно нормы, в долях (10%). */
-const TOLERANCE = 0.1;
-
-export const DAILY_NORMS: Record<string, DayNorm> = {
-  Основная: { kcal: 1800, protein: 90, fat: 60, carbs: 250, price: 450 },
-  Щадящая: { kcal: 1600, protein: 80, fat: 50, carbs: 220, price: 480 },
-  Диабетическая: { kcal: 1500, protein: 85, fat: 45, carbs: 180, price: 500 },
-};
-
-export function normForDiet(dietName: string): DayNorm {
-  return DAILY_NORMS[dietName] ?? DAILY_NORMS['Основная'];
+/** Статус метрики дня по нарушениям с бэкенда; нет в списке — «ок». */
+export function statusOf(violations: Violation[], metric: ViolationMetric): NormStatus {
+  return violations.find((item) => item.metric === metric)?.status ?? 'ok';
 }
 
-export function parseRuNumber(value: string | number | undefined): number {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  if (!value) return 0;
-  const parsed = Number(
-    String(value)
-      .replace(',', '.')
-      .replace(/[^\d.-]/g, '')
-  );
-  return Number.isFinite(parsed) ? parsed : 0;
+/**
+ * Норма дня из диеты — для показа «итог / норма» и лимита цены в диалоге
+ * блюд. Без диеты (ещё не выбрана или удалена из справочника) — нули.
+ */
+export function dietNorm(diet: Diet | undefined): DayNorm {
+  if (!diet) return { kcal: 0, protein: 0, fat: 0, carbs: 0, price: 0 };
+  return {
+    kcal: diet.kcal,
+    protein: diet.protein,
+    fat: diet.fat,
+    carbs: diet.carbs,
+    price: diet.pricePerDay,
+  };
 }
 
-export function sumDishes(dishes: MenuDishRef[]): DayTotals {
+export function sumDishes(dishes: DayTotals[]): DayTotals {
   return dishes.reduce(
     (sum, dish) => ({
       kcal: sum.kcal + (dish.kcal || 0),
@@ -56,32 +53,9 @@ export function sumDishes(dishes: MenuDishRef[]): DayTotals {
   );
 }
 
-export function compareToNorm(actual: number, norm: number): NormStatus {
-  if (norm <= 0) return 'ok';
-  if (actual < norm * (1 - TOLERANCE)) return 'low';
-  if (actual > norm * (1 + TOLERANCE)) return 'high';
-  return 'ok';
-}
-
-/**
- * Цена — жёсткий потолок: превышение лимита недопустимо (без +10%).
- * Ниже лимита более чем на допуск — «мало», иначе ок.
- */
-export function comparePriceToLimit(actual: number, limit: number): NormStatus {
-  if (limit <= 0) return 'ok';
-  if (actual > limit) return 'high';
-  if (actual < limit * (1 - TOLERANCE)) return 'low';
-  return 'ok';
-}
-
-/** Можно ли добавить блюдо, не превысив суточный лимит цены. */
-export function canAddWithinPriceLimit(
-  dayPriceWithoutSlot: number,
-  slotDraftPrice: number,
-  dishPrice: number,
-  limit: number
-): boolean {
-  return dayPriceWithoutSlot + slotDraftPrice + dishPrice <= limit;
+/** Сумма цен — для диалога выбора блюд, где у карт из списка ТТК нет БЖУ. */
+export function sumPrice(items: { price: number }[]): number {
+  return items.reduce((sum, item) => sum + (item.price || 0), 0);
 }
 
 export function formatMetric(value: number, digits = 0): string {

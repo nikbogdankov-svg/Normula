@@ -1,12 +1,19 @@
 /**
- * Контракт раздела «Порционник» (ПОРЦ-01…03).
- * Численность на дату по ЛПУ → отделениям → столам.
+ * Контракт раздела «Порционник» — portions.v1.PortionsService в
+ * onemore-admin (api/portions/v1/portions.proto).
+ *
+ * Численность задаётся на дату по объекту (или подобъекту) → его группе →
+ * диете группы. Ноль хранится: «заполнили нулём» отличается от «не
+ * заполняли». Раздача по блюдам считается бэкендом из численности,
+ * расписания меню того же объекта и диеты и карт ТТК.
  */
+import type { MealId } from '@/features/menu/types';
 
 export interface PortionEntry {
-  subObjectId: string;
-  departmentId: string;
-  tableId: string;
+  /** Объект или подобъект, которому принадлежит группа. */
+  objectId: string;
+  groupId: string;
+  dietId: string;
   headcount: number;
 }
 
@@ -15,12 +22,19 @@ export interface PortionsDayResponse {
   entries: PortionEntry[];
 }
 
+/** Тело PATCH /v1/portions/headcount. */
 export interface UpdatePortionHeadcountRequest {
   date: string;
-  subObjectId: string;
-  departmentId: string;
-  tableId: string;
+  objectId: string;
+  groupId: string;
+  dietId: string;
   headcount: number;
+}
+
+/** Тело POST /v1/portions/copy: уже заполненные строки дня `to` не трогаются. */
+export interface CopyPortionsDayRequest {
+  from: string;
+  to: string;
 }
 
 /** Верхний переключатель экрана. */
@@ -29,12 +43,18 @@ export type PortionsView = 'organizations' | 'dishes';
 /** Строка раздачи по блюдам. */
 export interface DishDistributionRow {
   dishName: string;
-  mealType: string;
+  mealId: MealId;
+  /** Объект верхнего уровня. */
   objectName: string;
+  /** Объект или подобъект, которому принадлежит группа. */
   subObjectName: string;
+  /** Группа. */
   departmentName: string;
+  /** Диета группы. */
   tableName: string;
   portions: number;
+  /** Чистый выход порции из карты ТТК, граммы; 0 — не задан. */
+  yieldNet: number;
 }
 
 export interface DishDistributionResponse {
