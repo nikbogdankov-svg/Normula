@@ -1,14 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import { Button, Drawer, Flex, Icon, Table, Text, type TableColumnConfig } from '@gravity-ui/uikit';
-import { Printer, Xmark } from '@gravity-ui/icons';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Button,
+  Drawer,
+  Flex,
+  Icon,
+  Select,
+  Table,
+  Text,
+  type TableColumnConfig,
+} from '@gravity-ui/uikit';
+import { ArrowDown, ArrowUp, ArrowUpArrowDown, Printer, Xmark } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
+import { useObjects } from '@/features/objects/api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './accounts-route.css';
 import './accounts-drawer.css';
 
+/** Значение фильтра «Все объекты». */
+const ALL_OBJECTS = 'all';
+
+/** Единственная сортируемая колонка — дата счёта. */
+type AccountSort = 'date';
+
 const ACCOUNT_ROWS = [
   {
+    objectId: 'sub-2-1',
     date: '12.08.2026',
     organization: 'Школа №5',
     passed: 312,
@@ -36,7 +53,8 @@ const ACCOUNT_ROWS = [
     ],
   },
   {
-    date: '12.08.2026',
+    objectId: 'sub-2-5',
+    date: '10.08.2026',
     organization: 'Детский сад №3',
     passed: 198,
     charged: 79200,
@@ -62,32 +80,6 @@ const ACCOUNT_ROWS = [
 
 type AccountRow = (typeof ACCOUNT_ROWS)[number];
 
-/** Колонки списка счетов — те же, что у таблицы ТТК. */
-const ACCOUNT_COLUMNS: TableColumnConfig<AccountRow>[] = [
-  {
-    id: 'date',
-    name: 'Дата',
-    template: (row) => <Text variant="body-2">{row.date}</Text>,
-  },
-  {
-    id: 'organization',
-    name: 'Организация',
-    template: (row) => <Text variant="body-2">{row.organization}</Text>,
-  },
-  {
-    id: 'passed',
-    name: 'Прошли',
-    align: 'end',
-    template: (row) => <Text variant="body-2">{row.passed} чел.</Text>,
-  },
-  {
-    id: 'charged',
-    name: 'Списано',
-    align: 'end',
-    template: (row) => <Text variant="body-2">{row.charged.toLocaleString('ru-RU')} ₽</Text>,
-  },
-];
-
 export function AccountsRoute() {
   const { current } = useOrganizations();
   const height = useDrawerHeight();
@@ -95,6 +87,42 @@ export function AccountsRoute() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<AccountRow | null>(null);
   const allowCloseRef = useRef(false);
+
+  // Фильтр и сортировка живут на клиенте: счета приходят целиком.
+  const [objectId, setObjectId] = useState(ALL_OBJECTS);
+  const [sort, setSort] = useState<AccountSort>('date');
+  const [ascending, setAscending] = useState(false);
+  const objects = useObjects();
+
+  const objectFilterOptions = useMemo(() => {
+    const all = objects.data?.objects ?? [];
+    return [
+      { value: ALL_OBJECTS, content: 'Все объекты' },
+      ...all.map((object) => ({ value: object.id, content: object.name })),
+    ];
+  }, [objects.data]);
+
+  const rows = useMemo(() => {
+    const byId = new Map((objects.data?.objects ?? []).map((object) => [object.id, object]));
+    const direction = ascending ? 1 : -1;
+
+    return ACCOUNT_ROWS.filter((row) => {
+      if (objectId === ALL_OBJECTS) return true;
+      // Счёт выписан подобъекту; выбор родительского объекта показывает
+      // все его счета.
+      const rowObject = byId.get(row.objectId);
+      return row.objectId === objectId || rowObject?.parentObjectId === objectId;
+    }).sort((a, b) => (parseAccountDate(a.date) - parseAccountDate(b.date)) * direction);
+  }, [objectId, ascending, objects.data]);
+
+  const onSort = (column: AccountSort) => {
+    if (sort === column) {
+      setAscending((value) => !value);
+    } else {
+      setSort(column);
+      setAscending(true);
+    }
+  };
 
   useEffect(() => {
     if (!selected) {
@@ -141,19 +169,28 @@ export function AccountsRoute() {
 
   return (
     <div className="ac-page">
+      <Flex className="ac-page__toolbar" alignItems="center" gap={2} wrap>
+        <Select
+          size="l"
+          width={280}
+          label="Объект:"
+          value={[objectId]}
+          onUpdate={(value) => setObjectId(value[0] ?? ALL_OBJECTS)}
+          options={objectFilterOptions}
+          disabled={objects.isPending}
+        />
+        <Text variant="body-1" color="secondary">
+          {objectId === ALL_OBJECTS ? `Всего счетов: ${rows.length}` : `Найдено: ${rows.length}`}
+        </Text>
+      </Flex>
       <div className="ac-page__scroll">
-        <div className="ac-page__header">
-          <Table width="max" className="admin-table" data={[]} columns={ACCOUNT_COLUMNS} />
-        </div>
-        <div className="admin-table-wrap">
-          <Table
-            width="max"
-            className="admin-table ac-page__table-body"
-            data={ACCOUNT_ROWS}
-            onRowClick={(row) => setSelected(row)}
-            columns={ACCOUNT_COLUMNS}
-          />
-        </div>
+        <AccountsTable
+          rows={rows}
+          sort={sort}
+          ascending={ascending}
+          onSort={onSort}
+          onOpen={(row) => setSelected(row)}
+        />
       </div>
 
       <Drawer
@@ -225,4 +262,119 @@ export function AccountsRoute() {
       </Drawer>
     </div>
   );
+}
+
+/** Шапка таблицы закреплена, скроллится только список строк. */
+function AccountsTable({
+  rows,
+  sort,
+  ascending,
+  onSort,
+  onOpen,
+}: {
+  rows: AccountRow[];
+  sort: AccountSort;
+  ascending: boolean;
+  onSort: (column: AccountSort) => void;
+  onOpen: (row: AccountRow) => void;
+}) {
+  const columns: TableColumnConfig<AccountRow>[] = [
+    {
+      id: 'date',
+      name: () => (
+        <SortableHeader
+          label="Дата"
+          column="date"
+          sort={sort}
+          ascending={ascending}
+          onSort={onSort}
+        />
+      ),
+      template: (row) => <Text variant="body-2">{row.date}</Text>,
+    },
+    {
+      id: 'organization',
+      name: 'Организация',
+      template: (row) => <Text variant="body-2">{row.organization}</Text>,
+    },
+    {
+      id: 'passed',
+      name: 'Прошли',
+      align: 'end',
+      template: (row) => <Text variant="body-2">{row.passed} чел.</Text>,
+    },
+    {
+      id: 'charged',
+      name: 'Списано',
+      align: 'end',
+      template: (row) => <Text variant="body-2">{row.charged.toLocaleString('ru-RU')} ₽</Text>,
+    },
+  ];
+
+  return (
+    <>
+      <div className="ac-page__header">
+        <Table width="max" className="admin-table" data={[]} columns={columns} />
+      </div>
+      <div className="admin-table-wrap">
+        <Table
+          width="max"
+          className="admin-table ac-page__table-body"
+          data={rows}
+          onRowClick={onOpen}
+          columns={columns}
+        />
+      </div>
+    </>
+  );
+}
+
+/** Заголовок «Дата» с переключением направления сортировки по клику. */
+function SortableHeader({
+  label,
+  column,
+  sort,
+  ascending,
+  onSort,
+}: {
+  label: string;
+  column: AccountSort;
+  sort: AccountSort;
+  ascending: boolean;
+  onSort: (column: AccountSort) => void;
+}) {
+  const active = sort === column;
+  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+
+  return (
+    <Flex
+      alignItems="center"
+      gap={1}
+      style={{ cursor: 'pointer', userSelect: 'none' }}
+      onClick={() => onSort(column)}
+      title={
+        active
+          ? ascending
+            ? 'По возрастанию — нажмите для убывания'
+            : 'По убыванию — нажмите для возрастания'
+          : `Сортировать по: ${label}`
+      }
+    >
+      {label}
+      <span
+        style={{
+          display: 'inline-flex',
+          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
+        }}
+      >
+        <Icon data={icon} size={14} />
+      </span>
+    </Flex>
+  );
+}
+
+/** Дата вида «ДД.ММ.ГГГГ» в число для сравнения. */
+function parseAccountDate(value: string): number {
+  const [day, month, year] = value.split('.').map(Number);
+  return new Date(year, month - 1, day).getTime();
 }
