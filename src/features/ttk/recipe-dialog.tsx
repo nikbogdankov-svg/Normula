@@ -273,7 +273,7 @@ export function RecipeDialog({
                   <>
                     <Label theme="normal" size="s">
                       Выход: {view.yieldNet}
-                      {view.yieldLoss ? ` (потери ${view.yieldLoss})` : ''}
+                      {view.yieldLoss !== undefined && view.yieldLoss !== 0 ? ` / ${view.yieldLoss}` : ''}
                     </Label>
                     <Label theme="normal" size="s">
                       {formatMoney(view.price)}

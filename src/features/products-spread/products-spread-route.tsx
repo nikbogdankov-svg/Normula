@@ -160,7 +160,6 @@ export function ProductsSpreadRoute() {
             </SegmentedRadioGroup>
             <Button size="l" view="normal-contrast" onClick={() => window.print()} title="Печать">
               <Icon data={Printer} size={16} />
-              Печать
             </Button>
           </Flex>
         </Flex>
