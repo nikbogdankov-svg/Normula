@@ -105,6 +105,10 @@ export function ProductsSpreadRoute() {
   const loading = spread.isPending || objects.isPending;
   const error = spread.isError || objects.isError;
 
+  // Подтвердить списание можно только за сегодня и завтра; более поздние
+  // даты — только просмотр.
+  const canConfirm = date <= shiftIso(todayIso(), 1);
+
   return (
     <div className="products-spread-page">
       <Flex className="products-spread-page__toolbar" direction="column" gap={3} wrap>
@@ -195,7 +199,7 @@ export function ProductsSpreadRoute() {
               <Text variant="body-1" color="secondary">
                 Товары уже списаны со склада
               </Text>
-            ) : (
+            ) : canConfirm ? (
               <Button
                 size="l"
                 view="action"
@@ -205,6 +209,10 @@ export function ProductsSpreadRoute() {
                 <Icon data={CircleCheck} size={16} />
                 Подтвердить списание товаров
               </Button>
+            ) : (
+              <Text variant="body-1" color="secondary">
+                Подтвердить раскладку возможно только для сегодняшнего либо завтрашнего дня
+              </Text>
             )}
           </Flex>
         </Flex>

@@ -8,7 +8,7 @@ import {
   Table,
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
-import { ArrowRightArrowLeft, Magnifier } from '@gravity-ui/icons';
+import { Magnifier, Plus } from '@gravity-ui/icons';
 import {
   EmptyState,
   ErrorState,
@@ -137,7 +137,7 @@ export function WarehouseTransfersRoute() {
           />
         </Flex>
         <Button view="normal-contrast" size="l" onClick={() => setCreateOpen(true)}>
-          <Icon data={ArrowRightArrowLeft} size={16} />
+          <Icon data={Plus} size={16} />
           Добавить перемещение
         </Button>
       </Flex>
