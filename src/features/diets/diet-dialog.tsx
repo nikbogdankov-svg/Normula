@@ -29,17 +29,15 @@ function NutritionRow({ label, value, suffix }: { label: string; value: number; 
   );
 }
 
-/**
- * Карточка диеты как модалка (popup size s).
- * Просмотр и редактирование — в одной панели: оба режима остаются в DOM,
- * чтобы смена содержимого не закрывала модалку.
- */
+/** Режим, в котором открыть диалог при новом diet. */
 export function DietDialog({
   diet,
+  initialMode = 'view',
   onClose,
   onDietChange,
 }: {
   diet: Diet | null;
+  initialMode?: 'view' | 'edit' | 'confirm-delete';
   onClose: () => void;
   onDietChange?: (diet: Diet) => void;
 }) {
@@ -66,7 +64,8 @@ export function DietDialog({
   useEffect(() => {
     if (!diet) return;
 
-    setMode('view');
+    setEditKey((key) => key + 1);
+    setMode(initialMode);
     setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- открытие по id диеты
   }, [diet?.id]);
@@ -101,11 +100,10 @@ export function DietDialog({
       { id: view.id, body: form.getBody() },
       {
         onSuccess: (data) => {
-          setView(data.diet);
-          setMode('view');
           onDietChange?.(data.diet);
           toaster.add({ name: 'diet-updated', title: 'Диета сохранена', theme: 'success' });
           void queryClient.invalidateQueries({ queryKey: ['diets'] });
+          requestClose();
         },
         onError: (e) =>
           toaster.add({
@@ -123,7 +121,7 @@ export function DietDialog({
   };
 
   const cancelDelete = () => {
-    setMode('view');
+    requestClose();
   };
 
   const runDelete = (deletionMode: 'soft' | 'immediate') => {

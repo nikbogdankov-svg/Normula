@@ -1,14 +1,6 @@
 import { useState } from 'react';
-import {
-  Table,
-  Text,
-  TextInput,
-  Flex,
-  Icon,
-  Button,
-  type TableColumnConfig,
-} from '@gravity-ui/uikit';
-import { Magnifier, Plus } from '@gravity-ui/icons';
+import { Button, Flex, Icon, Label, Text, TextInput } from '@gravity-ui/uikit';
+import { Magnifier, Pencil, Plus, TrashBin } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -20,6 +12,7 @@ import { useDiets } from './api';
 import type { Diet } from './types';
 import { DietDialog } from './diet-dialog';
 import { CreateDietDialog } from './create-diet-dialog';
+import { MEALS } from '@/features/menu/types';
 import './diets-route.css';
 
 const FACILITY_TYPE_LABELS: Record<string, string> = {
@@ -29,51 +22,130 @@ const FACILITY_TYPE_LABELS: Record<string, string> = {
   warehouse: 'Склад',
 };
 
-function formatAppliesTo(diet: Diet): string {
-  const labels = diet.appliesTo.map((type) => FACILITY_TYPE_LABELS[type]).filter(Boolean);
-  return labels.join(', ') || '—';
+/** Цвет тэга заведения: дружелюбный к виду организации. */
+const FACILITY_THEME: Record<string, 'info' | 'success' | 'danger' | 'warning' | 'utility'> = {
+  school: 'info',
+  kindergarten: 'success',
+  hospital: 'danger',
+  warehouse: 'utility',
+};
+
+/** Карточка диеты: заведения, приёмы пищи, нормы на день и действия. */
+function DietCard({
+  diet,
+  onEdit,
+  onDelete,
+}: {
+  diet: Diet;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const meals = diet.mealIds
+    .map((mealId) => MEALS.find((meal) => meal.id === mealId)?.label)
+    .filter(Boolean);
+
+  return (
+    <div className="diets-card">
+      <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ width: '100%' }}>
+        <Flex alignItems="center" gap={2} wrap>
+          <Text variant="subheader-2">{diet.name}</Text>
+          <div className="diets-card__tags">
+            {diet.appliesTo.map((type) => (
+              <Label key={type} theme={FACILITY_THEME[type]}>
+                {FACILITY_TYPE_LABELS[type] ?? type}
+              </Label>
+            ))}
+          </div>
+        </Flex>
+        <Flex gap={1}>
+          <Button
+            size="m"
+            view="flat"
+            title="Редактировать"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+          >
+            <Icon data={Pencil} size={18} />
+          </Button>
+          <Button
+            size="m"
+            view="flat"
+            title="Удалить"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Icon data={TrashBin} size={18} />
+          </Button>
+        </Flex>
+      </Flex>
+      <div className="diets-card__tags">
+        {meals.length === 0
+          ? null
+          : meals.map((label) => (
+              <span key={label} className="diets-card__tag">
+                {label}
+              </span>
+            ))}
+      </div>
+      <Text variant="body-2" style={{ marginTop: 4 }}>
+        {diet.pricePerDay} ₽ · {diet.kcal}ккал · Б: {diet.protein}г · Ж: {diet.fat}г · У:{' '}
+        {diet.carbs}г
+      </Text>
+    </div>
+  );
 }
 
-/** Раздел «Диеты»: справочник рационов питания, использующийся в объектах и меню. */
+/** Раздел «Диеты»: справочник рационов питания в виде карточек. */
 export function DietsRoute() {
   const { current } = useOrganizations();
-  const [search, setSearch] = useState('');
-  const [opened, setOpened] = useState<Diet | null>(null);
+  const [editing, setEditing] = useState<Diet | null>(null);
+  const [deleting, setDeleting] = useState<Diet | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   const { data, isPending, isError, error, refetch } = useDiets();
 
-  const diets = (data?.diets ?? []).filter((diet) =>
-    diet.name.toLowerCase().includes(search.trim().toLowerCase())
-  );
+  const diets = data?.diets ?? [];
+  const query = search.trim().toLowerCase();
+  const filteredDiets = query
+    ? diets.filter((diet) => diet.name.toLowerCase().includes(query))
+    : diets;
 
   return (
     <div className="diets-page">
-      <Flex className="diets-page__toolbar" direction="column" gap={3} wrap>
-        <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
-          <Text variant="body-1" color="secondary"></Text>
-          <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
-            <Icon data={Plus} size={16} />
-            Создать диету
-          </Button>
-        </Flex>
-        <TextInput
-          size="xl"
-          placeholder="Поиск по названию"
-          value={search}
-          onUpdate={setSearch}
-          hasClear
-          startContent={
-            <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
-              <Icon data={Magnifier} size={20} />
-            </span>
-          }
-        />
-        {data && (
+      <Flex
+        className="diets-page__toolbar"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={2}
+        wrap
+      >
+        <Flex alignItems="center" gap={2} wrap>
+          <TextInput
+            size="l"
+            placeholder="Поиск по названию диеты"
+            value={search}
+            onUpdate={setSearch}
+            hasClear
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <Icon data={Magnifier} size={16} />
+              </span>
+            }
+            style={{ width: 280 }}
+          />
           <Text variant="body-1" color="secondary">
-            {search.trim() ? `Найдено: ${diets.length}` : `Всего диет: ${diets.length}`}
+            {data ? `Всего диет: ${diets.length}` : ''}
           </Text>
-        )}
+        </Flex>
+        <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
+          <Icon data={Plus} size={16} />
+          Создать диету
+        </Button>
       </Flex>
 
       <div className="diets-page__scroll">
@@ -81,52 +153,40 @@ export function DietsRoute() {
           {current === null && <NoOrganizationSelectedState />}
           {current !== null && isPending && <LoadingState />}
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
-          {data && !isPending && !isError && diets.length === 0 && (
-            <EmptyState text={search.trim() ? 'Ничего не нашли по запросу' : 'Диет пока нет'} />
+          {data && !isPending && !isError && filteredDiets.length === 0 && (
+            <EmptyState
+              text={query ? `Ничего не нашли по запросу «${search.trim()}»` : 'Диет пока нет'}
+            />
           )}
 
-          {data && diets.length > 0 && <DietsTable diets={diets} onOpen={setOpened} />}
+          {data && filteredDiets.length > 0 && (
+            <div className="diets-page__cards">
+              {filteredDiets.map((diet) => (
+                <DietCard
+                  key={diet.id}
+                  diet={diet}
+                  onEdit={() => setEditing(diet)}
+                  onDelete={() => setDeleting(diet)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <DietDialog diet={opened} onClose={() => setOpened(null)} onDietChange={setOpened} />
+      <DietDialog
+        diet={editing}
+        initialMode="edit"
+        onClose={() => setEditing(null)}
+        onDietChange={setEditing}
+      />
+      <DietDialog
+        diet={deleting}
+        initialMode="confirm-delete"
+        onClose={() => setDeleting(null)}
+        onDietChange={setDeleting}
+      />
       <CreateDietDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
-  );
-}
-
-function DietsTable({ diets, onOpen }: { diets: Diet[]; onOpen: (diet: Diet) => void }) {
-  const columns: TableColumnConfig<Diet>[] = [
-    {
-      id: 'name',
-      name: 'Название',
-      template: (row) => <Text variant="body-2">{row.name}</Text>,
-    },
-    {
-      id: 'appliesTo',
-      name: 'Доступна для',
-      template: (row) => (
-        <Text variant="body-2" color="secondary">
-          {formatAppliesTo(row)}
-        </Text>
-      ),
-    },
-  ];
-
-  return (
-    <>
-      <div className="diets-page__header">
-        <Table width="max" className="admin-table" data={[]} columns={columns} />
-      </div>
-      <div className="admin-table-wrap">
-        <Table
-          width="max"
-          className="admin-table diets-page__table-body"
-          data={diets}
-          onRowClick={(row) => onOpen(row)}
-          columns={columns}
-        />
-      </div>
-    </>
   );
 }
