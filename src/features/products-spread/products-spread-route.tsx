@@ -14,7 +14,7 @@ import {
   Table,
 } from '@gravity-ui/uikit';
 import type { TableColumnConfig } from '@gravity-ui/uikit';
-import { ChevronLeft, ChevronRight, Magnifier, Printer } from '@gravity-ui/icons';
+import { ChevronLeft, ChevronRight, CircleCheck, Magnifier, Printer } from '@gravity-ui/icons';
 import { useObjects } from '@/features/objects/api';
 import { useOrganizations } from '@/shared/auth';
 import {
@@ -72,6 +72,8 @@ export function ProductsSpreadRoute() {
   const [viewMode, setViewMode] = useState<SpreadView>('meals');
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ProductSpreadItem | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   // Объекты верхнего уровня, кроме складов: раскладка идёт по объекту вместе
   // с его подобъектами.
@@ -177,11 +179,34 @@ export function ProductsSpreadRoute() {
             }
             style={{ width: '100%' }}
           />
-          {spread.data && (
-            <Text variant="body-1" color="secondary">
-              {hasFilters ? `Найдено: ${items.length} продуктов` : `Всего продуктов: ${total}`}
-            </Text>
-          )}
+          <Flex
+            alignItems="flex-start"
+            justifyContent="space-between"
+            gap={2}
+            wrap
+            style={{ marginTop: 4, marginBottom: 4 }}
+          >
+            {spread.data && (
+              <Text variant="body-1" color="secondary">
+                {hasFilters ? `Найдено: ${items.length} продуктов` : `Всего продуктов: ${total}`}
+              </Text>
+            )}
+            {confirmed ? (
+              <Text variant="body-1" color="secondary">
+                Товары уже списаны со склада
+              </Text>
+            ) : (
+              <Button
+                size="l"
+                view="action"
+                title="Подтвердить списание товаров"
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Icon data={CircleCheck} size={16} />
+                Подтвердить списание товаров
+              </Button>
+            )}
+          </Flex>
         </Flex>
       </Flex>
 
@@ -208,7 +233,46 @@ export function ProductsSpreadRoute() {
       </div>
 
       <ProductSpreadDialog item={selectedItem} onClose={() => setSelected(null)} />
+
+      <ConfirmSpreadDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmed(true);
+          setConfirmOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+/** Попап подтверждения списания: действие необратимо. */
+function ConfirmSpreadDialog({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onClose={onClose} size="s" className="products-spread-confirm-dialog">
+      <Dialog.Header caption="Подтверждение списания" />
+      <Dialog.Divider />
+      <Dialog.Body>
+        <Flex direction="column" gap={2}>
+          <Text variant="body-2">Проверьте информацию, изменить это будет нельзя.</Text>
+        </Flex>
+      </Dialog.Body>
+      <Dialog.Divider />
+      <Dialog.Footer
+        textButtonApply="Подтвердить"
+        textButtonCancel="Отмена"
+        onClickButtonApply={onConfirm}
+        onClickButtonCancel={onClose}
+      />
+    </Dialog>
   );
 }
 

@@ -92,6 +92,13 @@
   width: 45%;
 }
 
+/* Цене — фиксированная ширина, чтобы значение входило целиком даже на узких
+   окнах: в table-layout: fixed min-width ячеек игнорируется, работает только
+   явная ширина. */
+.ttk-page__header .admin-table .g-table__head .g-table__cell:nth-child(3) {
+  width: 140px;
+}
+
 .ttk-page__header .admin-table .g-table__head .g-table__cell:last-child {
   width: 8%;
   border-radius: 0 6px 6px 0;
@@ -201,6 +208,13 @@
 /* Сборнику — больше места, чтобы название входило целиком. */
 .ttk-page__scroll .admin-table .g-table__cell:nth-child(2) {
   width: 45%;
+}
+
+/* Цене — фиксированная ширина, чтобы значение входило целиком даже на узких
+   окнах: в table-layout: fixed min-width ячеек игнорируется, работает только
+   явная ширина. */
+.ttk-page__scroll .admin-table .g-table__cell:nth-child(3) {
+  width: 140px;
 }
 
 .ttk-page__scroll .admin-table .g-table__cell:last-child {
