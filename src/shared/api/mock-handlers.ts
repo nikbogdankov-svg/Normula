@@ -8,6 +8,7 @@ import type {
 import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/types';
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { ObjectItem } from '@/features/objects/types';
+import type { ProductSpreadItem, ProductSpreadResponse } from '@/features/products-spread/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -27,8 +28,9 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * сразу пойдут по сети, без правок в фичах.
  */
 export const MOCKED_PREFIXES: string[] = [
-  // Все разделы уже на бэке. Новый раздел без ручек регистрирует здесь
-  // свой префикс, пока бэкенд не появится.
+  // TEMP-MOCK «Раскладка продуктов»: на стенде данных ещё нет, раскладка
+  // нужна для отладки порционника. Убрать, когда появится за подтверждением.
+  '/v1/products-spread',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -251,7 +253,18 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
   const [route, search] = path.split('?');
   const params = new URLSearchParams(search);
 
-  // Мок-двойник карт ТТК для разделов на моках: только чтение.
+  // TEMP-MOCK «Раскладка продуктов»: стендовые данные до сих пор пустые,
+  // поэтому раскладка нужна для отладки порционника (пока мок не уберём).
+  if (route === '/v1/products-spread' && method === 'GET') {
+    const dateParam = params.get('date') ?? '';
+    const objectId = params.get('objectId') ?? undefined;
+    const response: ProductSpreadResponse = objectId
+      ? { date: dateParam, objectId, items: mockProductSpreadItems }
+      : { date: dateParam, items: mockProductSpreadItems };
+
+    return response as T;
+  }
+
   // Администрирование: персонал и роли (staff.v1.StaffService)
   if (route === '/v1/staff-roles' && method === 'GET') {
     return { roles: staffRoles } as T;
@@ -472,3 +485,106 @@ function syncMemberCount(organizationId: string) {
   const org = organizations.find((o) => o.id === organizationId);
   if (org) org.memberCount = (members[organizationId] ?? []).length;
 }
+
+/**
+ * TEMP-MOCK: правдоподобная раскладка продуктов на день. Отдаётся в ответ на
+ * любой запрошенный день; забрать вместе с обработчиком /v1/products-spread.
+ */
+const mockProductSpreadItems: ProductSpreadItem[] = [
+  {
+    productId: 'p-milk',
+    productName: 'Молоко, 3,2%',
+    unit: 'л',
+    total: 38.5,
+    byMeal: { breakfast: 15.0, second_breakfast: 3.5, lunch: 15.0, snack: 5.0 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Каша молочная рисовая', portions: 125, quantity: 15.0 },
+      { mealId: 'second_breakfast', dishName: 'Печенье с молоком', portions: 125, quantity: 3.5 },
+      { mealId: 'lunch', dishName: 'Суп-лапша молочный', portions: 125, quantity: 15.0 },
+      { mealId: 'snack', dishName: 'Какао', portions: 100, quantity: 5.0 },
+    ],
+  },
+  {
+    productId: 'p-potato',
+    productName: 'Картофель',
+    unit: 'кг',
+    total: 42.5,
+    byMeal: { lunch: 30.0, dinner: 12.5 },
+    dishes: [
+      { mealId: 'lunch', dishName: 'Пюре картофельное', portions: 120, quantity: 30.0 },
+      { mealId: 'dinner', dishName: 'Картофель отварной', portions: 100, quantity: 12.5 },
+    ],
+  },
+  {
+    productId: 'p-chicken',
+    productName: 'Курица (филе)',
+    unit: 'кг',
+    total: 16.2,
+    byMeal: { breakfast: 3.2, lunch: 9.0, dinner: 4.0 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Омлет с курицей', portions: 80, quantity: 3.2 },
+      { mealId: 'lunch', dishName: 'Курица отварная', portions: 125, quantity: 9.0 },
+      { mealId: 'dinner', dishName: 'Тушёная курица с овощами', portions: 100, quantity: 4.0 },
+    ],
+  },
+  {
+    productId: 'p-carrot',
+    productName: 'Морковь',
+    unit: 'кг',
+    total: 9.8,
+    byMeal: { breakfast: 1.8, lunch: 5.0, dinner: 3.0 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Салат морковный', portions: 80, quantity: 1.8 },
+      { mealId: 'lunch', dishName: 'Суп с морковью', portions: 125, quantity: 5.0 },
+      { mealId: 'dinner', dishName: 'Гарнир овощной', portions: 100, quantity: 3.0 },
+    ],
+  },
+  {
+    productId: 'p-bread',
+    productName: 'Хлеб пшеничный',
+    unit: 'кг',
+    total: 11.0,
+    byMeal: { breakfast: 3.0, lunch: 5.0, dinner: 3.0 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Хлеб к завтраку', portions: 125, quantity: 3.0 },
+      { mealId: 'lunch', dishName: 'Хлеб к обеду', portions: 125, quantity: 5.0 },
+      { mealId: 'dinner', dishName: 'Хлеб к ужину', portions: 100, quantity: 3.0 },
+    ],
+  },
+  {
+    productId: 'p-apple',
+    productName: 'Яблоки',
+    unit: 'кг',
+    total: 12.4,
+    byMeal: { second_breakfast: 6.0, snack: 6.4 },
+    dishes: [
+      { mealId: 'second_breakfast', dishName: 'Яблоко свежее', portions: 125, quantity: 6.0 },
+      { mealId: 'snack', dishName: 'Яблоко свежее', portions: 100, quantity: 6.4 },
+    ],
+  },
+  {
+    productId: 'p-sugar',
+    productName: 'Сахар',
+    unit: 'кг',
+    total: 4.6,
+    byMeal: { breakfast: 1.6, second_breakfast: 0.8, lunch: 1.2, snack: 1.0 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Чай с сахаром', portions: 125, quantity: 1.6 },
+      { mealId: 'second_breakfast', dishName: 'Компот', portions: 125, quantity: 0.8 },
+      { mealId: 'lunch', dishName: 'Компот', portions: 125, quantity: 1.2 },
+      { mealId: 'snack', dishName: 'Кисель', portions: 100, quantity: 1.0 },
+    ],
+  },
+  {
+    productId: 'p-butter',
+    productName: 'Масло сливочное',
+    unit: 'кг',
+    total: 1.45,
+    byMeal: { breakfast: 0.6, lunch: 0.5, dinner: 0.35 },
+    dishes: [
+      { mealId: 'breakfast', dishName: 'Масло к каше', portions: 125, quantity: 0.6 },
+      { mealId: 'lunch', dishName: 'Масло к гарниру', portions: 125, quantity: 0.5 },
+      { mealId: 'dinner', dishName: 'Масло к гарниру', portions: 100, quantity: 0.35 },
+    ],
+  },
+];
