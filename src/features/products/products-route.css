@@ -9,7 +9,7 @@
   height: 100%;
   overflow: hidden;
   padding: 16px;
-  gap: 8px;
+  gap: 12px;
 }
 
 .products-page__toolbar {
@@ -89,7 +89,10 @@
   margin-block-end: 0;
 }
 
-.products-page__header .admin-table .g-table__table {
+/* Шапка лежит внутри scroll-контейнера, и правило строк-карточек выше с
+   border-spacing: 0 8px распространяется и на неё. Перекрываем с большей
+   специфичностью: шапка должна прилипать к контенту без вертикальных зазоров. */
+.products-page__scroll .products-page__list .products-page__header .admin-table .g-table__table {
   border-collapse: separate;
   border-spacing: 0;
   margin: 0;
@@ -143,7 +146,7 @@
 }
 
 .products-page__scroll .products-page__table-body {
-  margin-top: -8px;
+  margin-top: 0;
 }
 
 .products-page__scroll .admin-table .g-table__table,

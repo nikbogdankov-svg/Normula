@@ -238,7 +238,7 @@ function SubObjectsCard({
         {objects.length > 0 && (
           <Select
             size="l"
-            width={360}
+            width={280}
             label="Объект:"
             value={selectedObjectId ? [selectedObjectId] : []}
             onUpdate={(value) => onSelectObject(value[0] ?? null)}

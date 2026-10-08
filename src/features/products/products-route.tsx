@@ -47,23 +47,25 @@ export function ProductsRoute() {
             Создать продукт
           </Button>
         </Flex>
-        <TextInput
-          size="xl"
-          placeholder="Поиск по названию"
-          value={search}
-          onUpdate={setSearch}
-          hasClear
-          startContent={
-            <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
-              <Icon data={Magnifier} size={20} />
-            </span>
-          }
-        />
-        {data && (
-          <Text variant="body-1" color="secondary">
-            {hasQuery ? `Найдено: ${products.length}` : `Всего продуктов: ${data.total}`}
-          </Text>
-        )}
+        <Flex direction="column" gap={2}>
+          <TextInput
+            size="xl"
+            placeholder="Поиск по названию"
+            value={search}
+            onUpdate={setSearch}
+            hasClear
+            startContent={
+              <span style={{ display: 'inline-flex', paddingInlineStart: 4, paddingInlineEnd: 4 }}>
+                <Icon data={Magnifier} size={20} />
+              </span>
+            }
+          />
+          {data && (
+            <Text variant="body-1" color="secondary">
+              {hasQuery ? `Найдено: ${products.length}` : `Всего продуктов: ${data.total}`}
+            </Text>
+          )}
+        </Flex>
       </Flex>
 
       <div className="products-page__scroll">

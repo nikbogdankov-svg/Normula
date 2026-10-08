@@ -108,7 +108,6 @@ export function WarehouseBalancesRoute() {
           value={objectId}
           onUpdate={setObjectId}
           options={options}
-          width={220}
           disabled={objects.isPending}
         />
         <TextInput
