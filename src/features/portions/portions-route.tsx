@@ -71,6 +71,11 @@ const MEALS_ORDER: Record<MealId, number> = Object.fromEntries(
   MEALS.map((meal, index) => [meal.id, index])
 ) as Record<MealId, number>;
 
+/** Название приёма пищи по его id — подпись под названием блюда. */
+const MEAL_LABELS: Record<MealId, string> = Object.fromEntries(
+  MEALS.map((meal) => [meal.id, meal.label])
+) as Record<MealId, string>;
+
 /** Килограммы на строку: порции × выход порции из ТТК (граммы); 0 — выход не задан. */
 function kilogramsOf(portions: number, yieldNet: number): number | null {
   return yieldNet > 0 ? (portions * yieldNet) / 1000 : null;
@@ -994,9 +999,14 @@ function DishesDistributionTable({
               if (row.isDishTotal) return 'Всего';
               if (!row.showDish) return null;
               return (
-                <Text variant="body-2" style={{ fontWeight: 600 }}>
-                  {row.dishName}
-                </Text>
+                <Flex direction="column">
+                  <Text variant="body-2" style={{ fontWeight: 600 }}>
+                    {row.dishName}
+                  </Text>
+                  <Text variant="body-1" color="secondary">
+                    {MEAL_LABELS[row.mealId]}
+                  </Text>
+                </Flex>
               );
             },
             placeholder: () => null,
