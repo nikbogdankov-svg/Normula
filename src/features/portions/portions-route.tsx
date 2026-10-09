@@ -5,6 +5,7 @@ import { dateTime } from '@gravity-ui/date-utils';
 import {
   Button,
   Card,
+  Dialog,
   Flex,
   Icon,
   SegmentedRadioGroup,
@@ -20,12 +21,27 @@ import {
   Magnifier,
   Printer,
   Receipt,
+  Sticker,
   TriangleExclamation,
 } from '@gravity-ui/icons';
-import { jsPDF } from 'jspdf';
-import ptSansBoldUrl from './assets/PTSans-Bold.ttf';
-import ptSansRegularUrl from './assets/PTSans-Regular.ttf';
 import { useOrganizations } from '@/shared/auth';
+import type { jsPDF } from 'jspdf';
+import {
+  createPdfDoc,
+  drawTextCell,
+  PDF_BODY_SIZE,
+  PDF_CELL_PADDING,
+  PDF_CONTENT_WIDTH,
+  PDF_GRID_COLOR,
+  PDF_HEADER_FILL,
+  PDF_LINE_HEIGHT,
+  PDF_MARGIN,
+  PDF_PAGE_HEIGHT,
+  PDF_PAGE_WIDTH,
+  PDF_TEXT_COLOR,
+  PDF_TEXT_COLOR_MUTED,
+  wrapText,
+} from '@/shared/print';
 import {
   EmptyState,
   ErrorState,
@@ -38,14 +54,22 @@ import {
   useCopyPortionsDay,
   useDishDistribution,
   usePortionsDay,
+  useStickerRecipes,
   useUpdatePortionHeadcount,
 } from './api';
+import { downloadStickersDoc, type StickerRow } from './portions-stickers';
+import { MEALS, type MealId } from '@/features/menu/types';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
 
 const ALL_SUBOBJECTS = '__all';
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Порядок приёмов пищи в течение дня — для сортировки строк по блюдам. */
+const MEALS_ORDER: Record<MealId, number> = Object.fromEntries(
+  MEALS.map((meal, index) => [meal.id, index])
+) as Record<MealId, number>;
 
 /** Килограммы на строку: порции × выход порции из ТТК (граммы); 0 — выход не задан. */
 function kilogramsOf(portions: number, yieldNet: number): number | null {
@@ -123,6 +147,50 @@ export function PortionsRoute() {
   const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
 
   const dishes = useDishDistribution(date, activeObjectId);
+
+  // Наклейки на термос: состав и КБЖУ берём из ТТК по именам блюд раздачи.
+  const stickerDishNames = useMemo(
+    () => [...new Set((dishes.data?.rows ?? []).map((row) => row.dishName))],
+    [dishes.data]
+  );
+  const stickerRecipes = useStickerRecipes(stickerDishNames);
+  // Выбранная строка (блюдо×отделение): null — диалог закрыт. Наклейки
+  // печатаются только на это отделение.
+  const [stickerRow, setStickerRow] = useState<DishDistributionRow | null>(null);
+  const [stickerExpiry, setStickerExpiry] = useState('');
+
+  const stickerRows = useMemo(() => {
+    const target = stickerRow;
+    return (dishes.data?.rows ?? [])
+      .filter(
+        (row) =>
+          target === null ||
+          (row.dishName === target.dishName &&
+            row.subObjectName === target.subObjectName &&
+            row.departmentName === target.departmentName)
+      )
+      .map((row) => {
+        const recipe = stickerRecipes.recipes?.get(row.dishName.trim().toLowerCase());
+        return {
+          dishName: row.dishName,
+          objectName: row.objectName,
+          subObjectName: row.subObjectName,
+          departmentName: row.departmentName,
+          tableName: row.tableName,
+          portions: row.portions,
+          yieldNet: row.yieldNet,
+          recipe: recipe ?? null,
+        } satisfies StickerRow;
+      });
+  }, [dishes.data, stickerRecipes.recipes, stickerRow]);
+
+  const downloadStickers = () => {
+    void downloadStickersDoc({
+      rows: stickerRows,
+      manufactureDate: todayIso(),
+      expiry: stickerExpiry.trim() || '—',
+    });
+  };
 
   if (current === null) {
     return (
@@ -379,6 +447,7 @@ export function PortionsRoute() {
               error={dishes.isError ? dishes.error : null}
               onRetry={() => void dishes.refetch()}
               onFill={() => setView('organizations')}
+              onSticker={(row) => setStickerRow(row)}
               rows={
                 dishSearchQuery
                   ? (dishes.data?.rows ?? []).filter((r) =>
@@ -391,6 +460,40 @@ export function PortionsRoute() {
           )}
         </div>
       </Card>
+
+      <Dialog open={stickerRow !== null} onClose={() => setStickerRow(null)} size="s">
+        <Dialog.Header
+          caption={stickerRow ? `Наклейка: ${stickerRow.dishName}` : 'Наклейки на термос'}
+        />
+        <Dialog.Divider />
+        <Dialog.Body>
+          {stickerRecipes.isPending && <LoadingState />}
+          {stickerRecipes.isError && <ErrorState error={stickerRecipes.error} />}
+          {!stickerRecipes.isPending && !stickerRecipes.isError && stickerRow && (
+            <Flex direction="column" gap={3}>
+              <Text variant="body-2">
+                {stickerRow.subObjectName} · {stickerRow.departmentName}
+              </Text>
+              <TextInput
+                size="l"
+                label="Срок годности:"
+                placeholder="Например «72 часа» или «до 12.10.2026»"
+                value={stickerExpiry}
+                onUpdate={setStickerExpiry}
+                hasClear
+              />
+            </Flex>
+          )}
+        </Dialog.Body>
+        <Dialog.Divider />
+        <Dialog.Footer
+          onClickButtonApply={downloadStickers}
+          onClickButtonCancel={() => setStickerRow(null)}
+          textButtonApply="Скачать PDF"
+          textButtonCancel="Отмена"
+          propsButtonApply={{ disabled: stickerRecipes.isPending || stickerRows.length === 0 }}
+        />
+      </Dialog>
     </Flex>
   );
 }
@@ -694,6 +797,7 @@ function DishesDistributionTable({
   error,
   onRetry,
   onFill,
+  onSticker,
   rows,
   totalPortions,
 }: {
@@ -701,6 +805,8 @@ function DishesDistributionTable({
   error: Error | null;
   onRetry: () => void;
   onFill: () => void;
+  /** Открывает диалог наклеек на строку блюдо×отделение. */
+  onSticker: (row: DishDistributionRow) => void;
   rows: DishDistributionRow[];
   totalPortions: number;
 }) {
@@ -721,15 +827,23 @@ function DishesDistributionTable({
       weightKg: number | null;
     };
 
+    // Одно и то же блюдо должно идти подряд одним блоком (как подобъекты
+    // в «По объектам»): группировка ниже склеивает только соседние строки.
+    // Сортировка стабильная — исходный порядок внутри блюда сохраняется.
+    const grouped = (rows as { dishName: string; mealId: MealId }[]).slice().sort((a, b) => {
+      const byDish = a.dishName.localeCompare(b.dishName, 'ru');
+      return byDish !== 0 ? byDish : MEALS_ORDER[a.mealId] - MEALS_ORDER[b.mealId];
+    }) as DishDistributionRow[];
+
     const result: DistRow[] = [];
     let index = 0;
     let grandKg = 0;
     let grandHasWeight = false;
-    while (index < rows.length) {
-      const dishName = rows[index].dishName;
+    while (index < grouped.length) {
+      const dishName = grouped[index].dishName;
       const dishStart = index;
-      while (index < rows.length && rows[index].dishName === dishName) index += 1;
-      const dishRows = rows.slice(dishStart, index);
+      while (index < grouped.length && grouped[index].dishName === dishName) index += 1;
+      const dishRows = grouped.slice(dishStart, index);
       let dishPortions = 0;
       let dishKg = 0;
       let dishHasWeight = false;
@@ -945,6 +1059,19 @@ function DishesDistributionTable({
               </Text>
             ),
           },
+          {
+            id: 'stickers',
+            name: '',
+            width: '8%',
+            align: 'center',
+            template: (row) =>
+              row.isDishTotal || row.isGrandTotal ? null : (
+                <Button view="flat" title="Наклейка на термос" onClick={() => onSticker(row)}>
+                  <Icon data={Sticker} size={16} />
+                </Button>
+              ),
+            placeholder: () => null,
+          },
         ]}
       />
     </div>
@@ -1005,53 +1132,12 @@ function buildPortionsPrintRows(
   return { rows: data, grand };
 }
 
-const PDF_PAGE_WIDTH = 210;
-const PDF_PAGE_HEIGHT = 297;
-const PDF_MARGIN = 12;
-const PDF_CELL_PADDING = 1.6;
-const PDF_BODY_SIZE = 9.5;
-const PDF_LINE_HEIGHT = PDF_BODY_SIZE * 1.15 * (25.4 / 72);
-
 const PDF_COLUMN_WIDTHS = [78, 46, 36, 26];
 const PDF_COLUMN_X: number[] = (() => {
   const xs = [PDF_MARGIN];
   for (const width of PDF_COLUMN_WIDTHS) xs.push(xs[xs.length - 1] + width);
   return xs;
 })();
-const PDF_CONTENT_WIDTH = PDF_PAGE_WIDTH - PDF_MARGIN * 2;
-
-const PDF_TEXT_COLOR: [number, number, number] = [0x1a, 0x1a, 0x1a];
-const PDF_TEXT_COLOR_MUTED: [number, number, number] = [0x64, 0x6e, 0x7b];
-const PDF_GRID_COLOR: [number, number, number] = [0xc8, 0xcc, 0xd4];
-const PDF_HEADER_FILL: [number, number, number] = [0xf0, 0xf1, 0xf4];
-
-/** Загружает встроенные шрифты с кириллицей; результат кэшируется на сеанс. */
-let ptSansFontsPromise: Promise<{ regular: string; bold: string }> | null = null;
-
-function readAsDataUrl(res: Response): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error('Не удалось прочитать файл шрифта'));
-    res.blob().then((blob) => reader.readAsDataURL(blob));
-  });
-}
-
-function loadPtSansFonts(): Promise<{ regular: string; bold: string }> {
-  ptSansFontsPromise ??= Promise.all([fetch(ptSansRegularUrl), fetch(ptSansBoldUrl)])
-    .then(async ([regularRes, boldRes]) => {
-      const [regular, bold] = await Promise.all([
-        readAsDataUrl(regularRes),
-        readAsDataUrl(boldRes),
-      ]);
-      return { regular: regular.split(',')[1] ?? '', bold: bold.split(',')[1] ?? '' };
-    })
-    .catch((error) => {
-      ptSansFontsPromise = null;
-      throw error;
-    });
-  return ptSansFontsPromise;
-}
 
 /** Рисует документ «Порционник» в переданный jsPDF (A4, миллиметры). */
 function writePortionsPdf(
@@ -1062,24 +1148,18 @@ function writePortionsPdf(
   const marginBottom = 16;
   const bodyMaxY = PDF_PAGE_HEIGHT - marginBottom;
 
-  const wrap = (text: string, width: number): string[] => {
-    const lines = doc.splitTextToSize(text, width);
-    return lines.length ? lines : [''];
-  };
-
+  /** Границы колонки по индексу под текст с учётом отступа. */
+  const cellWidth = (colIndex: number): number =>
+    PDF_COLUMN_WIDTHS[colIndex] - PDF_CELL_PADDING * 2;
+  const cellX = (colIndex: number): number => PDF_COLUMN_X[colIndex] + PDF_CELL_PADDING;
+  const cellRightX = (colIndex: number): number => PDF_COLUMN_X[colIndex + 1] - PDF_CELL_PADDING;
   const drawCellLines = (
     lines: string[],
     colIndex: number,
     cellTop: number,
     rightAlign = false
   ) => {
-    const leftX = PDF_COLUMN_X[colIndex] + PDF_CELL_PADDING;
-    const rightX = PDF_COLUMN_X[colIndex + 1] - PDF_CELL_PADDING;
-    let y = cellTop + PDF_CELL_PADDING + PDF_LINE_HEIGHT;
-    for (const line of lines) {
-      doc.text(line, rightAlign ? rightX : leftX, y, { align: rightAlign ? 'right' : 'left' });
-      y += PDF_LINE_HEIGHT;
-    }
+    drawTextCell(doc, lines, cellX(colIndex), cellRightX(colIndex), cellTop, rightAlign);
   };
 
   const drawGridLine = (y: number) => {
@@ -1130,9 +1210,9 @@ function writePortionsPdf(
       : '';
     const deptLabel = row.showDepartment ? row.departmentName : '';
     const cellLines = [
-      wrap(subLabel, PDF_COLUMN_WIDTHS[0] - PDF_CELL_PADDING * 2),
-      wrap(deptLabel, PDF_COLUMN_WIDTHS[1] - PDF_CELL_PADDING * 2),
-      wrap(row.tableName, PDF_COLUMN_WIDTHS[2] - PDF_CELL_PADDING * 2),
+      wrapText(doc, subLabel, cellWidth(0)),
+      wrapText(doc, deptLabel, cellWidth(1)),
+      wrapText(doc, row.tableName, cellWidth(2)),
     ];
     const rowHeight =
       Math.max(...cellLines.map((lines) => lines.length * PDF_LINE_HEIGHT)) + PDF_CELL_PADDING * 2;
@@ -1197,12 +1277,7 @@ async function downloadPortionsDoc(data: {
   grand: number;
 }): Promise<void> {
   const displayDate = data.date.split('-').reverse().join('.');
-  const fonts = await loadPtSansFonts();
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  doc.addFileToVFS('PTSans-Regular.ttf', fonts.regular);
-  doc.addFont('PTSans-Regular.ttf', 'PTSans', 'normal');
-  doc.addFileToVFS('PTSans-Bold.ttf', fonts.bold);
-  doc.addFont('PTSans-Bold.ttf', 'PTSans', 'bold');
+  const doc = await createPdfDoc();
   writePortionsPdf(doc, { ...data, displayDate });
   doc.save(`Порционник_${displayDate}.pdf`);
 }

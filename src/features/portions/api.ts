@@ -1,5 +1,12 @@
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
+import type {
+  GetRecipeResponse,
+  ListRecipesResponse,
+  Recipe,
+  RecipeSummary,
+} from '@/features/ttk/types';
 import type {
   CopyPortionsDayRequest,
   DishDistributionResponse,
@@ -86,6 +93,72 @@ export function useCopyPortionsDay() {
       });
     },
   });
+}
+
+/**
+ * Карты ТТК по именам блюд раздачи — для наклеек на термос. Сначала грузится
+ * список карт, затем полная карта по каждому найденному имени. Потеряли имя
+ * (карты нет) — блюдо в выдаче отсутствует, наклейка печатается без состава.
+ *
+ * Data берётся из мок-двойника /v1/mock/ttk: раздача по блюдам ещё на моках,
+ * её блюда завязаны на мок-карты, поэтому настоящий /v1/ttk с ними не
+ * совпадёт. Двойник удаляется вместе с моками раздачи.
+ */
+export function useStickerRecipes(dishNames: string[]): {
+  summaries: RecipeSummary[] | undefined;
+  recipes: ReadonlyMap<string, Recipe> | undefined;
+  isPending: boolean;
+  isError: boolean;
+  error: Error | null;
+} {
+  const api = useApi();
+  const names = useMemo(
+    () => [...new Set(dishNames.map((name) => name.trim().toLowerCase()))].filter(Boolean).sort(),
+    [dishNames]
+  );
+
+  const list = useQuery({
+    queryKey: [KEY, api.organizationId, 'ttk-list'],
+    queryFn: () => api.request<ListRecipesResponse>('/v1/mock/ttk'),
+    enabled: api.organizationId !== null && names.length > 0,
+  });
+
+  const summaries = list.data?.recipes;
+
+  const matched = useMemo(() => {
+    const byName = new Map<string, RecipeSummary>();
+    for (const summary of summaries ?? []) {
+      const key = summary.name.trim().toLowerCase();
+      if (names.includes(key) && !byName.has(key)) byName.set(key, summary);
+    }
+    return byName;
+  }, [summaries, names]);
+
+  const ids = useMemo(() => [...matched.values()].map((summary) => summary.id), [matched]);
+
+  const full = useQuery({
+    queryKey: [KEY, api.organizationId, 'ttk-full', ids],
+    queryFn: async () => {
+      const recipes = new Map<string, Recipe>();
+      for (const id of ids) {
+        const { recipe } = await api.request<GetRecipeResponse>(`/v1/mock/ttk/${id}`);
+        recipes.set(recipe.name.trim().toLowerCase(), recipe);
+      }
+      return recipes;
+    },
+    enabled: api.organizationId !== null && ids.length > 0,
+  });
+
+  return {
+    summaries,
+    recipes: full.data,
+    // full не запускается, когда ни одна карта не сматчилась — это не загрузка,
+    // а отсутствие карт: наклейки печатаются без состава.
+    isPending: (names.length > 0 && list.isPending) || (ids.length > 0 && full.isPending),
+    isError: list.isError || full.isError,
+    error:
+      list.error instanceof Error ? list.error : full.error instanceof Error ? full.error : null,
+  };
 }
 
 function upsertEntry(
