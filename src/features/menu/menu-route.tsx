@@ -11,7 +11,14 @@ import {
   TextInput,
   useToaster,
 } from '@gravity-ui/uikit';
-import { ArrowLeft, ArrowRotateLeft, ChevronLeft, ChevronRight, Eye } from '@gravity-ui/icons';
+import {
+  ArrowLeft,
+  ArrowRotateLeft,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Printer,
+} from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
@@ -49,6 +56,7 @@ import {
   type NormStatus,
 } from './norms';
 import { MEALS, type Dish, type MealId, type Violation, type ViolationMetric } from './types';
+import { buildMenuPrintRows, downloadMenuDoc } from './menu-print';
 import './menu-route.css';
 
 const EMPTY_DISHES: Dish[] = [];
@@ -378,6 +386,28 @@ function MenuByDates() {
     goToWeek(shiftIsoDate(startDate, direction * CYCLE_DAYS));
   };
 
+  const printMenu = () => {
+    const mealLabelOf = (mealId: MealId) =>
+      MEALS.find((meal) => meal.id === mealId)?.label ?? mealId;
+    void downloadMenuDoc({
+      startDate,
+      cycleDays: CYCLE_DAYS,
+      objectName: selectedObject?.name ?? '',
+      dietName: diet?.name ?? '',
+      rows: buildMenuPrintRows({
+        days,
+        meals: activeMeals,
+        dayLabelOf: (day) => {
+          const header = formatDayHeader(startDate, day);
+          return `${header.weekday} ${header.date}`;
+        },
+        mealLabelOf,
+        dishesOf: (day, mealId) => slotMap.get(slotKey(day, mealId)) ?? EMPTY_DISHES,
+        totalsOf: (day) => dayTotals.get(day) ?? sumDishes([]),
+      }),
+    });
+  };
+
   const allowDayViolation = (day: number) => {
     if (!objectId || !dietId) return;
     allowViolation.mutate(
@@ -515,6 +545,16 @@ function MenuByDates() {
             disabled={weekLoading || !periodSynced}
           >
             Заполнение меню
+          </Button>
+          <Button
+            type="button"
+            view="normal-contrast"
+            size="l"
+            onClick={printMenu}
+            disabled={weekLoading || !periodSynced}
+            title="Печать (PDF)"
+          >
+            <Icon data={Printer} size={16} />
           </Button>
         </Flex>
       </Flex>

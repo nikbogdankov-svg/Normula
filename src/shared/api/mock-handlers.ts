@@ -9,6 +9,8 @@ import type { Employee, EmployeeDocuments, StaffRole } from '@/features/staff/ty
 import { EMPTY_DOCUMENTS } from '@/features/staff/types';
 import type { ObjectItem } from '@/features/objects/types';
 import type { ProductSpreadItem, ProductSpreadResponse } from '@/features/products-spread/types';
+import type { DishDistributionRow } from '@/features/portions/types';
+import type { Recipe, RecipeSummary } from '@/features/ttk/types';
 
 /**
  * In-memory обработчики для mock-режима: фронт полностью работает без бэка.
@@ -31,6 +33,13 @@ export const MOCKED_PREFIXES: string[] = [
   // TEMP-MOCK «Раскладка продуктов»: на стенде данных ещё нет, раскладка
   // нужна для отладки порционника. Убрать, когда появится за подтверждением.
   '/v1/products-spread',
+  // TEMP-MOCK «Раздача по блюдам»: тестовые данные для наклеек на термос,
+  // пока бэкенд не отдаёт строки по объектам. Убрать вместе с обработчиком.
+  '/v1/portions/dishes',
+  // Мок-двойник справочника ТТК: блюда мок-раздачи завязаны на мок-карты,
+  // поэтому разделы на моках читают двойник, а не настоящий /v1/ttk.
+  // Удалить вместе с моками последнего читающего раздела.
+  '/v1/mock/ttk',
 ];
 
 /** Обслуживается ли путь моками, пока бэкенда под него нет. */
@@ -265,6 +274,46 @@ export async function handleMockRequest<T>(path: string, options: RequestOptions
     return response as T;
   }
 
+  // TEMP-MOCK «Раздача по блюдам» для наклеек на термос: пока бэкенд не
+  // отдаёт строки, подменяем их правдоподобным списком. Строки отдаются
+  // на любой объект: в mock-режиме объекты свои, а при настоящем входе id
+  // объекта приходит с бэкенда и фильтровался бы в пустоту.
+  if (route === '/v1/portions/dishes' && method === 'GET') {
+    const dateParam = params.get('date') ?? '';
+
+    return {
+      date: dateParam,
+      totalPortions: mockDishDistributionRows.reduce((sum, row) => sum + row.portions, 0),
+      rows: mockDishDistributionRows,
+    } as T;
+  }
+
+  // Мок-двойник справочника «ТТК»: полноценная ручка (v1/ttk) живёт на бэке,
+  // но её читают разделы, которые пока на моках (раздача по блюдам) и чьи
+  // блюда завязаны на мок-карты. Двойник отдаёт состав и КБЖУ наклейкам
+  // на термос и работает и в офлайне, и при настоящем входе (в MOCKED_PREFIXES).
+  if (route === '/v1/mock/ttk' && method === 'GET') {
+    const recipes: RecipeSummary[] = mockTtkRecipes.map(
+      ({ id, name, collectionName, yieldNet, yieldLoss, kcal, price }) => ({
+        id,
+        name,
+        collectionName,
+        yieldNet,
+        yieldLoss,
+        kcal,
+        price,
+      })
+    );
+    return { recipes } as T;
+  }
+
+  const mockTtkRecipe = match('/v1/mock/ttk/:id', route);
+  if (mockTtkRecipe && method === 'GET') {
+    const recipe = mockTtkRecipes.find((item) => item.id === mockTtkRecipe.id);
+    if (!recipe) throw new Error('mock: карта ТТК не найдена');
+    return { recipe } as T;
+  }
+
   // Администрирование: персонал и роли (staff.v1.StaffService)
   if (route === '/v1/staff-roles' && method === 'GET') {
     return { roles: staffRoles } as T;
@@ -487,6 +536,116 @@ function syncMemberCount(organizationId: string) {
 }
 
 /**
+ * TEMP-MOCK: правдоподобная раздача по блюдам для наклеек на термос.
+ * Отдаётся в ответ на любой запрошенный день; забрать вместе с
+ * обработчиком /v1/portions/dishes.
+ */
+const mockDishDistributionRows: DishDistributionRow[] = [
+  // Больница №1 → Корпус А
+  {
+    dishName: 'Каша рисовая на воде',
+    mealId: 'breakfast',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Терапевтическое отделение',
+    tableName: 'Основной',
+    portions: 120,
+    yieldNet: 200,
+  },
+  {
+    dishName: 'Курица отварная',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Терапевтическое отделение',
+    tableName: 'Основной',
+    portions: 120,
+    yieldNet: 80,
+  },
+  {
+    dishName: 'Пюре картофельное',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Терапевтическое отделение',
+    tableName: 'Основной',
+    portions: 120,
+    yieldNet: 180,
+  },
+  {
+    dishName: 'Компот из сухофруктов',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Терапевтическое отделение',
+    tableName: 'Основной',
+    portions: 120,
+    yieldNet: 200,
+  },
+  {
+    dishName: 'Тушёная курица с овощами',
+    mealId: 'dinner',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Терапевтическое отделение',
+    tableName: 'Основной',
+    portions: 120,
+    yieldNet: 250,
+  },
+  // Больница №1 → хирургия того же корпуса (другие диеты)
+  {
+    dishName: 'Каша рисовая на воде',
+    mealId: 'breakfast',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Хирургическое отделение',
+    tableName: 'Диабетический',
+    portions: 45,
+    yieldNet: 200,
+  },
+  {
+    dishName: 'Курица отварная',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Хирургическое отделение',
+    tableName: 'Диабетический',
+    portions: 45,
+    yieldNet: 80,
+  },
+  {
+    dishName: 'Пюре картофельное',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Хирургическое отделение',
+    tableName: 'Диабетический',
+    portions: 45,
+    yieldNet: 180,
+  },
+  {
+    dishName: 'Компот из сухофруктов',
+    mealId: 'lunch',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Хирургическое отделение',
+    tableName: 'Диабетический',
+    portions: 45,
+    yieldNet: 200,
+  },
+  {
+    dishName: 'Кефир',
+    mealId: 'dinner',
+    objectName: 'Больница №1',
+    subObjectName: 'Корпус А',
+    departmentName: 'Хирургическое отделение',
+    tableName: 'Диабетический',
+    portions: 45,
+    yieldNet: 200,
+  },
+];
+
+/**
  * TEMP-MOCK: правдоподобная раскладка продуктов на день. Отдаётся в ответ на
  * любой запрошенный день; забрать вместе с обработчиком /v1/products-spread.
  */
@@ -585,6 +744,264 @@ const mockProductSpreadItems: ProductSpreadItem[] = [
       { mealId: 'breakfast', dishName: 'Масло к каше', portions: 125, quantity: 0.6 },
       { mealId: 'lunch', dishName: 'Масло к гарниру', portions: 125, quantity: 0.5 },
       { mealId: 'dinner', dishName: 'Масло к гарниру', portions: 100, quantity: 0.35 },
+    ],
+  },
+];
+
+/**
+ * TEMP-MOCK: карты ТТК для наклеек на термос. Наклейка берёт состав и КБЖУ
+ * из карты по имени блюда, поэтому названия совпадают с mockDishDistributionRows.
+ * Убрать вместе с обработчиком /v1/ttk, когда появится реальный справочник.
+ */
+const mockTtkRecipes: Recipe[] = [
+  {
+    id: 'recipe-porridge',
+    name: 'Каша рисовая на воде',
+    collectionName: '',
+    yieldNet: 200,
+    yieldLoss: 25,
+    technology: 'Крупу промыть, залить водой и варить до готовности.',
+    protein: 3.2,
+    fat: 0.5,
+    carbs: 31.8,
+    kcal: 145,
+    price: 12.4,
+    ingredients: [
+      {
+        id: 'r1-i1',
+        productId: 'p-rice',
+        productName: 'Рис',
+        unit: 'кг',
+        gross: 0.045,
+        net: 0.045,
+        unitPrice: 90,
+        total: 4.05,
+      },
+      {
+        id: 'r1-i2',
+        productId: 'p-salt',
+        productName: 'Соль',
+        unit: 'кг',
+        gross: 0.004,
+        net: 0.004,
+        unitPrice: 20,
+        total: 0.08,
+      },
+      {
+        id: 'r1-i3',
+        productId: 'p-water',
+        productName: 'Вода',
+        unit: 'л',
+        gross: 0.2,
+        net: 0.2,
+        unitPrice: 1.5,
+        total: 0.3,
+      },
+    ],
+  },
+  {
+    id: 'recipe-chicken-boiled',
+    name: 'Курица отварная',
+    collectionName: '',
+    yieldNet: 80,
+    yieldLoss: 35,
+    technology: 'Курицу отварить до готовности, охладить.',
+    protein: 21.5,
+    fat: 9.2,
+    carbs: 0,
+    kcal: 170,
+    price: 28.7,
+    ingredients: [
+      {
+        id: 'r2-i1',
+        productId: 'p-chicken',
+        productName: 'Курица',
+        unit: 'кг',
+        gross: 0.1,
+        net: 0.08,
+        unitPrice: 280,
+        total: 28,
+      },
+      {
+        id: 'r2-i2',
+        productId: 'p-salt',
+        productName: 'Соль',
+        unit: 'кг',
+        gross: 0.003,
+        net: 0.003,
+        unitPrice: 20,
+        total: 0.06,
+      },
+    ],
+  },
+  {
+    id: 'recipe-mashed',
+    name: 'Пюре картофельное',
+    collectionName: '',
+    yieldNet: 180,
+    yieldLoss: 15,
+    technology: 'Картофель отварить, размять с молоком и маслом.',
+    protein: 2.6,
+    fat: 3.1,
+    carbs: 23.4,
+    kcal: 130,
+    price: 15.9,
+    ingredients: [
+      {
+        id: 'r3-i1',
+        productId: 'p-potato',
+        productName: 'Картофель',
+        unit: 'кг',
+        gross: 0.2,
+        net: 0.15,
+        unitPrice: 55,
+        total: 11,
+      },
+      {
+        id: 'r3-i2',
+        productId: 'p-milk',
+        productName: 'Молоко',
+        unit: 'л',
+        gross: 0.04,
+        net: 0.04,
+        unitPrice: 85,
+        total: 3.4,
+      },
+      {
+        id: 'r3-i3',
+        productId: 'p-butter',
+        productName: 'Масло сливочное',
+        unit: 'кг',
+        gross: 0.005,
+        net: 0.005,
+        unitPrice: 700,
+        total: 3.5,
+      },
+    ],
+  },
+  {
+    id: 'recipe-compote',
+    name: 'Компот из сухофруктов',
+    collectionName: '',
+    yieldNet: 200,
+    yieldLoss: 10,
+    technology: 'Сухофрукты залить водой, довести до кипения и настоять.',
+    protein: 0.5,
+    fat: 0,
+    carbs: 16.8,
+    kcal: 68,
+    price: 9.6,
+    ingredients: [
+      {
+        id: 'r4-i1',
+        productId: 'p-dried',
+        productName: 'Сухофрукты',
+        unit: 'кг',
+        gross: 0.03,
+        net: 0.03,
+        unitPrice: 240,
+        total: 7.2,
+      },
+      {
+        id: 'r4-i2',
+        productId: 'p-sugar',
+        productName: 'Сахар',
+        unit: 'кг',
+        gross: 0.01,
+        net: 0.01,
+        unitPrice: 60,
+        total: 0.6,
+      },
+      {
+        id: 'r4-i3',
+        productId: 'p-water',
+        productName: 'Вода',
+        unit: 'л',
+        gross: 0.2,
+        net: 0.2,
+        unitPrice: 1.5,
+        total: 0.3,
+      },
+    ],
+  },
+  {
+    id: 'recipe-stew-chicken',
+    name: 'Тушёная курица с овощами',
+    collectionName: '',
+    yieldNet: 250,
+    yieldLoss: 20,
+    technology: 'Курицу и овощи тушить до готовности, посолить.',
+    protein: 16.4,
+    fat: 6.1,
+    carbs: 10.2,
+    kcal: 167,
+    price: 34.2,
+    ingredients: [
+      {
+        id: 'r5-i1',
+        productId: 'p-chicken',
+        productName: 'Курица',
+        unit: 'кг',
+        gross: 0.12,
+        net: 0.1,
+        unitPrice: 280,
+        total: 33.6,
+      },
+      {
+        id: 'r5-i2',
+        productId: 'p-potato',
+        productName: 'Картофель',
+        unit: 'кг',
+        gross: 0.12,
+        net: 0.09,
+        unitPrice: 55,
+        total: 6.6,
+      },
+      {
+        id: 'r5-i3',
+        productId: 'p-carrot',
+        productName: 'Морковь',
+        unit: 'кг',
+        gross: 0.03,
+        net: 0.025,
+        unitPrice: 45,
+        total: 1.35,
+      },
+      {
+        id: 'r5-i4',
+        productId: 'p-salt',
+        productName: 'Соль',
+        unit: 'кг',
+        gross: 0.003,
+        net: 0.003,
+        unitPrice: 20,
+        total: 0.06,
+      },
+    ],
+  },
+  {
+    id: 'recipe-kefir',
+    name: 'Кефир',
+    collectionName: '',
+    yieldNet: 200,
+    yieldLoss: 0,
+    technology: 'Кефир разлить в ёмкости и хранить в холодильнике.',
+    protein: 3.4,
+    fat: 2.8,
+    carbs: 4.1,
+    kcal: 53,
+    price: 18.5,
+    ingredients: [
+      {
+        id: 'r6-i1',
+        productId: 'p-kefir',
+        productName: 'Кефир',
+        unit: 'л',
+        gross: 0.2,
+        net: 0.2,
+        unitPrice: 92,
+        total: 18.4,
+      },
     ],
   },
 ];
