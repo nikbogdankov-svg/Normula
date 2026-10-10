@@ -3,6 +3,7 @@ import {
   Button,
   Flex,
   Icon,
+  SegmentedRadioGroup,
   Text,
   TextInput,
   Table,
@@ -20,7 +21,7 @@ import { useWriteOffs } from '@/features/warehouse/api';
 import { formatDate, formatMoney } from '@/features/warehouse/format';
 import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
 import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
-import type { WriteOff, WriteOffSummary } from '@/features/warehouse/types';
+import type { WriteOff, WriteOffKind, WriteOffSummary } from '@/features/warehouse/types';
 import { WriteOffDrawer } from './write-off-drawer';
 import { CreateWriteOffDialog } from './create-write-off-dialog';
 import './write-offs-route.css';
@@ -99,12 +100,13 @@ export function WriteOffsRoute() {
   const [objectId, setObjectId] = useState('');
   const { options, objects } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
+  const [kind, setKind] = useState<WriteOffKind>('manual');
   const debouncedSearch = useDebouncedValue(search.trim());
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WriteOff | null>(null);
 
-  const writeOffs = useWriteOffs({ objectId, search: debouncedSearch });
+  const writeOffs = useWriteOffs({ objectId, search: debouncedSearch }, kind);
   const rows = writeOffs.data?.pages.flatMap((page) => page.writeOffs) ?? [];
 
   if (api.organizationId === null) {
@@ -140,6 +142,14 @@ export function WriteOffsRoute() {
             }
             style={{ width: 280 }}
           />
+          <SegmentedRadioGroup
+            size="l"
+            value={kind}
+            onUpdate={(value) => setKind(value as WriteOffKind)}
+          >
+            <SegmentedRadioGroup.Option value="manual" content="Исключительные" />
+            <SegmentedRadioGroup.Option value="auto" content="Автоматические" />
+          </SegmentedRadioGroup>
         </Flex>
         <Button
           view="normal-contrast"

@@ -7,7 +7,6 @@ SPA платформы StyleU. React 18 + TypeScript + Vite + Gravity UI + Logto
 
 ```bash
 npm run dev        # dev-сервер; ходит на стенд stg (среда local == stg)
-npm run dev:mock   # то же, но без Logto и без бэка: данные in-memory
 npm run check      # typecheck + lint + prettier + build — после ЛЮБОГО изменения
 npm run format     # prettier --write
 ```
@@ -33,10 +32,9 @@ src/
     routes/              страницы вне фич (лендинг, callback, 404)
   shared/
     config.ts            runtime-конфиг из window.__APP_CONFIG__ — НЕ import.meta.env
-    api/client.ts        apiFetch + ApiError; в mock-режиме отвечает mock-handlers
+    api/client.ts        apiFetch + ApiError
     api/use-api.ts       useApi(): авторизованные запросы, сам подставляет токен
-    api/mock-handlers.ts in-memory обработчики разделов, у которых ещё нет бэкенда
-    auth/                Logto + mock реализации одного AuthContext; OrgProvider
+    auth/                AuthContext на Logto; OrgProvider
     ui/                  Page, LoadingState/ErrorState/EmptyState, FullPageLoader
   features/
     hello/               ЕДИНСТВЕННАЯ И ЭТАЛОННАЯ ФИЧА — копируй её структуру
@@ -62,16 +60,9 @@ src/
 5. **queryKey организационного запроса всегда включает api.organizationId** —
    иначе при смене организации покажутся чужие данные из кэша. Для запросов
    с tokenKind='api' (как /hello) organizationId в ключе не нужен.
-6. **Моки — только для разделов, у которых ещё нет бэкенда.** Пока ручки нет,
-   её эндпоинты живут в mock-handlers.ts, а префикс — в MOCKED_PREFIXES. Как
-   только ручка появилась на сервере, её моки удаляются целиком (обработчики,
-   сид-данные, префикс) — фича ходит только в бэк. Из-за этого в
-   npm run dev:mock такие разделы не работают, и это ожидаемо.
-   Исключение — справочник с бэком, который читают разделы, ещё живущие на
-   моках, и их мок-данные завязаны на мок-записи. Тогда остаётся мок-двойник:
-   только GET под `/v1/mock/<раздел>` и хук `useMock<X>` для этих разделов.
-   Двойник удаляется вместе с моками последнего раздела, который его читает.
-   Сейчас все разделы на бэке, `MOCKED_PREFIXES` пуст.
+6. **Моков нет.** Фронт ходит только в настоящий бэк и входит только через
+   Logto. Ручки, которой на бэке ещё нет, фронт вызывает как есть: страница
+   показывает ошибку, но саму страницу и её дизайн не трогаем.
 7. Тексты интерфейса — на русском. Код и идентификаторы — на английском.
 
 ## Рецепт: добавить фичу «X» (страница со списком/формой)
@@ -83,9 +74,7 @@ src/
 3. `src/features/x/x-route.tsx` — страница: Page → Loading/Error/Empty → контент.
 4. Роут в `src/app/router.tsx` (children раздела /app) + пункт в NAV
    в `src/app/layout/app-layout.tsx`.
-5. Если бэкенда ещё нет — обработчики в `src/shared/api/mock-handlers.ts` и
-   префикс в MOCKED_PREFIXES (см. инвариант 6); если есть — моков не пишем.
-6. `npm run check`.
+5. `npm run check`.
 
 ## Gravity UI: справка
 
@@ -107,8 +96,7 @@ src/
 
 ## Авторизация: как это работает
 
-- `AuthProvider` (shared/auth/provider.tsx) выбирает реализацию по
-  `config.authMode`: Logto (реальная) или mock (offline).
+- `AuthProvider` (shared/auth/provider.tsx) — реализация на Logto.
 - Logto SPA: PKCE, resources=[apiResource], scopes включают
   UserScope.Organizations — поэтому доступны организационные токены.
 - `OrgProvider` грузит организации пользователя (userinfo.organization_data),
@@ -118,7 +106,7 @@ src/
   из этого токена достаёт organization_id и скоупы.
 - Страницы под логином — дети `<ProtectedRoute/>` в router.tsx.
 
-Что нужно от окружения для authMode='logto':
+Что нужно от окружения:
 - В Logto Console: SPA-приложение, Redirect URI `<origin>/callback`,
   Post sign-out `<origin>/`.
 - `config/env.<среда>`: LOGTO_ENDPOINT, LOGTO_APP_ID, API_RESOURCE.

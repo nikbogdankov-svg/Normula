@@ -1,6 +1,8 @@
 /**
  * Контракт раздела «Раскладка продуктов» — GetProductSpread в
- * portions.v1.PortionsService (api/portions/v1/portions.proto).
+ * portions.v1.PortionsService (api/portions/v1/portions.proto) и
+ * ConfirmProductSpread в warehouse.v1.WarehouseService
+ * (api/warehouse/v1/warehouse.proto).
  *
  * Бэкенд считает из порционника (численность на дату), меню (расписание
  * объекта и диеты) и ТТК (брутто ингредиентов на порцию): сколько какого
@@ -44,4 +46,17 @@ export interface ProductSpreadResponse {
   /** Объект из запроса; пусто — раскладка по всей организации. */
   objectId?: string;
   items: ProductSpreadItem[];
+  /** Подтверждена: у каждого объекта и подобъекта с раскладкой есть автосписание. */
+  confirmed: boolean;
+}
+
+/**
+ * Тело POST /v1/products-spread/confirm: продукты раскладки списываются со
+ * склада, сначала из ранних партий, и выписываются счета. Не хватает хотя бы
+ * одного продукта — не списывается ничего.
+ */
+export interface ConfirmProductSpreadRequest {
+  date: string;
+  /** Объект верхнего уровня; не задан — вся организация. */
+  objectId?: string;
 }

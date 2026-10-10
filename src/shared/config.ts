@@ -10,8 +10,6 @@
  * конфиг подставляется на старте контейнера без пересборки.
  */
 
-export type AuthMode = 'logto' | 'mock';
-
 export interface LogtoSettings {
   /** Базовый URL Logto, напр. https://<tenant>.logto.app */
   endpoint: string;
@@ -26,15 +24,7 @@ export interface AppConfig {
   env: string;
   /** Базовый путь к API: всегда same-origin '/api' (dev: vite-proxy, prod: nginx). */
   apiBaseUrl: string;
-  /** 'mock' — без Logto и без бэка (данные in-memory), 'logto' — по-настоящему. */
-  authMode: AuthMode;
-  /**
-   * Отдавать ли из памяти ручки, которых на бэкенде ещё нет. Не зависит от
-   * authMode: можно входить настоящим Logto, а недоделанные разделы всё равно
-   * получать из моков. На стенде и проде выключено.
-   */
-  mockUnimplemented: boolean;
-  logto?: LogtoSettings;
+  logto: LogtoSettings;
 }
 
 declare global {
@@ -49,20 +39,16 @@ function loadConfig(): AppConfig {
     throw new Error('window.__APP_CONFIG__ не найден: /config.js не отдался или не загрузился');
   }
 
-  const authMode: AuthMode = raw.authMode === 'logto' ? 'logto' : 'mock';
-  if (authMode === 'logto') {
-    const missing = (['endpoint', 'appId', 'apiResource'] as const).filter((k) => !raw.logto?.[k]);
-    if (missing.length > 0) {
-      throw new Error(`authMode='logto', но не заданы logto.${missing.join(', logto.')}`);
-    }
+  const logto = raw.logto;
+  const missing = (['endpoint', 'appId', 'apiResource'] as const).filter((k) => !logto?.[k]);
+  if (!logto || missing.length > 0) {
+    throw new Error(`не заданы logto.${missing.join(', logto.')}`);
   }
 
   return {
     env: raw.env ?? 'unknown',
     apiBaseUrl: raw.apiBaseUrl ?? '/api',
-    authMode,
-    mockUnimplemented: raw.mockUnimplemented === true,
-    logto: raw.logto,
+    logto,
   };
 }
 

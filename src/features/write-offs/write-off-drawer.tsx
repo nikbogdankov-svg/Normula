@@ -25,6 +25,9 @@ function WriteOffView({
         <Text variant="body-2" color="secondary">
           Дата: <strong>{formatDate(writeOff.date)}</strong>
         </Text>
+        <Text variant="body-2" color="secondary">
+          Тип: <strong>{writeOff.kind === 'auto' ? 'Автоматическое' : 'Исключительное'}</strong>
+        </Text>
       </Flex>
 
       <div className="admin-table-wrap">
@@ -139,7 +142,12 @@ export function WriteOffDrawer({
           <Button view="outlined" size="l" onClick={onClose}>
             Закрыть
           </Button>
-          <Button view="normal" size="l" disabled={!view} onClick={() => view && onEdit(view)}>
+          <Button
+            view="normal"
+            size="l"
+            disabled={!view || view.kind === 'auto'}
+            onClick={() => view && onEdit(view)}
+          >
             Редактировать
           </Button>
         </div>

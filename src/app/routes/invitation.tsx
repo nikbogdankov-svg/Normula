@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useLogto } from '@logto/react';
 import { Alert, Button, Card, Flex, Text } from '@gravity-ui/uikit';
-import { config } from '@/shared/config';
 import { FullPageLoader } from '@/shared/ui/full-page-loader';
 
 /**
@@ -15,14 +14,6 @@ import { FullPageLoader } from '@/shared/ui/full-page-loader';
  * самостоятельной регистрации.
  */
 export function InvitationRoute() {
-  if (config.authMode === 'logto') {
-    return <LogtoInvitation />;
-  }
-
-  return <MockInvitation />;
-}
-
-function LogtoInvitation() {
   const [params] = useSearchParams();
   const { signIn, signOut, isAuthenticated, isLoading } = useLogto();
   const started = useRef(false);
@@ -125,22 +116,6 @@ function InvitationCard({ children }: { children: React.ReactNode }) {
           {children}
         </Flex>
       </Card>
-    </Flex>
-  );
-}
-
-function MockInvitation() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    navigate('/app', { replace: true });
-  }, [navigate]);
-
-  return (
-    <Flex justifyContent="center" style={{ padding: 48 }}>
-      <Text variant="body-2" color="secondary">
-        mock-режим: приглашения принимать не у кого
-      </Text>
     </Flex>
   );
 }

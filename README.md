@@ -44,7 +44,6 @@ Post sign-out redirect `http://localhost:5173/`.
 ```bash
 npm run dev                 # стенд stg
 npm run dev:api-local       # бэк на localhost:8080, Logto — как на stg
-npm run dev:mock            # без сети и без Logto: данные in-memory
 APP_ENV=prod npm run dev    # прод-контур (осторожно)
 ```
 
@@ -65,8 +64,7 @@ docker run -p 8080:8080 -e APP_ENV=prod onemore-frontend   # onemore.styleu.ru
 на stg молча подняла бы прод-конфиг. Без неё контейнер падает со списком сред.
 
 Точечно переопределить можно переменными `API_UPSTREAM`, `API_RESOURCE`,
-`LOGTO_ENDPOINT`, `LOGTO_APP_ID` — они важнее пресета. `AUTH_MODE=mock`
-в контейнере запрещён (entrypoint падает): mock — только для локальной разработки.
+`LOGTO_ENDPOINT`, `LOGTO_APP_ID` — они важнее пресета.
 
 Проверка живости — `GET /healthz`; в образе есть `HEALTHCHECK` на неё.
 
@@ -91,7 +89,6 @@ Redirect URI `https://<домен>/callback` и post sign-out `https://<доме
 | Команда | Что делает |
 |---|---|
 | `npm run dev` | dev-сервер (среда `local` = stg) |
-| `npm run dev:mock` | dev-сервер без Logto и без бэка |
 | `npm run dev:api-local` | dev-сервер против локального бэка на :8080 |
 | `npm run check` | typecheck + eslint + prettier + сборка |
 | `npm run format` | prettier --write |

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-/** Организация пользователя (из Logto userinfo / мока). */
+/** Организация пользователя (из Logto userinfo). */
 export interface Organization {
   id: string;
   name: string;
@@ -13,9 +13,8 @@ export interface AuthUser {
 }
 
 /**
- * Контракт авторизации. Две реализации: LogtoAuthProvider и MockAuthProvider.
- * Остальной код зависит только от этого интерфейса — переключение режима
- * не трогает фичи.
+ * Контракт авторизации; реализация — LogtoAuthProvider. Остальной код
+ * зависит только от этого интерфейса.
  */
 export interface AuthContextValue {
   isLoading: boolean;
