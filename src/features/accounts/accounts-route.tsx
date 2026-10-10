@@ -11,8 +11,12 @@ import {
 } from '@gravity-ui/uikit';
 import { ArrowDown, ArrowUp, ArrowUpArrowDown, Printer, Xmark } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
-import { NoOrganizationSelectedState } from '@/shared/ui/states';
+import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useObjects } from '@/features/objects/api';
+import { MEALS } from '@/features/menu/types';
+import { formatDate } from '@/features/warehouse/format';
+import { useAccounts } from './api';
+import type { Account } from './types';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './accounts-route.css';
 import './accounts-drawer.css';
@@ -23,62 +27,41 @@ const ALL_OBJECTS = 'all';
 /** Единственная сортируемая колонка — дата счёта. */
 type AccountSort = 'date';
 
-const ACCOUNT_ROWS = [
-  {
-    objectId: 'sub-2-1',
-    date: '12.08.2026',
-    organization: 'Школа №5',
-    passed: 312,
-    charged: 124800,
-    meals: [
-      {
-        name: 'Завтрак',
-        passed: 72,
-        charged: 28800,
-        diets: [
-          { name: 'Обычная', passed: 42, charged: 16800 },
-          { name: 'Диета 5', passed: 30, charged: 12000 },
-        ],
-      },
-      {
-        name: 'Обед',
-        passed: 83,
-        charged: 33200,
-        diets: [
-          { name: 'Диета 5', passed: 45, charged: 18000 },
-          { name: 'Безмолочная', passed: 20, charged: 8000 },
-          { name: 'Белковая', passed: 18, charged: 7200 },
-        ],
-      },
-    ],
-  },
-  {
-    objectId: 'sub-2-5',
-    date: '10.08.2026',
-    organization: 'Детский сад №3',
-    passed: 198,
-    charged: 79200,
-    meals: [
-      {
-        name: 'Завтрак',
-        passed: 24,
-        charged: 9600,
-        diets: [
-          { name: 'Обычная', passed: 14, charged: 5600 },
-          { name: 'Пюревая', passed: 10, charged: 4000 },
-        ],
-      },
-      {
-        name: 'Обед',
-        passed: 24,
-        charged: 9600,
-        diets: [{ name: 'Пюревая', passed: 24, charged: 9600 }],
-      },
-    ],
-  },
-];
+/** Строка таблицы: счёт в том виде, в каком его показывают таблица и панель. */
+interface AccountRow {
+  objectId: string;
+  /** ДД.ММ.ГГГГ. */
+  date: string;
+  organization: string;
+  passed: number;
+  charged: number;
+  meals: {
+    name: string;
+    passed: number;
+    charged: number;
+    diets: { name: string; passed: number; charged: number }[];
+  }[];
+}
 
-type AccountRow = (typeof ACCOUNT_ROWS)[number];
+function toRow(account: Account): AccountRow {
+  return {
+    objectId: account.objectId,
+    date: formatDate(account.date),
+    organization: account.objectName,
+    passed: account.passed,
+    charged: account.charged,
+    meals: (account.meals ?? []).map((meal) => ({
+      name: MEALS.find((item) => item.id === meal.mealId)?.label ?? meal.mealId,
+      passed: meal.passed,
+      charged: meal.charged,
+      diets: (meal.diets ?? []).map((diet) => ({
+        name: diet.dietName,
+        passed: diet.passed,
+        charged: diet.charged,
+      })),
+    })),
+  };
+}
 
 export function AccountsRoute() {
   const { current } = useOrganizations();
@@ -93,6 +76,7 @@ export function AccountsRoute() {
   const [sort, setSort] = useState<AccountSort>('date');
   const [ascending, setAscending] = useState(false);
   const objects = useObjects();
+  const accounts = useAccounts();
 
   const objectFilterOptions = useMemo(() => {
     const all = objects.data?.objects ?? [];
@@ -106,14 +90,17 @@ export function AccountsRoute() {
     const byId = new Map((objects.data?.objects ?? []).map((object) => [object.id, object]));
     const direction = ascending ? 1 : -1;
 
-    return ACCOUNT_ROWS.filter((row) => {
-      if (objectId === ALL_OBJECTS) return true;
-      // Счёт выписан подобъекту; выбор родительского объекта показывает
-      // все его счета.
-      const rowObject = byId.get(row.objectId);
-      return row.objectId === objectId || rowObject?.parentObjectId === objectId;
-    }).sort((a, b) => (parseAccountDate(a.date) - parseAccountDate(b.date)) * direction);
-  }, [objectId, ascending, objects.data]);
+    return (accounts.data?.accounts ?? [])
+      .map(toRow)
+      .filter((row) => {
+        if (objectId === ALL_OBJECTS) return true;
+        // Счёт выписан подобъекту; выбор родительского объекта показывает
+        // все его счета.
+        const rowObject = byId.get(row.objectId);
+        return row.objectId === objectId || rowObject?.parentObjectId === objectId;
+      })
+      .sort((a, b) => (parseAccountDate(a.date) - parseAccountDate(b.date)) * direction);
+  }, [objectId, ascending, objects.data, accounts.data]);
 
   const onSort = (column: AccountSort) => {
     if (sort === column) {
@@ -184,13 +171,19 @@ export function AccountsRoute() {
         </Text>
       </Flex>
       <div className="ac-page__scroll">
-        <AccountsTable
-          rows={rows}
-          sort={sort}
-          ascending={ascending}
-          onSort={onSort}
-          onOpen={(row) => setSelected(row)}
-        />
+        {accounts.isPending && <LoadingState />}
+        {accounts.isError && (
+          <ErrorState error={accounts.error} onRetry={() => void accounts.refetch()} />
+        )}
+        {accounts.isSuccess && (
+          <AccountsTable
+            rows={rows}
+            sort={sort}
+            ascending={ascending}
+            onSort={onSort}
+            onOpen={(row) => setSelected(row)}
+          />
+        )}
       </div>
 
       <Drawer

@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useHandleSignInCallback } from '@logto/react';
 import { Alert, Button, Flex, Text } from '@gravity-ui/uikit';
@@ -6,17 +5,10 @@ import { config } from '@/shared/config';
 import { FullPageLoader } from '@/shared/ui/full-page-loader';
 
 /**
- * Завершение OIDC-редиректа. Режим-зависимая часть авторизации живёт здесь,
- * а не в роутах: страница /callback просто рендерит <AuthCallback/>.
+ * Завершение OIDC-редиректа. Часть авторизации живёт здесь, а не в роутах:
+ * страница /callback просто рендерит <AuthCallback/>.
  */
 export function AuthCallback() {
-  if (config.authMode === 'logto') {
-    return <LogtoCallback />;
-  }
-  return <MockCallback />;
-}
-
-function LogtoCallback() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
@@ -59,13 +51,5 @@ function LogtoCallback() {
   }
 
   if (isLoading) return <FullPageLoader />;
-  return <FullPageLoader />;
-}
-
-function MockCallback() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    navigate('/app', { replace: true });
-  }, [navigate]);
   return <FullPageLoader />;
 }

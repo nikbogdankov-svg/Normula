@@ -30,14 +30,12 @@ preset_get() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$PRESET" | head -n 1
 }
 
-AUTH_MODE="${AUTH_MODE:-$(preset_get AUTH_MODE)}"
 API_UPSTREAM="${API_UPSTREAM:-$(preset_get API_UPSTREAM)}"
 API_RESOURCE="${API_RESOURCE:-$(preset_get API_RESOURCE)}"
 LOGTO_ENDPOINT="${LOGTO_ENDPOINT:-$(preset_get LOGTO_ENDPOINT)}"
 LOGTO_APP_ID="${LOGTO_APP_ID:-$(preset_get LOGTO_APP_ID)}"
-MOCK_UNIMPLEMENTED="${MOCK_UNIMPLEMENTED:-$(preset_get MOCK_UNIMPLEMENTED)}"
 
-for key in AUTH_MODE API_UPSTREAM API_RESOURCE LOGTO_ENDPOINT LOGTO_APP_ID; do
+for key in API_UPSTREAM API_RESOURCE LOGTO_ENDPOINT LOGTO_APP_ID; do
   eval "value=\${$key}"
   if [ -z "$value" ]; then
     echo "[entrypoint] не задан ${key} (ни в ${PRESET}, ни в окружении)" >&2
@@ -45,19 +43,10 @@ for key in AUTH_MODE API_UPSTREAM API_RESOURCE LOGTO_ENDPOINT LOGTO_APP_ID; do
   fi
 done
 
-# mock-режим — только для локальной разработки: в образе он означал бы
-# «приложение без авторизации и без бэка», выкатывать такое нельзя.
-if [ "$AUTH_MODE" != "logto" ]; then
-  echo "[entrypoint] AUTH_MODE='${AUTH_MODE}' в контейнере запрещён: только 'logto'" >&2
-  exit 1
-fi
-
 cat > /usr/share/nginx/html/config.js <<CFG
 window.__APP_CONFIG__ = {
   "env": "${APP_ENV}",
   "apiBaseUrl": "/api",
-  "authMode": "${AUTH_MODE}",
-  "mockUnimplemented": ${MOCK_UNIMPLEMENTED},
   "logto": {
     "endpoint": "${LOGTO_ENDPOINT}",
     "appId": "${LOGTO_APP_ID}",

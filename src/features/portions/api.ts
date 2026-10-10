@@ -99,10 +99,6 @@ export function useCopyPortionsDay() {
  * Карты ТТК по именам блюд раздачи — для наклеек на термос. Сначала грузится
  * список карт, затем полная карта по каждому найденному имени. Потеряли имя
  * (карты нет) — блюдо в выдаче отсутствует, наклейка печатается без состава.
- *
- * Data берётся из мок-двойника /v1/mock/ttk: раздача по блюдам ещё на моках,
- * её блюда завязаны на мок-карты, поэтому настоящий /v1/ttk с ними не
- * совпадёт. Двойник удаляется вместе с моками раздачи.
  */
 export function useStickerRecipes(dishNames: string[]): {
   summaries: RecipeSummary[] | undefined;
@@ -119,7 +115,7 @@ export function useStickerRecipes(dishNames: string[]): {
 
   const list = useQuery({
     queryKey: [KEY, api.organizationId, 'ttk-list'],
-    queryFn: () => api.request<ListRecipesResponse>('/v1/mock/ttk'),
+    queryFn: () => api.request<ListRecipesResponse>('/v1/ttk'),
     enabled: api.organizationId !== null && names.length > 0,
   });
 
@@ -141,7 +137,7 @@ export function useStickerRecipes(dishNames: string[]): {
     queryFn: async () => {
       const recipes = new Map<string, Recipe>();
       for (const id of ids) {
-        const { recipe } = await api.request<GetRecipeResponse>(`/v1/mock/ttk/${id}`);
+        const { recipe } = await api.request<GetRecipeResponse>(`/v1/ttk/${id}`);
         recipes.set(recipe.name.trim().toLowerCase(), recipe);
       }
       return recipes;
