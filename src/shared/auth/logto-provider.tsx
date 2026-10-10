@@ -8,20 +8,13 @@ import {
   UserScope,
   type LogtoConfig,
 } from '@logto/react';
-import { config, type LogtoSettings } from '@/shared/config';
+import { config } from '@/shared/config';
 import {
   AuthContext,
   type AuthContextValue,
   type AuthUser,
   type Organization,
 } from './auth-context';
-
-function requireLogtoSettings(): LogtoSettings {
-  if (!config.logto) {
-    throw new Error("authMode='logto', но config.logto не задан");
-  }
-  return config.logto;
-}
 
 /**
  * Конфиг SPA-приложения Logto (PKCE, без секрета).
@@ -43,7 +36,7 @@ function requireLogtoSettings(): LogtoSettings {
  * (см. withReservedScopes в @logto/js), а имя и почту хранит бэкенд.
  */
 function buildLogtoConfig(): LogtoConfig {
-  const logto = requireLogtoSettings();
+  const logto = config.logto;
 
   return {
     endpoint: logto.endpoint,
@@ -120,7 +113,7 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
     clearAllTokens,
     fetchUserInfo,
   } = logto;
-  const apiResource = requireLogtoSettings().apiResource;
+  const apiResource = config.logto.apiResource;
   const [user, setUser] = useState<AuthUser | null>(null);
 
   // Методы useLogto не бросают исключений: SDK ловит ошибку, кладёт её в

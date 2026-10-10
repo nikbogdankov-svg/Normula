@@ -12,6 +12,7 @@ import {
   type ListWriteOffsResponse,
   type ReceiptRequest,
   type TransferRequest,
+  type WriteOffKind,
   type WriteOffRequest,
 } from './types';
 
@@ -56,14 +57,16 @@ export function useReceipt(id: string | null) {
   });
 }
 
-/** Страницы списаний объекта: свежие сверху, следующая — по курсору. */
-export function useWriteOffs(params: ListParams) {
+/** Страницы списаний объекта одного типа: свежие сверху, следующая — по курсору. */
+export function useWriteOffs(params: ListParams, kind: WriteOffKind) {
   const api = useApi();
 
   return useInfiniteQuery({
-    queryKey: [KEY, api.organizationId, 'write-offs', params.objectId, params.search],
+    queryKey: [KEY, api.organizationId, 'write-offs', params.objectId, params.search, kind],
     queryFn: ({ pageParam }) =>
-      api.request<ListWriteOffsResponse>(listQuery('/v1/warehouse/write-offs', params, pageParam)),
+      api.request<ListWriteOffsResponse>(
+        `${listQuery('/v1/warehouse/write-offs', params, pageParam)}&kind=${kind}`
+      ),
     initialPageParam: '',
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
     enabled: api.organizationId !== null && params.objectId !== '',

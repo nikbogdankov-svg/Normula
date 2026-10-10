@@ -21,27 +21,9 @@ export interface RequestOptions {
 
 /**
  * Единая точка HTTP-общения с бэкендом. Функция чистая: токен приходит
- * аргументом, base URL — из runtime-конфига. В mock-режиме запрос
- * перехватывает in-memory реестр (см. mock-handlers.ts) — сети нет вообще.
+ * аргументом, base URL — из runtime-конфига.
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  // Полностью офлайновый режим: из памяти отвечает всё.
-  if (config.authMode === 'mock') {
-    const { handleMockRequest } = await import('./mock-handlers');
-
-    return handleMockRequest<T>(path, options);
-  }
-
-  // Вход настоящий, но у части разделов бэкенда ещё нет — их обслуживаем
-  // из памяти, чтобы они не отдавали 404 живому пользователю.
-  if (config.mockUnimplemented) {
-    const { handleMockRequest, isMocked } = await import('./mock-handlers');
-
-    if (isMocked(path)) {
-      return handleMockRequest<T>(path, options);
-    }
-  }
-
   const headers: Record<string, string> = {};
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers.Authorization = `Bearer ${options.token}`;

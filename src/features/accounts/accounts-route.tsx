@@ -14,6 +14,10 @@ import { useOrganizations } from '@/shared/auth';
 import { usePageObjectChoice } from '@/shared/object-selection';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useObjects } from '@/features/objects/api';
+import { MEALS } from '@/features/menu/types';
+import { formatDate } from '@/features/warehouse/format';
+import { useAccounts } from './api';
+import type { Account } from './types';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './accounts-route.css';
 import './accounts-drawer.css';
@@ -76,7 +80,25 @@ const ACCOUNT_ROWS = [
   },
 ];
 
-type AccountRow = (typeof ACCOUNT_ROWS)[number];
+function toRow(account: Account): AccountRow {
+  return {
+    objectId: account.objectId,
+    date: formatDate(account.date),
+    organization: account.objectName,
+    passed: account.passed,
+    charged: account.charged,
+    meals: (account.meals ?? []).map((meal) => ({
+      name: MEALS.find((item) => item.id === meal.mealId)?.label ?? meal.mealId,
+      passed: meal.passed,
+      charged: meal.charged,
+      diets: (meal.diets ?? []).map((diet) => ({
+        name: diet.dietName,
+        passed: diet.passed,
+        charged: diet.charged,
+      })),
+    })),
+  };
+}
 
 export function AccountsRoute() {
   const { current } = useOrganizations();
@@ -88,6 +110,7 @@ export function AccountsRoute() {
 
   // Фильтр живёт на клиенте: счета приходят целиком.
   const objects = useObjects();
+  const accounts = useAccounts();
 
   const objectOptions = useMemo(() => {
     const all = objects.data?.objects ?? [];
@@ -106,14 +129,26 @@ export function AccountsRoute() {
   const rows = useMemo(() => {
     const byId = new Map((objects.data?.objects ?? []).map((object) => [object.id, object]));
 
-    return ACCOUNT_ROWS.filter((row) => {
-      if (objectId === ALL_OBJECTS) return true;
-      // Счёт выписан подобъекту; выбор родительского объекта показывает
-      // все его счета.
-      const rowObject = byId.get(row.objectId);
-      return row.objectId === objectId || rowObject?.parentObjectId === objectId;
-    });
-  }, [objectId, objects.data]);
+    return (accounts.data?.accounts ?? [])
+      .map(toRow)
+      .filter((row) => {
+        if (objectId === ALL_OBJECTS) return true;
+        // Счёт выписан подобъекту; выбор родительского объекта показывает
+        // все его счета.
+        const rowObject = byId.get(row.objectId);
+        return row.objectId === objectId || rowObject?.parentObjectId === objectId;
+      })
+      .sort((a, b) => (parseAccountDate(a.date) - parseAccountDate(b.date)) * direction);
+  }, [objectId, ascending, objects.data, accounts.data]);
+
+  const onSort = (column: AccountSort) => {
+    if (sort === column) {
+      setAscending((value) => !value);
+    } else {
+      setSort(column);
+      setAscending(true);
+    }
+  };
 
   useEffect(() => {
     if (!selected) {
@@ -175,7 +210,19 @@ export function AccountsRoute() {
         </Text>
       </Flex>
       <div className="ac-page__scroll">
-        <AccountsTable rows={rows} onOpen={(row) => setSelected(row)} />
+        {accounts.isPending && <LoadingState />}
+        {accounts.isError && (
+          <ErrorState error={accounts.error} onRetry={() => void accounts.refetch()} />
+        )}
+        {accounts.isSuccess && (
+          <AccountsTable
+            rows={rows}
+            sort={sort}
+            ascending={ascending}
+            onSort={onSort}
+            onOpen={(row) => setSelected(row)}
+          />
+        )}
       </div>
 
       <Drawer
