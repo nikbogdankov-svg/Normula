@@ -9,8 +9,9 @@ import {
   Text,
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
-import { ArrowDown, ArrowUp, ArrowUpArrowDown, Printer, Xmark } from '@gravity-ui/icons';
+import { Printer, Xmark } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { usePageObjectChoice } from '@/shared/object-selection';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useObjects } from '@/features/objects/api';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
@@ -19,9 +20,6 @@ import './accounts-drawer.css';
 
 /** Значение фильтра «Все объекты». */
 const ALL_OBJECTS = 'all';
-
-/** Единственная сортируемая колонка — дата счёта. */
-type AccountSort = 'date';
 
 const ACCOUNT_ROWS = [
   {
@@ -88,23 +86,25 @@ export function AccountsRoute() {
   const [view, setView] = useState<AccountRow | null>(null);
   const allowCloseRef = useRef(false);
 
-  // Фильтр и сортировка живут на клиенте: счета приходят целиком.
-  const [objectId, setObjectId] = useState(ALL_OBJECTS);
-  const [sort, setSort] = useState<AccountSort>('date');
-  const [ascending, setAscending] = useState(false);
+  // Фильтр живёт на клиенте: счета приходят целиком.
   const objects = useObjects();
 
-  const objectFilterOptions = useMemo(() => {
+  const objectOptions = useMemo(() => {
     const all = objects.data?.objects ?? [];
-    return [
-      { value: ALL_OBJECTS, content: 'Все объекты' },
-      ...all.map((object) => ({ value: object.id, content: object.name })),
-    ];
+    return all.map((object) => ({ value: object.id, content: object.name }));
   }, [objects.data]);
+  const { objectId, setObjectIdLocal: setObjectId } = usePageObjectChoice(
+    objectOptions,
+    ALL_OBJECTS
+  );
+
+  const objectFilterOptions = useMemo(
+    () => [{ value: ALL_OBJECTS, content: 'Все объекты' }, ...objectOptions],
+    [objectOptions]
+  );
 
   const rows = useMemo(() => {
     const byId = new Map((objects.data?.objects ?? []).map((object) => [object.id, object]));
-    const direction = ascending ? 1 : -1;
 
     return ACCOUNT_ROWS.filter((row) => {
       if (objectId === ALL_OBJECTS) return true;
@@ -112,17 +112,8 @@ export function AccountsRoute() {
       // все его счета.
       const rowObject = byId.get(row.objectId);
       return row.objectId === objectId || rowObject?.parentObjectId === objectId;
-    }).sort((a, b) => (parseAccountDate(a.date) - parseAccountDate(b.date)) * direction);
-  }, [objectId, ascending, objects.data]);
-
-  const onSort = (column: AccountSort) => {
-    if (sort === column) {
-      setAscending((value) => !value);
-    } else {
-      setSort(column);
-      setAscending(true);
-    }
-  };
+    });
+  }, [objectId, objects.data]);
 
   useEffect(() => {
     if (!selected) {
@@ -184,13 +175,7 @@ export function AccountsRoute() {
         </Text>
       </Flex>
       <div className="ac-page__scroll">
-        <AccountsTable
-          rows={rows}
-          sort={sort}
-          ascending={ascending}
-          onSort={onSort}
-          onOpen={(row) => setSelected(row)}
-        />
+        <AccountsTable rows={rows} onOpen={(row) => setSelected(row)} />
       </div>
 
       <Drawer
@@ -267,29 +252,15 @@ export function AccountsRoute() {
 /** Шапка таблицы закреплена, скроллится только список строк. */
 function AccountsTable({
   rows,
-  sort,
-  ascending,
-  onSort,
   onOpen,
 }: {
   rows: AccountRow[];
-  sort: AccountSort;
-  ascending: boolean;
-  onSort: (column: AccountSort) => void;
   onOpen: (row: AccountRow) => void;
 }) {
   const columns: TableColumnConfig<AccountRow>[] = [
     {
       id: 'date',
-      name: () => (
-        <SortableHeader
-          label="Дата"
-          column="date"
-          sort={sort}
-          ascending={ascending}
-          onSort={onSort}
-        />
-      ),
+      name: 'Дата',
       template: (row) => <Text variant="body-2">{row.date}</Text>,
     },
     {
@@ -327,54 +298,4 @@ function AccountsTable({
       </div>
     </>
   );
-}
-
-/** Заголовок «Дата» с переключением направления сортировки по клику. */
-function SortableHeader({
-  label,
-  column,
-  sort,
-  ascending,
-  onSort,
-}: {
-  label: string;
-  column: AccountSort;
-  sort: AccountSort;
-  ascending: boolean;
-  onSort: (column: AccountSort) => void;
-}) {
-  const active = sort === column;
-  const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
-
-  return (
-    <Flex
-      alignItems="center"
-      gap={1}
-      style={{ cursor: 'pointer', userSelect: 'none' }}
-      onClick={() => onSort(column)}
-      title={
-        active
-          ? ascending
-            ? 'По возрастанию — нажмите для убывания'
-            : 'По убыванию — нажмите для возрастания'
-          : `Сортировать по: ${label}`
-      }
-    >
-      {label}
-      <span
-        style={{
-          display: 'inline-flex',
-          color: active ? 'var(--g-color-text-primary)' : 'var(--g-color-text-secondary)',
-        }}
-      >
-        <Icon data={icon} size={14} />
-      </span>
-    </Flex>
-  );
-}
-
-/** Дата вида «ДД.ММ.ГГГГ» в число для сравнения. */
-function parseAccountDate(value: string): number {
-  const [day, month, year] = value.split('.').map(Number);
-  return new Date(year, month - 1, day).getTime();
 }

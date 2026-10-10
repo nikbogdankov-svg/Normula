@@ -97,7 +97,7 @@ function WriteOffsTable({
 export function WriteOffsRoute() {
   const api = useApi();
   const [objectId, setObjectId] = useState('');
-  const { options, objects } = useObjectChoice(objectId, setObjectId);
+  const { options, objects, changeObjectId } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search.trim());
   const [openedId, setOpenedId] = useState<string | null>(null);
@@ -123,7 +123,7 @@ export function WriteOffsRoute() {
         <Flex alignItems="center" gap={2} wrap>
           <ObjectSelect
             value={objectId}
-            onUpdate={setObjectId}
+            onUpdate={changeObjectId}
             options={options}
             disabled={objects.isPending}
           />

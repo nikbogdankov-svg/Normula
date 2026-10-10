@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster, ToasterComponent, ToasterProvider } from '@gravity-ui/uikit';
 import { AuthProvider, OrgProvider } from '@/shared/auth';
+import { ObjectSelectionProvider } from '@/shared/object-selection';
 import { ApiError } from '@/shared/api/client';
 import { AppThemeProvider } from './theme';
 import { ErrorBoundary } from './error-boundary';
@@ -31,7 +32,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <ToasterProvider toaster={toaster}>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <OrgProvider>{children}</OrgProvider>
+              <OrgProvider>
+                <ObjectSelectionProvider>{children}</ObjectSelectionProvider>
+              </OrgProvider>
             </AuthProvider>
           </QueryClientProvider>
           <ToasterComponent />
