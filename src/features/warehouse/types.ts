@@ -93,6 +93,12 @@ export interface GetReceiptResponse {
   receipt: Receipt;
 }
 
+/**
+ * Тип списания: manual — исключительное, заведённое вручную; auto —
+ * автоматическое, заведено подтверждением раскладки и не правится.
+ */
+export type WriteOffKind = 'manual' | 'auto';
+
 /** Списание в списке, без строк. */
 export interface WriteOffSummary {
   id: string;
@@ -101,6 +107,7 @@ export interface WriteOffSummary {
   reason: string;
   itemsCount: number;
   total: number;
+  kind: WriteOffKind;
 }
 
 /** Строка списания. */
@@ -126,6 +133,7 @@ export interface WriteOff {
   reason: string;
   items: WriteOffItem[];
   total: number;
+  kind: WriteOffKind;
 }
 
 export interface WriteOffItemInput {

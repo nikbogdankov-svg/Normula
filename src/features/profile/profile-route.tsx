@@ -1,15 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import {
-  Button,
-  Card,
-  Flex,
-  Icon,
-  Select,
-  Switch,
-  Text,
-  TextInput,
-  useToaster,
-} from '@gravity-ui/uikit';
+import { Button, Card, Flex, Icon, Select, Switch, Text, TextInput } from '@gravity-ui/uikit';
 import { ArrowRightFromSquare, Bell, Gear, Key, Person, ShieldCheck } from '@gravity-ui/icons';
 import type { IconData } from '@gravity-ui/uikit';
 import { useAuth } from '@/shared/auth';
@@ -79,19 +69,9 @@ function PersonalCard() {
 
 function SecurityCard() {
   const { signOut } = useAuth();
-  const toaster = useToaster();
 
   const openPasswordSettings = () => {
-    if (config.authMode === 'logto' && config.logto) {
-      window.open(config.logto.endpoint, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    toaster.add({
-      name: 'profile-password',
-      title: 'Недоступно в offline-режиме',
-      content: 'Смена пароля доступна при входе через службу идентификации.',
-      theme: 'info',
-    });
+    window.open(config.logto.endpoint, '_blank', 'noopener,noreferrer');
   };
 
   return (

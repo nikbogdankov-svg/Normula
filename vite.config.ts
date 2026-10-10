@@ -13,17 +13,10 @@ import react from '@vitejs/plugin-react';
  *
  * Любой ключ переопределяется одноимённой переменной окружения:
  *   API_UPSTREAM=http://localhost:8080 npm run dev
- *   AUTH_MODE=mock npm run dev
  */
 const APP_ENV = process.env.APP_ENV ?? 'local';
 
-type EnvKey =
-  | 'AUTH_MODE'
-  | 'API_UPSTREAM'
-  | 'API_RESOURCE'
-  | 'LOGTO_ENDPOINT'
-  | 'LOGTO_APP_ID'
-  | 'MOCK_UNIMPLEMENTED';
+type EnvKey = 'API_UPSTREAM' | 'API_RESOURCE' | 'LOGTO_ENDPOINT' | 'LOGTO_APP_ID';
 
 function readPreset(env: string): Record<string, string> {
   const file = path.resolve(__dirname, 'config', `env.${env}`);
@@ -41,16 +34,13 @@ function readPreset(env: string): Record<string, string> {
 const preset = readPreset(APP_ENV);
 const setting = (key: EnvKey): string => process.env[key] ?? preset[key] ?? '';
 
-const authMode = setting('AUTH_MODE') || 'logto';
 const apiUpstream = setting('API_UPSTREAM');
 
-if (authMode === 'logto') {
-  const missing = (['API_RESOURCE', 'LOGTO_ENDPOINT', 'LOGTO_APP_ID'] as const).filter(
-    (key) => !setting(key)
-  );
-  if (missing.length > 0) {
-    throw new Error(`APP_ENV='${APP_ENV}': не заданы ${missing.join(', ')}`);
-  }
+const missing = (['API_RESOURCE', 'LOGTO_ENDPOINT', 'LOGTO_APP_ID'] as const).filter(
+  (key) => !setting(key)
+);
+if (missing.length > 0) {
+  throw new Error(`APP_ENV='${APP_ENV}': не заданы ${missing.join(', ')}`);
 }
 
 /** Ровно тот же формат, что рендерит docker/entrypoint.sh в контейнере. */
@@ -58,8 +48,6 @@ function renderConfigJs(): string {
   const appConfig = {
     env: APP_ENV,
     apiBaseUrl: '/api',
-    authMode,
-    mockUnimplemented: setting('MOCK_UNIMPLEMENTED') === 'true',
     logto: {
       endpoint: setting('LOGTO_ENDPOINT'),
       appId: setting('LOGTO_APP_ID'),
@@ -101,7 +89,7 @@ function runtimeConfigPlugin(): Plugin {
 }
 
 export default defineConfig(() => {
-  console.info(`[onemore] APP_ENV=${APP_ENV} authMode=${authMode} api=${apiUpstream}`);
+  console.info(`[onemore] APP_ENV=${APP_ENV} api=${apiUpstream}`);
 
   return {
     plugins: [react(), runtimeConfigPlugin()],

@@ -12,6 +12,8 @@ import {
   Text,
   TextInput,
   Table,
+  Tooltip,
+  useToaster,
 } from '@gravity-ui/uikit';
 import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, CircleCheck, Magnifier, Printer } from '@gravity-ui/icons';
@@ -24,7 +26,7 @@ import {
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
-import { useProductSpread } from './api';
+import { useConfirmProductSpread, useProductSpread } from './api';
 import { MEALS, type ProductSpreadItem } from './types';
 import './products-spread-route.css';
 
@@ -73,7 +75,8 @@ export function ProductsSpreadRoute() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ProductSpreadItem | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const toaster = useToaster();
+  const confirmSpread = useConfirmProductSpread();
 
   // Объекты верхнего уровня, кроме складов: раскладка идёт по объекту вместе
   // с его подобъектами.
@@ -87,6 +90,30 @@ export function ProductsSpreadRoute() {
   const activeObjectId = selectedObjectId === ALL_OBJECTS ? null : selectedObjectId;
 
   const spread = useProductSpread(date, activeObjectId);
+  const confirmed = spread.data?.confirmed ?? false;
+
+  const onConfirm = () => {
+    confirmSpread.mutate(
+      { date, objectId: activeObjectId ?? undefined },
+      {
+        onSuccess: () => {
+          setConfirmOpen(false);
+          toaster.add({
+            name: 'products-spread-confirmed',
+            title: 'Товары списаны со склада',
+            theme: 'success',
+          });
+        },
+        onError: (e) =>
+          toaster.add({
+            name: 'products-spread-confirm',
+            title: 'Ошибка',
+            content: e.message,
+            theme: 'danger',
+          }),
+      }
+    );
+  };
 
   const items = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -105,8 +132,8 @@ export function ProductsSpreadRoute() {
   const loading = spread.isPending || objects.isPending;
   const error = spread.isError || objects.isError;
 
-  // Подтвердить списание можно только за сегодня и завтра; более поздние
-  // даты — только просмотр.
+  // Подтвердить списание можно за любой прошедший день, сегодня и завтра;
+  // более поздние даты — только просмотр. Бэкенд проверяет то же по Москве.
   const canConfirm = date <= shiftIso(todayIso(), 1);
 
   return (
@@ -199,20 +226,25 @@ export function ProductsSpreadRoute() {
               <Text variant="body-1" color="secondary">
                 Товары уже списаны со склада
               </Text>
-            ) : canConfirm ? (
-              <Button
-                size="l"
-                view="action"
-                title="Подтвердить списание товаров"
-                onClick={() => setConfirmOpen(true)}
-              >
-                <Icon data={CircleCheck} size={16} />
-                Подтвердить списание товаров
-              </Button>
             ) : (
-              <Text variant="body-1" color="secondary">
-                Подтвердить раскладку возможно только для сегодняшнего либо завтрашнего дня
-              </Text>
+              <Tooltip
+                content="Подтвердить списание можно за прошедшие дни, сегодня и завтра"
+                disabled={canConfirm}
+                openDelay={0}
+              >
+                <span tabIndex={canConfirm ? undefined : 0}>
+                  <Button
+                    size="l"
+                    view="action"
+                    title={canConfirm ? 'Подтвердить списание товаров' : undefined}
+                    disabled={!canConfirm}
+                    onClick={() => setConfirmOpen(true)}
+                  >
+                    <Icon data={CircleCheck} size={16} />
+                    Подтвердить списание товаров
+                  </Button>
+                </span>
+              </Tooltip>
             )}
           </Flex>
         </Flex>
@@ -244,11 +276,9 @@ export function ProductsSpreadRoute() {
 
       <ConfirmSpreadDialog
         open={confirmOpen}
+        loading={confirmSpread.isPending}
         onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmed(true);
-          setConfirmOpen(false);
-        }}
+        onConfirm={onConfirm}
       />
     </div>
   );
@@ -257,10 +287,12 @@ export function ProductsSpreadRoute() {
 /** Попап подтверждения списания: действие необратимо. */
 function ConfirmSpreadDialog({
   open,
+  loading,
   onClose,
   onConfirm,
 }: {
   open: boolean;
+  loading: boolean;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -277,6 +309,7 @@ function ConfirmSpreadDialog({
       <Dialog.Footer
         textButtonApply="Подтвердить"
         textButtonCancel="Отмена"
+        loading={loading}
         onClickButtonApply={onConfirm}
         onClickButtonCancel={onClose}
       />
