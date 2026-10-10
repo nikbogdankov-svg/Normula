@@ -117,7 +117,7 @@ export function TtkRoute() {
         <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
           <Select
             size="l"
-            width={260}
+            width={280}
             label="Сборник:"
             value={[collection]}
             onUpdate={(value) => setCollection(value[0] ?? ALL_COLLECTIONS)}

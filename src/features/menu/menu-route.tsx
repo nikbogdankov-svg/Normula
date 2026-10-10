@@ -20,6 +20,7 @@ import {
   Printer,
 } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { useObjectSelection } from '@/shared/object-selection';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
   useAllowViolation,
@@ -127,6 +128,11 @@ function MenuByDates() {
   const fillSchedule = useFillSchedule();
   const createMenu = useCreateMenu();
   const toaster = useToaster();
+  const {
+    objectId: savedObjectId,
+    setObjectId: saveObjectId,
+    clearObjectId,
+  } = useObjectSelection();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
   const [objectId, setObjectId] = useState<string | null>(null);
   const [dietId, setDietId] = useState<string | null>(null);
@@ -147,8 +153,14 @@ function MenuByDates() {
 
   useEffect(() => {
     if (topLevelObjects.length === 0) return;
-    setObjectId((current) => current ?? topLevelObjects[0].id);
-  }, [topLevelObjects]);
+    setObjectId(
+      (current) =>
+        current ??
+        (savedObjectId && topLevelObjects.some((object) => object.id === savedObjectId)
+          ? savedObjectId
+          : topLevelObjects[0].id)
+    );
+  }, [topLevelObjects, savedObjectId]);
 
   /** Рационы селекта — диеты групп выбранного объекта; без групп — весь справочник. */
   const groupDiets = objectDiets(selectedObject);
@@ -484,7 +496,12 @@ function MenuByDates() {
             width={280}
             value={objectId ? [objectId] : []}
             placeholder="Выберите объект"
-            onUpdate={(values) => setObjectId(values[0] ?? null)}
+            onUpdate={(values) => {
+              const next = values[0] ?? null;
+              setObjectId(next);
+              if (next) saveObjectId(next);
+              else clearObjectId();
+            }}
             options={objectOptions}
             disabled={objectsList.length === 0}
             popupClassName="menu-object-select-popup"

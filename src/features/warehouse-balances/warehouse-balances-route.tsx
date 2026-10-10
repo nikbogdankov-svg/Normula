@@ -69,7 +69,7 @@ function buildCards(batches: Batch[], search: string): ProductCard[] {
 export function WarehouseBalancesRoute() {
   const api = useApi();
   const [objectId, setObjectId] = useState('');
-  const { options, objects } = useObjectChoice(objectId, setObjectId);
+  const { options, objects, changeObjectId } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -106,7 +106,7 @@ export function WarehouseBalancesRoute() {
       <Flex justifyContent="space-between" gap={8} className="warehouse-balances-page__toolbar">
         <ObjectSelect
           value={objectId}
-          onUpdate={setObjectId}
+          onUpdate={changeObjectId}
           options={options}
           disabled={objects.isPending}
         />
