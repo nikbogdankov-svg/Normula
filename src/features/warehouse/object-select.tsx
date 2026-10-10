@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Select } from '@gravity-ui/uikit';
 import { useObjects } from '@/features/objects/api';
+import { useObjectSelection } from '@/shared/object-selection';
 import type { ObjectItem } from '@/features/objects/types';
 
 /** Объект в селекте склада. */
@@ -21,18 +22,31 @@ export function objectOptions(objects: ObjectItem[]): ObjectOption[] {
 
 /**
  * Выбор объекта для разделов склада. Пока ничего не выбрано, подставляет
- * первый объект организации — иначе списки не с чего грузить.
+ * сохранённый на других страницах объект, а если его нет — первый объект
+ * организации, иначе списки не с чего грузить.
  */
 export function useObjectChoice(value: string, onUpdate: (id: string) => void) {
   const objects = useObjects();
   const options = useMemo(() => objectOptions(objects.data?.objects ?? []), [objects.data]);
+  const { objectId: savedObjectId, setObjectId } = useObjectSelection();
 
   useEffect(() => {
-    if (value || options.length === 0) return;
-    onUpdate(options[0].value);
-  }, [value, options, onUpdate]);
+    if (options.length === 0) return;
+    const preferred =
+      savedObjectId && options.some((option) => option.value === savedObjectId)
+        ? savedObjectId
+        : options[0].value;
+    if (value === '' || !options.some((option) => option.value === value)) {
+      onUpdate(preferred);
+    }
+  }, [value, options, savedObjectId, onUpdate]);
 
-  return { options, objects };
+  const changeObjectId = (next: string) => {
+    onUpdate(next);
+    setObjectId(next);
+  };
+
+  return { options, objects, changeObjectId };
 }
 
 export function ObjectSelect({

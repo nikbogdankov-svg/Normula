@@ -19,6 +19,7 @@ import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, CircleCheck, Magnifier, Printer } from '@gravity-ui/icons';
 import { useObjects } from '@/features/objects/api';
 import { useOrganizations } from '@/shared/auth';
+import { usePageObjectChoice } from '@/shared/object-selection';
 import {
   EmptyState,
   ErrorState,
@@ -28,6 +29,7 @@ import {
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { useConfirmProductSpread, useProductSpread } from './api';
 import { MEALS, type ProductSpreadItem } from './types';
+import { buildProductSpreadPrint, downloadProductSpreadDoc } from './products-spread-print';
 import './products-spread-route.css';
 
 const ALL_OBJECTS = '__all';
@@ -58,6 +60,12 @@ function formatQuantity(quantity: number, unit: string): string {
   return `${quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${unit}`;
 }
 
+/** ISO-дата в виде «ДД.ММ.ГГГГ» для печатного документа. */
+function formatDisplayDate(date: string): string {
+  const [y, m, d] = date.split('-');
+  return `${d}.${m}.${y}`;
+}
+
 /** Раскладка продуктов на день: тулбар закреплён, скроллится таблица. */
 export function ProductsSpreadRoute() {
   const { current } = useOrganizations();
@@ -70,7 +78,6 @@ export function ProductsSpreadRoute() {
     setSearchParams(next === todayIso() ? {} : { date: next }, { replace: true });
   };
 
-  const [selectedObjectId, setSelectedObjectId] = useState<string>(ALL_OBJECTS);
   const [viewMode, setViewMode] = useState<SpreadView>('meals');
   const [searchQuery, setSearchQuery] = useState('');
   const [selected, setSelected] = useState<ProductSpreadItem | null>(null);
@@ -86,6 +93,14 @@ export function ProductsSpreadRoute() {
         (object) => !object.parentObjectId && object.type !== 'warehouse'
       ),
     [objects.data]
+  );
+  const objectOptions = useMemo(
+    () => objectsList.map((unit) => ({ value: unit.id, content: unit.name })),
+    [objectsList]
+  );
+  const { objectId: selectedObjectId, setObjectIdLocal: setSelectedObjectId } = usePageObjectChoice(
+    objectOptions,
+    ALL_OBJECTS
   );
   const activeObjectId = selectedObjectId === ALL_OBJECTS ? null : selectedObjectId;
 
@@ -132,8 +147,23 @@ export function ProductsSpreadRoute() {
   const loading = spread.isPending || objects.isPending;
   const error = spread.isError || objects.isError;
 
-  // Подтвердить списание можно за любой прошедший день, сегодня и завтра;
-  // более поздние даты — только просмотр. Бэкенд проверяет то же по Москве.
+  const activeObjectName =
+    activeObjectId === null
+      ? null
+      : (objectsList.find((unit) => unit.id === activeObjectId)?.name ?? null);
+
+  const handlePrint = () => {
+    if (!spread.data) return;
+    const printData = buildProductSpreadPrint(spread.data.items);
+    void downloadProductSpreadDoc({
+      displayDate: formatDisplayDate(date),
+      objectName: activeObjectName ?? 'Вся организация',
+      ...printData,
+    });
+  };
+
+  // Подтвердить списание можно только за сегодня и завтра; более поздние
+  // даты — только просмотр.
   const canConfirm = date <= shiftIso(todayIso(), 1);
 
   return (
@@ -141,6 +171,18 @@ export function ProductsSpreadRoute() {
       <Flex className="products-spread-page__toolbar" direction="column" gap={3} wrap>
         <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
           <Flex alignItems="center" gap={3} wrap>
+            {objectsList.length > 0 && (
+              <Select
+                size="l"
+                width={280}
+                label="Объект:"
+                title="Объект:"
+                value={[selectedObjectId]}
+                onUpdate={(value) => setSelectedObjectId(value[0] ?? ALL_OBJECTS)}
+                placeholder="Выберите объект"
+                options={[{ value: ALL_OBJECTS, content: 'Вся организация' }, ...objectOptions]}
+              />
+            )}
             <Flex alignItems="center" gap={1}>
               <Button
                 view="outlined"
@@ -165,21 +207,6 @@ export function ProductsSpreadRoute() {
                 <Icon data={ChevronRight} size={16} />
               </Button>
             </Flex>
-            {objectsList.length > 0 && (
-              <Select
-                size="l"
-                width={280}
-                label="Объект:"
-                title="Объект:"
-                value={[selectedObjectId]}
-                onUpdate={(value) => setSelectedObjectId(value[0] ?? ALL_OBJECTS)}
-                placeholder="Выберите объект"
-                options={[
-                  { value: ALL_OBJECTS, content: 'Вся организация' },
-                  ...objectsList.map((unit) => ({ value: unit.id, content: unit.name })),
-                ]}
-              />
-            )}
           </Flex>
           <Flex alignItems="center" gap={3}>
             <SegmentedRadioGroup
@@ -191,7 +218,12 @@ export function ProductsSpreadRoute() {
               <SegmentedRadioGroup.Option value="meals">По приёмам пищи</SegmentedRadioGroup.Option>
               <SegmentedRadioGroup.Option value="products">По продуктам</SegmentedRadioGroup.Option>
             </SegmentedRadioGroup>
-            <Button size="l" view="normal-contrast" onClick={() => window.print()} title="Печать">
+            <Button
+              size="l"
+              view="normal-contrast"
+              onClick={handlePrint}
+              title="Скачать раскладку PDF"
+            >
               <Icon data={Printer} size={16} />
             </Button>
           </Flex>

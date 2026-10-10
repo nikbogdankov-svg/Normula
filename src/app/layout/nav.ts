@@ -10,7 +10,6 @@ import {
   Gear,
   Heart,
   Layers3Diagonal,
-  ListCheck,
   Person,
   Receipt,
   ShoppingBasket,
@@ -80,7 +79,6 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/app/objects', label: 'Объекты', icon: Layers3Diagonal },
       { to: '/app/products', label: 'Продукты', icon: Box },
-      { to: '/app/norms', label: 'Нормы', icon: ListCheck, wip: true },
       { to: '/app/diets', label: 'Диеты', icon: Heart },
     ],
   },

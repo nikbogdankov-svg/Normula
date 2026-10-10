@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DatePicker } from '@gravity-ui/date-components';
 import { dateTime } from '@gravity-ui/date-utils';
@@ -49,6 +49,7 @@ import {
   NoOrganizationSelectedState,
 } from '@/shared/ui/states';
 import { useObjects } from '@/features/objects/api';
+import { useObjectSelection } from '@/shared/object-selection';
 import type { ObjectGroup, ObjectItem } from '@/features/objects/types';
 import {
   useCopyPortionsDay,
@@ -148,8 +149,22 @@ export function PortionsRoute() {
   // Объекты верхнего уровня; селект готов к произвольному числу.
   const objectsList = useMemo(() => topLevelObjects(objects.data?.objects ?? []), [objects.data]);
   const units = useMemo(() => portionUnits(objects.data?.objects ?? []), [objects.data]);
+  const { objectId: savedObjectId, setObjectId, clearObjectId } = useObjectSelection();
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const activeObjectId = selectedObjectId ?? objectsList[0]?.id ?? null;
+  const objectListIds = useMemo(() => objectsList.map((object) => object.id), [objectsList]);
+  const preferredObjectId =
+    savedObjectId && objectListIds.includes(savedObjectId) ? savedObjectId : objectsList[0]?.id;
+  const activeObjectId = selectedObjectId ?? preferredObjectId ?? null;
+
+  // В «По объектам» глобальный выбор подхватывается, пока пользователь не
+  // выбрал своё («Все»), иначе остаётся прежний дефолт. Значение хранится в
+  // формате object:<id>.
+  useEffect(() => {
+    if (selectedId !== ALL_SUBOBJECTS) return;
+    if (savedObjectId && objectListIds.includes(savedObjectId)) {
+      setSelectedId(`object:${savedObjectId}`);
+    }
+  }, [savedObjectId, objectListIds, selectedId]);
 
   const dishes = useDishDistribution(date, activeObjectId);
 
@@ -339,7 +354,15 @@ export function PortionsRoute() {
                   label="Объект:"
                   title="Объект:"
                   value={[selectedId]}
-                  onUpdate={(value) => setSelectedId(value[0] ?? ALL_SUBOBJECTS)}
+                  onUpdate={(value) => {
+                    const next = value[0] ?? ALL_SUBOBJECTS;
+                    setSelectedId(next);
+                    if (next === ALL_SUBOBJECTS) {
+                      clearObjectId();
+                    } else if (next.startsWith('object:')) {
+                      setObjectId(next.slice('object:'.length));
+                    }
+                  }}
                   placeholder="Выберите объект или подобъект"
                   options={[{ value: ALL_SUBOBJECTS, content: 'Все' }, ...objectOptions]}
                 />
@@ -368,7 +391,12 @@ export function PortionsRoute() {
                   label="Объект:"
                   title="Объект:"
                   value={activeObjectId ? [activeObjectId] : []}
-                  onUpdate={(value) => setSelectedObjectId(value[0] ?? null)}
+                  onUpdate={(value) => {
+                    const next = value[0] ?? null;
+                    setSelectedObjectId(next);
+                    if (next) setObjectId(next);
+                    else clearObjectId();
+                  }}
                   options={objectsList.map((unit) => ({
                     value: unit.id,
                     content: unit.name,
