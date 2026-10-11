@@ -162,8 +162,14 @@ function MenuByDates() {
     );
   }, [topLevelObjects, savedObjectId]);
 
-  /** Рационы селекта — диеты групп выбранного объекта; без групп — весь справочник. */
-  const groupDiets = objectDiets(selectedObject);
+  /** Диеты, которые справочник ещё знает: группы объекта могут ссылаться на удалённые. */
+  const knownDietIds = useMemo(
+    () => new Set((diets.data?.diets ?? []).map((diet) => diet.id)),
+    [diets.data]
+  );
+
+  /** Рационы селекта — живые диеты групп выбранного объекта; без них — весь справочник. */
+  const groupDiets = objectDiets(selectedObject).filter((diet) => knownDietIds.has(diet.id));
   const dietOptions: GroupDiet[] =
     groupDiets.length > 0
       ? groupDiets
