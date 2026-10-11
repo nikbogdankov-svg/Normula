@@ -513,7 +513,7 @@ export function CreateReceiptDrawer({
                       }
                     />
                     <ItemInput
-                      label="Цена, ₽:"
+                      label="Цена за шт, ₽:"
                       placeholder="0.00"
                       value={row.unitPrice}
                       onUpdate={(v) => updateItem(index, { unitPrice: v })}

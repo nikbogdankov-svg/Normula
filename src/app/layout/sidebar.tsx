@@ -41,7 +41,7 @@ export function Sidebar({
   onToggleCollapsed: () => void;
 }) {
   const { theme, toggleTheme } = useAppTheme();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { current, scopes } = useOrganizations();
 
   // Пункты, которых у человека нет, не рисуем вовсе: показать и убрать
@@ -120,7 +120,7 @@ export function Sidebar({
           // иначе название организации и роль слипаются в одну строку.
           <Flex direction="column" style={{ overflow: 'hidden', minWidth: 0 }}>
             <Text variant="body-1" ellipsis>
-              {current ? current.name : 'Без организации'}
+              {user?.name || user?.email || 'Пользователь'}
             </Text>
             {current && roleCaption(scopes) && (
               <Text variant="caption-2" color="secondary" ellipsis>
