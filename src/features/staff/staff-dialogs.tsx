@@ -144,9 +144,11 @@ function ProfileFields({
 function DocumentFields({
   documents,
   onChange,
+  showOtherDoc = true,
 }: {
   documents: EmployeeDocuments;
   onChange: (patch: Partial<EmployeeDocuments>) => void;
+  showOtherDoc?: boolean;
 }) {
   return (
     <>
@@ -155,8 +157,8 @@ function DocumentFields({
           size="l"
           label="СНИЛС:"
           placeholder="112-233-445 95"
-          value={documents.snils}
-          onUpdate={(v) => onChange({ snils: v })}
+          value={maskSnils(documents.snils)}
+          onUpdate={(v) => onChange({ snils: digitsOnly(v, 11) })}
           autoFocus
           style={{ flex: 1 }}
         />
@@ -165,39 +167,57 @@ function DocumentFields({
           label="ИНН:"
           placeholder="12 цифр"
           value={documents.inn}
-          onUpdate={(v) => onChange({ inn: v })}
+          onUpdate={(v) => onChange({ inn: digitsOnly(v, 12) })}
           style={{ flex: 1 }}
         />
       </Flex>
-      {/* В макете паспорт одним полем, но серия и номер хранятся раздельно:
-          склеивать их в одну строку значило бы разбирать её обратно. */}
-      <Flex gap={2}>
-        <TextInput
-          size="l"
-          label="Серия:"
-          placeholder="0123"
-          value={documents.passportSeries}
-          onUpdate={(v) => onChange({ passportSeries: v })}
-          style={{ flex: 1 }}
-        />
-        <TextInput
-          size="l"
-          label="Номер:"
-          placeholder="456789"
-          value={documents.passportNumber}
-          onUpdate={(v) => onChange({ passportNumber: v })}
-          style={{ flex: 2 }}
-        />
-      </Flex>
+      {/* Паспорт одним полем с маской; серия и номер хранятся раздельно
+          (ведущий ноль серии значащий) и разделяются на лету. */}
       <TextInput
         size="l"
-        label="Другой док:"
-        placeholder="Необязательно"
-        value={documents.otherDoc}
-        onUpdate={(v) => onChange({ otherDoc: v })}
+        label="Паспорт:"
+        placeholder="0123 456789"
+        value={maskPassport(documents.passportSeries, documents.passportNumber)}
+        onUpdate={(v) => {
+          const raw = digitsOnly(v, 10);
+          onChange({ passportSeries: raw.slice(0, 4), passportNumber: raw.slice(4) });
+        }}
       />
+      {showOtherDoc && (
+        <TextInput
+          size="l"
+          label="Другой док:"
+          placeholder="Необязательно"
+          value={documents.otherDoc}
+          onUpdate={(v) => onChange({ otherDoc: v })}
+        />
+      )}
     </>
   );
+}
+
+/** Оставляет только цифры и обрезает до нужной длины. */
+function digitsOnly(value: string, maxLength: number): string {
+  return value.replace(/\D/g, '').slice(0, maxLength);
+}
+
+/** СНИЛС в виде XXX-XXX-XXX XX: показ, в значении остаются только цифры. */
+function maskSnils(value: string): string {
+  const raw = digitsOnly(value, 11);
+  const part1 = raw.slice(0, 3);
+  const part2 = raw.slice(3, 6);
+  const part3 = raw.slice(6, 9);
+  const part4 = raw.slice(9, 11);
+  const chunks = [part1, part2, part3].filter(Boolean).join('-');
+  return part4 ? `${chunks} ${part4}` : chunks;
+}
+
+/** Паспорт одним полем «серия номер»: показ, в значении — два раздельных поля. */
+function maskPassport(series: string, number: string): string {
+  const raw = `${digitsOnly(series, 4)}${digitsOnly(number, 6)}`.slice(0, 10);
+  const part1 = raw.slice(0, 4);
+  const part2 = raw.slice(4);
+  return part1 && part2 ? `${part1} ${part2}` : part1;
 }
 
 /** Двухшаговое добавление сотрудника из макета. */
@@ -378,7 +398,11 @@ export function EditEmployeeDialog({
                     showPasswordNote={false}
                   />
                 ) : (
-                  <DocumentFields documents={form.documents} onChange={setDoc} />
+                  <DocumentFields
+                    documents={form.documents}
+                    onChange={setDoc}
+                    showOtherDoc={false}
+                  />
                 ))}
             </Flex>
           </div>

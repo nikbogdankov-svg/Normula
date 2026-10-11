@@ -108,6 +108,7 @@
   padding: 0;
   border-radius: 8px;
   background-clip: padding-box;
+  transition: background-color 0.12s ease;
 }
 
 /* Колонки карточки повторяют фиксированный заголовок таблицы: одинаковые
@@ -156,9 +157,9 @@
   background-color: var(--g-color-base-simple-hover);
 }
 
-/* Hover закрытой строки-карточки товара. */
+/* Hover закрытой строки-карточки товара — 12% прозрачности. */
 .warehouse-balances-card:hover > td {
-  background-color: var(--g-color-base-simple-hover);
+  background-color: rgba(0, 0, 0, 0.12);
 }
 
 /* Раскрытая строка не подсвечивается вообще (класс + атрибут для надёжности).

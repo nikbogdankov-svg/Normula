@@ -15,6 +15,11 @@ function parseDecimal(value: string): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
+/** Разрешаем только цифры и десятичный разделитель: минус и буквы не вводятся. */
+function sanitizeNumber(value: string): string {
+  return value.replace(/[^\d.,]/g, '');
+}
+
 /** Норма заполнена, но это не число или оно отрицательное. */
 function isInvalidNorm(value: string): boolean {
   if (value.trim() === '') return false;
@@ -68,7 +73,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
   const patchNumber = (
     field: keyof Pick<Draft, 'pricePerDay' | 'kcal' | 'protein' | 'fat' | 'carbs'>,
     value: string
-  ) => setDraft((current) => ({ ...current, [field]: value }));
+  ) => setDraft((current) => ({ ...current, [field]: sanitizeNumber(value) }));
 
   const toggleType = (type: FacilityType) =>
     setDraft((current) => ({
