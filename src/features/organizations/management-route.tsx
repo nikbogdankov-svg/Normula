@@ -221,18 +221,24 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
   const create = useCreateOrganization();
   const toaster = useToaster();
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [adminFirstName, setAdminFirstName] = useState('');
+  const [adminLastName, setAdminLastName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
 
   const reset = () => {
     setName('');
-    setDescription('');
+    setAdminFirstName('');
+    setAdminLastName('');
     setAdminEmail('');
   };
 
   const submit = () => {
     create.mutate(
-      { name: name.trim(), description: description.trim(), adminEmail: adminEmail.trim() },
+      {
+        name: name.trim(),
+        description: `${adminFirstName.trim()} ${adminLastName.trim()}`.trim(),
+        adminEmail: adminEmail.trim(),
+      },
       {
         onSuccess: (result) => {
           toaster.add({
@@ -261,14 +267,18 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
-          <TextInput label="Название" value={name} onUpdate={setName} autoFocus />
-          <TextInput label="Описание" value={description} onUpdate={setDescription} />
+          <TextInput label="Название" value={name} onUpdate={setName} autoFocus size="l" />
+          <Flex gap={3}>
+            <TextInput label="Имя" value={adminFirstName} onUpdate={setAdminFirstName} size="l" />
+            <TextInput label="Фамилия" value={adminLastName} onUpdate={setAdminLastName} size="l" />
+          </Flex>
           <TextInput
             label="Почта администратора"
             type="email"
             value={adminEmail}
             onUpdate={setAdminEmail}
-            note="На этот адрес уйдёт приглашение с ролью администратора организации"
+            note="На этот адрес придёт ссылка для входа в систему"
+            size="l"
           />
         </Flex>
       </Dialog.Body>
@@ -278,7 +288,10 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
         onClickButtonApply={submit}
         textButtonCancel="Отмена"
         textButtonApply="Создать"
-        propsButtonApply={{ disabled: !name.trim() || !adminEmail.trim() }}
+        propsButtonApply={{
+          disabled:
+            !name.trim() || !adminFirstName.trim() || !adminLastName.trim() || !adminEmail.trim(),
+        }}
         loading={create.isPending}
       />
     </Dialog>
