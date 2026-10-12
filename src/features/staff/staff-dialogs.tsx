@@ -101,7 +101,7 @@ function ProfileFields({
         note={
           showPasswordNote ? (
             <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
-              На эту почту придет пароль, с которым сотрудник войдет в систему
+              На эту почту придет ссылка, с которым сотрудник войдет в систему
             </Text>
           ) : undefined
         }
