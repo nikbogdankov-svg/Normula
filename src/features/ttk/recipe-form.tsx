@@ -80,6 +80,10 @@ function parseOptionalDecimal(value: string): number | null {
   return parseDecimal(value, RECIPE_DECIMALS);
 }
 
+/** Разрешаем только цифры и десятичный разделитель: минус и буквы не вводятся. */
+function sanitizeNumber(value: string): string {
+  return value.replace(/[^\d.,]/g, '');
+}
 function NumberInput({
   label,
   value,
@@ -103,7 +107,7 @@ function NumberInput({
       label={label}
       placeholder={placeholder}
       value={value}
-      onUpdate={onUpdate}
+      onUpdate={(v) => onUpdate(sanitizeNumber(v))}
       validationState={invalid ? 'invalid' : undefined}
       endContent={endContent}
       style={{ flex }}
@@ -161,19 +165,19 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setIngredients((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   };
 
-  // Пустая строка ингредиента (ничего не выбрано и не введено) не считается.
-  const activeIngredients = ingredients.filter(
-    (row) => row.productId || row.productName.trim() || row.gross.trim() || row.net.trim()
-  );
+  // Ингредиент считается активным только если выбран продукт И введено брутто.
+  const activeIngredients = ingredients.filter((row) => row.productId && row.gross.trim() !== '');
 
   const ingredientProblem = (row: IngredientDraft): string | null => {
     if (!row.productId) return 'Выберите продукт из справочника';
 
     const gross = parseDecimal(row.gross, RECIPE_DECIMALS);
-    if (gross === null || gross <= 0) return 'Брутто должно быть больше нуля';
+    if (row.gross.trim() === '' || gross === null || gross <= 0)
+      return 'Брутто должно быть больше нуля';
 
     const net = parseOptionalDecimal(row.net);
-    if (net === null || net > gross) return 'Нетто от нуля до брутто';
+    if (row.net.trim() !== '' && (net === null || net < 0 || net > gross))
+      return 'Нетто от нуля до брутто';
 
     if (activeIngredients.some((other) => other !== row && other.productId === row.productId)) {
       return 'Этот продукт уже есть в карте';

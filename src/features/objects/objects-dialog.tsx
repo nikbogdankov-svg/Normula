@@ -316,7 +316,7 @@ function SubObjectBlock({
             }}
           />
         </Flex>
-        {canRemove && (
+        {canRemove && subObjectIndex !== 0 && (
           <Button
             view="flat"
             size="l"
