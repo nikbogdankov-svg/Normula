@@ -228,6 +228,8 @@ function SubObjectsCard({
 
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? objects[0] ?? null;
   const editingSubObject = subObjects.find((s) => s.id === editingSubObjectId) ?? null;
+  // У склада нет групп/классов и подобъектов.
+  const isWarehouse = selectedObject?.type === 'warehouse';
 
   /** Строки первой таблицы: группы/классы самого объекта. */
   const objectRows = useMemo(() => groupRows(selectedObject), [selectedObject]);
@@ -284,70 +286,76 @@ function SubObjectsCard({
           )}
         </Flex>
 
-        <div
-          style={{
-            borderTop: '1px solid var(--g-color-line-generic)',
-            paddingTop: 4,
-            paddingBottom: 8,
-          }}
-        >
-          {objectRows.length === 0 ? (
-            <EmptyState text="У объекта пока нет групп/классов" />
-          ) : (
-            <div className="admin-table-wrap">
-              <Table
-                width="max"
-                className="admin-table objects-group-table objects-facility-tables"
-                data={objectRows}
-                getRowClassNames={(row) =>
-                  groupRowClassNames({
-                    isLastInDepartment: row.isLastInDepartment,
-                    showDepartment: row.showDepartment,
-                    // У таблицы групп самого объекта колонка «Группа / класс»
-                    // стоит первой, поэтому разделители на всю ширину.
-                    isLastInSubObject: true,
-                  })
-                }
-                columns={[
-                  {
-                    id: 'departmentName',
-                    name: 'Группа / класс',
-                    width: '60%',
-                    template: (row) => (row.showDepartment ? row.departmentName : null),
-                    placeholder: () => null,
-                  },
-                  {
-                    id: 'tableName',
-                    name: 'Рацион',
-                    width: '40%',
-                  },
-                ]}
-              />
-            </div>
-          )}
-        </div>
+        {!isWarehouse && (
+          <div
+            style={{
+              borderTop: '1px solid var(--g-color-line-generic)',
+              paddingTop: 4,
+              paddingBottom: 8,
+            }}
+          >
+            {objectRows.length === 0 ? (
+              <EmptyState text="У объекта пока нет групп/классов" />
+            ) : (
+              <div className="admin-table-wrap">
+                <Table
+                  width="max"
+                  className="admin-table objects-group-table objects-facility-tables"
+                  data={objectRows}
+                  getRowClassNames={(row) =>
+                    groupRowClassNames({
+                      isLastInDepartment: row.isLastInDepartment,
+                      showDepartment: row.showDepartment,
+                      // У таблицы групп самого объекта колонка «Группа / класс»
+                      // стоит первой, поэтому разделители на всю ширину.
+                      isLastInSubObject: true,
+                    })
+                  }
+                  columns={[
+                    {
+                      id: 'departmentName',
+                      name: 'Группа / класс',
+                      width: '60%',
+                      template: (row) => (row.showDepartment ? row.departmentName : null),
+                      placeholder: () => null,
+                    },
+                    {
+                      id: 'tableName',
+                      name: 'Рацион',
+                      width: '40%',
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
-      <Button
-        view="normal-contrast"
-        size="l"
-        disabled={selectedObject === null}
-        onClick={() => setAddingSubObject(true)}
-        style={{ alignSelf: 'flex-start' }}
-      >
-        <Icon data={Plus} size={16} />
-        Добавить подобъект
-      </Button>
+      {!isWarehouse && (
+        <>
+          <Button
+            view="normal-contrast"
+            size="l"
+            disabled={selectedObject === null}
+            onClick={() => setAddingSubObject(true)}
+            style={{ alignSelf: 'flex-start' }}
+          >
+            <Icon data={Plus} size={16} />
+            Добавить подобъект
+          </Button>
 
-      {subObjects.length === 0
-        ? null
-        : subObjects.map((subObject) => (
-            <SubObjectSection
-              key={subObject.id}
-              subObject={subObject}
-              onEdit={() => setEditingSubObjectId(subObject.id)}
-            />
-          ))}
+          {subObjects.length === 0
+            ? null
+            : subObjects.map((subObject) => (
+                <SubObjectSection
+                  key={subObject.id}
+                  subObject={subObject}
+                  onEdit={() => setEditingSubObjectId(subObject.id)}
+                />
+              ))}
+        </>
+      )}
 
       <ObjectDrawer
         object={editing ? selectedObject : null}

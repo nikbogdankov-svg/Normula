@@ -137,6 +137,7 @@ function hasChanges(form: ObjectForm, original: ObjectItem): boolean {
 
 function DepartmentBlock({
   variant,
+  facilityType,
   department,
   diets,
   dietsLoaded,
@@ -146,6 +147,7 @@ function DepartmentBlock({
   canRemove,
 }: {
   variant: FacilityType | 'object';
+  facilityType: FacilityType;
   department: DepartmentForm;
   diets: DietOption[];
   dietsLoaded: boolean;
@@ -170,11 +172,11 @@ function DepartmentBlock({
         ? 'Старшая группа'
         : 'Терапия';
 
-  // Выбранные видны всегда; невыбранные — только подходящие типу учреждения.
+  // Выбранные видны всегда; невыбранные — только доступные этому типу объекта.
   const visibleDiets = diets.filter(
     (diet) =>
       department.dietIds.includes(diet.id) ||
-      (diet.appliesTo !== null && (isObject || diet.appliesTo.includes(variant)))
+      (diet.appliesTo !== null && diet.appliesTo.includes(facilityType))
   );
 
   const toggleDiet = (dietId: string) => {
@@ -287,35 +289,6 @@ function SubObjectBlock({
           autoFocus
           style={{ flex: 1 }}
         />
-        <Flex direction="column" gap={1}>
-          <Select
-            size="l"
-            width={240}
-            value={[subObject.type]}
-            options={[
-              { value: 'school', content: 'Школа' },
-              { value: 'kindergarten', content: 'Детский сад' },
-              { value: 'hospital', content: 'Больница' },
-              { value: 'warehouse', content: 'Склад' },
-            ]}
-            onUpdate={(newValue) => {
-              const nextType = newValue[0] as FacilityType;
-              onUpdate(subObjectIndex, {
-                type: nextType,
-                // У склада нет групп и отделений.
-                departments:
-                  nextType === 'warehouse'
-                    ? []
-                    : subObject.departments.map((department) => ({
-                        ...department,
-                        dietIds: department.dietIds.filter((id) =>
-                          diets.find((item) => item.id === id)?.appliesTo?.includes(nextType)
-                        ),
-                      })),
-              });
-            }}
-          />
-        </Flex>
         {canRemove && (
           <Button
             view="flat"
@@ -335,6 +308,7 @@ function SubObjectBlock({
             <DepartmentBlock
               key={department.key}
               variant={subObject.type}
+              facilityType={subObject.type}
               department={department}
               diets={diets}
               dietsLoaded={dietsLoaded}
@@ -684,6 +658,7 @@ export function ObjectDrawer({
                   <DepartmentBlock
                     key={department.key}
                     variant="object"
+                    facilityType={form.type}
                     department={department}
                     diets={diets}
                     dietsLoaded={dietsQuery.data !== undefined}
@@ -790,8 +765,12 @@ export function SubObjectDrawer({
       setVisible(false);
       return;
     }
-    // For new sub‑object, inherit type from parent object.
-    setForm(subObject ? toForm(subObject) : { ...emptySubObject(), type: parent.type });
+    // Подобъект всегда наследует тип родительского объекта: выбрать нельзя.
+    setForm(
+      subObject
+        ? { ...toForm(subObject), type: parent.type }
+        : { ...emptySubObject(), type: parent.type }
+    );
     setConfirmingDelete(false);
     setMounted(true);
     const frame = requestAnimationFrame(() => setVisible(true));
