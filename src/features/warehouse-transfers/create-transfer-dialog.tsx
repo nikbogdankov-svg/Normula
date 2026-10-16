@@ -147,7 +147,12 @@ export function CreateTransferDialog({
         content: `${batch.productName} — остаток ${formatQuantity(batch.remaining, batch.unit)}`,
       }));
 
-  // Склад-получатель не может совпадать с отправителем.
+  // Склады не должны совпадать: каждый селект скрывает выбранный в другом.
+  const fromOptions = useMemo(
+    () => objectOptions.filter((option) => option.value !== toObjectId),
+    [objectOptions, toObjectId]
+  );
+
   const toOptions = useMemo(
     () => objectOptions.filter((option) => option.value !== fromObjectId),
     [objectOptions, fromObjectId]
@@ -240,7 +245,7 @@ export function CreateTransferDialog({
               <ObjectSelect
                 value={fromObjectId}
                 onUpdate={changeFromObject}
-                options={objectOptions}
+                options={fromOptions}
                 label="Со склада:"
                 width="max"
               />

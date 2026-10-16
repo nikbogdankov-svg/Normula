@@ -32,6 +32,11 @@ interface DraftRow {
 
 const emptyRow = (): DraftRow => ({ receiptId: '', batchId: '', quantity: '' });
 
+/** В количестве разрешены только цифры и десятичный разделитель: минус и буквы отсекаются. */
+function sanitizeNumber(value: string): string {
+  return value.replace(/[^\d.,]/g, '');
+}
+
 /** Накладная в селекте: номер и дата. */
 interface ReceiptOption {
   value: string;
@@ -319,10 +324,11 @@ export function CreateWriteOffDialog({
                       label="Кол-во:"
                       placeholder="0"
                       value={row.quantity}
-                      onUpdate={(value) => updateRow(index, { quantity: value })}
+                      onUpdate={(value) => updateRow(index, { quantity: sanitizeNumber(value) })}
                       disabled={!row.batchId}
                       validationState={quantityInvalid ? 'invalid' : undefined}
                       errorMessage={quantityInvalid ? problem : undefined}
+                      errorPlacement="inside"
                       style={{ width: '100%' }}
                       endContent={
                         batch ? (
