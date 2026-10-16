@@ -341,7 +341,7 @@ function SubObjectsCard({
 
       {subObjects.length === 0 ? (
         <Card view="filled" style={{ padding: '12px 16px' }}>
-          <EmptyState text="Подобъекты пока не добавлены" />
+          <EmptyState text="Нет подобъектов" />
         </Card>
       ) : (
         subObjects.map((subObject) => (
