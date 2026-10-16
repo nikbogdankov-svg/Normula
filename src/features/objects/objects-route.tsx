@@ -339,19 +339,15 @@ function SubObjectsCard({
         Добавить подобъект
       </Button>
 
-      {subObjects.length === 0 ? (
-        <Card view="filled" style={{ padding: '12px 16px' }}>
-          <EmptyState text="Нет подобъектов" />
-        </Card>
-      ) : (
-        subObjects.map((subObject) => (
-          <SubObjectSection
-            key={subObject.id}
-            subObject={subObject}
-            onEdit={() => setEditingSubObjectId(subObject.id)}
-          />
-        ))
-      )}
+      {subObjects.length === 0
+        ? null
+        : subObjects.map((subObject) => (
+            <SubObjectSection
+              key={subObject.id}
+              subObject={subObject}
+              onEdit={() => setEditingSubObjectId(subObject.id)}
+            />
+          ))}
 
       <ObjectDrawer
         object={editing ? selectedObject : null}
