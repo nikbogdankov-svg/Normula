@@ -292,7 +292,36 @@ function SubObjectBlock({
           autoFocus
           style={{ flex: 1 }}
         />
-        {canRemove && (
+        <Flex direction="column" gap={1}>
+          <Select
+            size="l"
+            width={240}
+            value={[subObject.type]}
+            options={[
+              { value: 'school', content: 'Школа' },
+              { value: 'kindergarten', content: 'Детский сад' },
+              { value: 'hospital', content: 'Больница' },
+              { value: 'warehouse', content: 'Склад' },
+            ]}
+            onUpdate={(newValue) => {
+              const nextType = newValue[0] as FacilityType;
+              onUpdate(subObjectIndex, {
+                type: nextType,
+                // У склада нет групп и отделений.
+                departments:
+                  nextType === 'warehouse'
+                    ? []
+                    : subObject.departments.map((department) => ({
+                        ...department,
+                        dietIds: department.dietIds.filter((id) =>
+                          diets.find((item) => item.id === id)?.appliesTo?.includes(nextType)
+                        ),
+                      })),
+              });
+            }}
+          />
+        </Flex>
+        {canRemove && subObjectIndex !== 0 && (
           <Button
             view="flat"
             size="l"

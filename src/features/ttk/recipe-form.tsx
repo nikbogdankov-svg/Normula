@@ -91,6 +91,10 @@ function parseOptionalDecimal(value: string): number | null {
   return parseDecimal(value, RECIPE_DECIMALS);
 }
 
+/** Разрешаем только цифры и десятичный разделитель: минус и буквы не вводятся. */
+function sanitizeNumber(value: string): string {
+  return value.replace(/[^\d.,]/g, '');
+}
 function NumberInput({
   label,
   value,
@@ -114,7 +118,7 @@ function NumberInput({
       label={label}
       placeholder={placeholder}
       value={value}
-      onUpdate={onUpdate}
+      onUpdate={(v) => onUpdate(sanitizeNumber(v))}
       validationState={invalid ? 'invalid' : undefined}
       endContent={endContent}
       style={{ flex }}
@@ -173,10 +177,8 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
     setIngredients((rows) => (rows.length <= 1 ? rows : rows.filter((_, i) => i !== index)));
   };
 
-  // Пустая строка ингредиента (ничего не выбрано и не введено) не считается.
-  const activeIngredients = ingredients.filter(
-    (row) => row.productId || row.productName.trim() || row.gross.trim() || row.net.trim()
-  );
+  // Ингредиент считается активным только если выбран продукт И введено брутто.
+  const activeIngredients = ingredients.filter((row) => row.productId && row.gross.trim() !== '');
 
   const ingredientProblem = (row: IngredientDraft): IngredientProblem | null => {
     if (!row.productId) return 'selectProduct';
