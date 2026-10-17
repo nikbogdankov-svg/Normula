@@ -17,6 +17,7 @@ import { useCreateRecipe, useDeleteRecipe, useRecipe, useUpdateRecipe } from './
 import { useRecipeForm } from './recipe-form';
 import type { Ingredient, Recipe } from './types';
 import { useDrawerHeight } from './use-drawer-height';
+import { useTranslation } from '@/shared/i18n';
 import './recipe-drawer.css';
 
 /** Пара «подпись — значение» в шапке карты. */
@@ -33,6 +34,7 @@ function MetaRow({ title, children }: { title: string; children: React.ReactNode
 
 /** Таблица ингредиентов: на порцию, на 100 порций (умножением) и деньги. */
 function IngredientsTable({ recipe }: { recipe: Recipe }) {
+  const { t } = useTranslation();
   const per100 = (value: number) => Math.round(value * 100 * 1000) / 1000;
 
   return (
@@ -42,24 +44,24 @@ function IngredientsTable({ recipe }: { recipe: Recipe }) {
       columns={[
         {
           id: 'name',
-          name: 'Наименование',
+          name: t('ttk.colName'),
           template: (row) => <Text variant="body-2">{row.productName}</Text>,
         },
         {
           id: 'gross',
-          name: '1 порция, брутто',
+          name: t('ttk.colGross1'),
           align: 'right',
           template: (row) => <Text variant="body-2">{formatQuantity(row.gross, row.unit)}</Text>,
         },
         {
           id: 'net',
-          name: '1 порция, нетто',
+          name: t('ttk.colNet1'),
           align: 'right',
           template: (row) => <Text variant="body-2">{formatQuantity(row.net, row.unit)}</Text>,
         },
         {
           id: 'gross100',
-          name: '100 порций, брутто',
+          name: t('ttk.colGross100'),
           align: 'right',
           template: (row) => (
             <Text variant="body-2">{formatQuantity(per100(row.gross), row.unit)}</Text>
@@ -67,7 +69,7 @@ function IngredientsTable({ recipe }: { recipe: Recipe }) {
         },
         {
           id: 'net100',
-          name: '100 порций, нетто',
+          name: t('ttk.colNet100'),
           align: 'right',
           template: (row) => (
             <Text variant="body-2">{formatQuantity(per100(row.net), row.unit)}</Text>
@@ -75,17 +77,17 @@ function IngredientsTable({ recipe }: { recipe: Recipe }) {
         },
         {
           id: 'unitPrice',
-          name: 'Цена за ед.',
+          name: t('ttk.colUnitPrice'),
           align: 'right',
           template: (row) => (
             <Text variant="body-2" color={row.unitPrice ? 'primary' : 'secondary'}>
-              {row.unitPrice ? `${formatMoney(row.unitPrice)}/${row.unit}` : 'нет остатков'}
+              {row.unitPrice ? `${formatMoney(row.unitPrice)}/${row.unit}` : t('ttk.noStock')}
             </Text>
           ),
         },
         {
           id: 'total',
-          name: 'Сумма',
+          name: t('ttk.colSum'),
           align: 'right',
           template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
         },
@@ -123,6 +125,7 @@ export function RecipeDialog({
   const modeRef = useRef(mode);
   /** Закрытие только через явный requestClose — dismiss от Floating UI игнорируем. */
   const allowCloseRef = useRef(false);
+  const { t } = useTranslation();
 
   modeRef.current = mode;
 
@@ -170,18 +173,23 @@ export function RecipeDialog({
           setConfirmDeleteOpen(false);
           toaster.add(
             deletionMode === 'immediate'
-              ? { name: 'ttk-deleted', title: 'ТТК удалена', theme: 'success' }
+              ? { name: 'ttk-deleted', title: t('ttk.deleted'), theme: 'success' }
               : {
                   name: 'ttk-deleted',
-                  title: 'ТТК удалена',
-                  content: 'Останется в меню до конца периода',
+                  title: t('ttk.deleted'),
+                  content: t('ttk.deletedInMenu'),
                   theme: 'success',
                 }
           );
           requestClose();
         },
         onError: (e) =>
-          toaster.add({ name: 'ttk-delete', title: 'Ошибка', content: e.message, theme: 'danger' }),
+          toaster.add({
+            name: 'ttk-delete',
+            title: t('common.error'),
+            content: e.message,
+            theme: 'danger',
+          }),
       }
     );
   };
@@ -196,10 +204,15 @@ export function RecipeDialog({
         onSuccess: () => {
           setMode('view');
           setOpen(true);
-          toaster.add({ name: 'ttk-updated', title: 'ТТК сохранена', theme: 'success' });
+          toaster.add({ name: 'ttk-updated', title: t('ttk.saved'), theme: 'success' });
         },
         onError: (e) =>
-          toaster.add({ name: 'ttk-update', title: 'Ошибка', content: e.message, theme: 'danger' }),
+          toaster.add({
+            name: 'ttk-update',
+            title: t('common.error'),
+            content: e.message,
+            theme: 'danger',
+          }),
       }
     );
   };
@@ -214,10 +227,15 @@ export function RecipeDialog({
         setMode('view');
         setOpen(true);
         onRecipeChange(created.id);
-        toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
+        toaster.add({ name: 'ttk-created', title: t('ttk.created'), theme: 'success' });
       },
       onError: (e) =>
-        toaster.add({ name: 'ttk-create', title: 'Ошибка', content: e.message, theme: 'danger' }),
+        toaster.add({
+          name: 'ttk-create',
+          title: t('common.error'),
+          content: e.message,
+          theme: 'danger',
+        }),
     });
   };
 
@@ -268,11 +286,11 @@ export function RecipeDialog({
           <div className="ttk-recipe-drawer__mode" hidden={mode !== 'view'}>
             <div className="ttk-recipe-drawer__header">
               <div className="ttk-recipe-drawer__title-row">
-                <Text variant="subheader-3">{view?.name ?? 'ТТК'}</Text>
+                <Text variant="subheader-3">{view?.name ?? t('ttk.title')}</Text>
                 {view && (
                   <>
                     <Label theme="normal" size="s">
-                      Выход: {view.yieldNet}
+                      {t('ttk.yieldLabel')} {view.yieldNet}
                       {view.yieldLoss !== undefined && view.yieldLoss !== 0
                         ? ` / ${view.yieldLoss}`
                         : ''}
@@ -283,7 +301,7 @@ export function RecipeDialog({
                   </>
                 )}
               </div>
-              <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
                 <Icon data={Xmark} size={20} />
               </Button>
             </div>
@@ -296,8 +314,8 @@ export function RecipeDialog({
               {view && (
                 <>
                   <div className="ttk-recipe-drawer__meta">
-                    <MetaRow title="Сборник:">{view.collectionName || '—'}</MetaRow>
-                    <MetaRow title="Технология:">{view.technology || '—'}</MetaRow>
+                    <MetaRow title={t('ttk.collectionLabel')}>{view.collectionName || '—'}</MetaRow>
+                    <MetaRow title={t('ttk.technologyLabel')}>{view.technology || '—'}</MetaRow>
                   </div>
 
                   <div className="ttk-recipe-drawer__table-wrap">
@@ -305,7 +323,7 @@ export function RecipeDialog({
                       <IngredientsTable recipe={view} />
                     ) : (
                       <Text variant="body-2" color="secondary">
-                        Ингредиенты не указаны
+                        {t('ttk.noIngredients')}
                       </Text>
                     )}
                   </div>
@@ -317,25 +335,25 @@ export function RecipeDialog({
                       columns={[
                         {
                           id: 'protein',
-                          name: 'Белки, г',
+                          name: t('ttk.proteinG'),
                           align: 'center',
                           template: (row) => <Text variant="body-2">{row.protein}</Text>,
                         },
                         {
                           id: 'fat',
-                          name: 'Жиры, г',
+                          name: t('ttk.fatG'),
                           align: 'center',
                           template: (row) => <Text variant="body-2">{row.fat}</Text>,
                         },
                         {
                           id: 'carbs',
-                          name: 'Углеводы, г',
+                          name: t('ttk.carbsG'),
                           align: 'center',
                           template: (row) => <Text variant="body-2">{row.carbs}</Text>,
                         },
                         {
                           id: 'kcal',
-                          name: 'Энерг. ценность, ккал',
+                          name: t('ttk.kcalCol'),
                           align: 'center',
                           template: (row) => <Text variant="body-2">{row.kcal}</Text>,
                         },
@@ -354,15 +372,15 @@ export function RecipeDialog({
                 disabled={!view}
               >
                 <Icon data={TrashBin} size={16} />
-                Удалить
+                {t('common.delete')}
               </Button>
               <Flex gap={2}>
                 <Button view="outlined" size="l" onClick={requestClose}>
-                  Отмена
+                  {t('common.cancel')}
                 </Button>
                 <Button view="normal" size="l" onClick={startEdit} disabled={!view}>
                   <Icon data={Pencil} size={16} />
-                  Редактировать
+                  {t('common.edit')}
                 </Button>
               </Flex>
             </div>
@@ -371,9 +389,9 @@ export function RecipeDialog({
           <div className="ttk-recipe-drawer__mode" hidden={mode !== 'edit'}>
             <div className="ttk-recipe-drawer__header">
               <div className="ttk-recipe-drawer__title-row">
-                <Text variant="subheader-3">Редактировать ТТК</Text>
+                <Text variant="subheader-3">{t('ttk.editTitle')}</Text>
               </div>
-              <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
                 <Icon data={Xmark} size={20} />
               </Button>
             </div>
@@ -384,7 +402,7 @@ export function RecipeDialog({
 
             <div className="ttk-recipe-drawer__footer">
               <Button view="outlined" size="l" onClick={() => setMode('view')}>
-                Отмена
+                {t('common.cancel')}
               </Button>
               <Flex gap={2}>
                 <Button
@@ -394,7 +412,7 @@ export function RecipeDialog({
                   disabled={!form.canSubmit}
                   loading={update.isPending}
                 >
-                  Сохранить в текущей
+                  {t('ttk.saveCurrent')}
                 </Button>
                 <Button
                   view="action"
@@ -403,7 +421,7 @@ export function RecipeDialog({
                   disabled={!form.canSubmit}
                   loading={create.isPending}
                 >
-                  Сохранить в новой
+                  {t('ttk.saveNew')}
                 </Button>
               </Flex>
             </div>
@@ -412,13 +430,11 @@ export function RecipeDialog({
       </Drawer>
 
       <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} size="s">
-        <Dialog.Header caption={`Удалить «${view?.name ?? ''}»?`} />
+        <Dialog.Header caption={t('ttk.deleteHeader', { name: view?.name ?? '' })} />
         <Dialog.Divider />
         <Dialog.Body>
           <Flex direction="column" gap={3}>
-            <Text variant="body-2">
-              ТТК используется в меню и других разделах. Выберите, как её удалить.
-            </Text>
+            <Text variant="body-2">{t('ttk.deleteDescription')}</Text>
             <Flex direction="column" gap={2}>
               <Button
                 view="outlined-danger"
@@ -426,10 +442,10 @@ export function RecipeDialog({
                 onClick={() => runDelete('soft')}
                 loading={remove.isPending}
               >
-                Удалить после конца периода
+                {t('ttk.deleteSoft')}
               </Button>
               <Text variant="body-1" color="secondary">
-                До конца периода ТТК останется в меню и других разделах
+                {t('ttk.deleteSoftHint')}
               </Text>
             </Flex>
             <Flex direction="column" gap={2}>
@@ -439,10 +455,10 @@ export function RecipeDialog({
                 onClick={() => runDelete('immediate')}
                 loading={remove.isPending}
               >
-                Удалить сейчас
+                {t('ttk.deleteNow')}
               </Button>
               <Text variant="body-1" color="secondary">
-                Будет убрана из всех разделов немедленно
+                {t('ttk.deleteNowHint')}
               </Text>
             </Flex>
             <Button
@@ -451,7 +467,7 @@ export function RecipeDialog({
               onClick={() => setConfirmDeleteOpen(false)}
               disabled={remove.isPending}
             >
-              Отмена
+              {t('common.cancel')}
             </Button>
           </Flex>
         </Dialog.Body>

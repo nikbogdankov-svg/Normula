@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Dialog, Flex, Icon, useToaster } from '@gravity-ui/uikit';
 import { Plus } from '@gravity-ui/icons';
+import { useTranslation } from '@/shared/i18n';
 import { useCreateDiet } from './api';
 import { useDietForm } from './diet-form';
 import './diets-route.css';
@@ -9,6 +10,7 @@ import './diets-route.css';
 export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const create = useCreateDiet();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [formKey, setFormKey] = useState(0);
   const form = useDietForm(null, String(formKey));
 
@@ -20,13 +22,13 @@ export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: ()
   const submit = () => {
     create.mutate(form.getBody(), {
       onSuccess: () => {
-        toaster.add({ name: 'diet-created', title: 'Диета создана', theme: 'success' });
+        toaster.add({ name: 'diet-created', title: t('diets.createdToast'), theme: 'success' });
         onClose();
       },
       onError: (e) =>
         toaster.add({
           name: 'diet-create',
-          title: 'Ошибка',
+          title: t('common.error'),
           content: e.message,
           theme: 'danger',
         }),
@@ -35,14 +37,14 @@ export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <Dialog open={open} onClose={onClose} size="s" className="diet-dialog">
-      <Dialog.Header caption="Создать диету" />
+      <Dialog.Header caption={t('diets.createDietTitle')} />
       <Dialog.Divider />
       <Dialog.Body>{form.fields}</Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="outlined" size="l" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             view="action"
@@ -52,7 +54,7 @@ export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: ()
             loading={create.isPending}
           >
             <Icon data={Plus} size={16} />
-            Создать диету
+            {t('diets.createDiet')}
           </Button>
         </Flex>
       </Dialog.Footer>

@@ -1,4 +1,5 @@
 import { Alert, Flex, Loader, Text } from '@gravity-ui/uikit';
+import { useTranslation } from '@/shared/i18n';
 
 /** Стандартные состояния данных — чтобы фичи не изобретали свои. */
 
@@ -11,13 +12,16 @@ export function LoadingState() {
 }
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
-  const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+  const { t } = useTranslation();
+  const message = error instanceof Error ? error.message : t('common.unknownError');
   return (
     <Alert
       theme="danger"
-      title="Не удалось загрузить данные"
+      title={t('states.loadFailed')}
       message={message}
-      actions={onRetry ? <Alert.Action onClick={onRetry}>Повторить</Alert.Action> : undefined}
+      actions={
+        onRetry ? <Alert.Action onClick={onRetry}>{t('common.retry')}</Alert.Action> : undefined
+      }
     />
   );
 }
@@ -28,13 +32,10 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
  * Показываем это явно, иначе такие страницы молча «висят» в загрузке.
  */
 export function NoOrganizationsBanner() {
+  const { t } = useTranslation();
   return (
     <div style={{ padding: '16px 32px 0' }}>
-      <Alert
-        theme="warning"
-        title="Нет доступных организаций"
-        message="Аккаунт не состоит ни в одной организации — разделы с организационными данными работать не будут."
-      />
+      <Alert theme="warning" title={t('states.noOrgTitle')} message={t('states.noOrgMessage')} />
     </div>
   );
 }
@@ -45,11 +46,11 @@ export function NoOrganizationsBanner() {
  * отключённого запроса isPending остаётся true.
  */
 export function NoOrganizationSelectedState() {
+  const { t } = useTranslation();
   return (
     <Flex justifyContent="center" style={{ padding: 48 }}>
       <Text variant="body-2" color="secondary">
-        Нет организации — данные не запрашиваются. Попросите администратора добавить вас в
-        организацию.
+        {t('states.noOrgSelected')}
       </Text>
     </Flex>
   );

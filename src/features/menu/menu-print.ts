@@ -17,6 +17,7 @@ import {
 } from '@/shared/print';
 import { sumDishes, formatMetric, type DayTotals } from './norms';
 import { formatDateRange } from './dates';
+import { i18n } from '@/shared/i18n';
 import type { Dish, MealId } from './types';
 
 /** Строка печатной сетки меню: один приём пищи одного дня. */
@@ -67,8 +68,10 @@ export function buildMenuPrintRows(input: MenuPrintInput): MenuPrintRow[] {
     const dayTotals = input.totalsOf(day);
     rows.push({
       dayLabel: '',
-      mealLabel: 'Итог на день',
-      dishesText: `Б ${formatMetric(dayTotals.protein)} · Ж ${formatMetric(dayTotals.fat)} · У ${formatMetric(dayTotals.carbs)}`,
+      mealLabel: i18n.t('menu.dayTotal'),
+      dishesText: `${i18n.t('menu.macroProtein')} ${formatMetric(dayTotals.protein)} · ${i18n.t(
+        'menu.macroFat'
+      )} ${formatMetric(dayTotals.fat)} · ${i18n.t('menu.macroCarbs')} ${formatMetric(dayTotals.carbs)}`,
       kcal: dayTotals.kcal,
       price: dayTotals.price,
       total: true,
@@ -125,11 +128,11 @@ export function writeMenuPdf(
     doc.setFont('PTSans', 'bold');
     doc.setFontSize(PDF_BODY_SIZE);
     doc.setTextColor(...PDF_TEXT_COLOR);
-    drawCellLines(['День'], 0, top);
-    drawCellLines(['Приём'], 1, top);
-    drawCellLines(['Блюда'], 2, top);
-    drawCellLines(['Ккал'], 3, top, true);
-    drawCellLines(['Цена'], 4, top, true);
+    drawCellLines([i18n.t('menu.printColDay')], 0, top);
+    drawCellLines([i18n.t('menu.printColMeal')], 1, top);
+    drawCellLines([i18n.t('menu.printColDishes')], 2, top);
+    drawCellLines([i18n.t('menu.printColKcal')], 3, top, true);
+    drawCellLines([i18n.t('menu.printColPrice')], 4, top, true);
     doc.setFont('PTSans', 'normal');
     drawGridLine(top + height);
     return top + height;
@@ -139,7 +142,7 @@ export function writeMenuPdf(
   doc.setFont('PTSans', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(...PDF_TEXT_COLOR);
-  doc.text('Меню', PDF_MARGIN, marginTop);
+  doc.text(i18n.t('menu.printTitle'), PDF_MARGIN, marginTop);
   doc.text(data.displayRange, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop, { align: 'right' });
   doc.setFont('PTSans', 'normal');
   doc.setFontSize(PDF_BODY_SIZE);
@@ -190,7 +193,7 @@ export function writeMenuPdf(
   doc.setFont('PTSans', 'normal');
   doc.setFontSize(PDF_BODY_SIZE);
   doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
-  doc.text('Ответственный за питание: ______________________', PDF_MARGIN, y + PDF_LINE_HEIGHT);
+  doc.text(i18n.t('menu.printResponsible'), PDF_MARGIN, y + PDF_LINE_HEIGHT);
   doc.text(data.displayRange, PDF_PAGE_WIDTH - PDF_MARGIN, y + PDF_LINE_HEIGHT, {
     align: 'right',
   });
@@ -210,5 +213,5 @@ export async function downloadMenuDoc(data: {
     ...data,
     displayRange,
   });
-  doc.save(`Меню_${displayRange.replace(/[ –]+/g, '_')}.pdf`);
+  doc.save(i18n.t('menu.printFileName', { range: displayRange.replace(/[ –]+/g, '_') }));
 }

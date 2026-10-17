@@ -2,17 +2,18 @@ import { useEffect, useState } from 'react';
 import { Button, Dialog, Flex, Icon, Text, useToaster } from '@gravity-ui/uikit';
 import { Pencil, TrashBin } from '@gravity-ui/icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from '@/shared/i18n';
 import { useDeleteDiet, useUpdateDiet } from './api';
 import { useDietForm } from './diet-form';
 import { MEALS } from '@/features/menu/types';
 import type { Diet } from './types';
 import './diets-route.css';
 
-const FACILITY_TYPE_LABELS: Record<string, string> = {
-  school: 'Школа',
-  kindergarten: 'Детский сад',
-  hospital: 'Больница',
-  warehouse: 'Склад',
+const FACILITY_TYPE_LABEL_KEYS: Record<string, string> = {
+  school: 'facility.school',
+  kindergarten: 'facility.kindergarten',
+  hospital: 'facility.hospital',
+  warehouse: 'facility.warehouse',
 };
 
 /** Строка «подпись — значение» в блоке нормы на день. */
@@ -45,6 +46,7 @@ export function DietDialog({
   const remove = useDeleteDiet();
   const toaster = useToaster();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<Diet | null>(null);
   const [mode, setMode] = useState<'view' | 'edit' | 'confirm-delete'>('view');
@@ -101,14 +103,14 @@ export function DietDialog({
       {
         onSuccess: (data) => {
           onDietChange?.(data.diet);
-          toaster.add({ name: 'diet-updated', title: 'Диета сохранена', theme: 'success' });
+          toaster.add({ name: 'diet-updated', title: t('diets.updatedToast'), theme: 'success' });
           void queryClient.invalidateQueries({ queryKey: ['diets'] });
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'diet-update',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -132,13 +134,13 @@ export function DietDialog({
       {
         onSuccess: () => {
           // Режим уходит на бэкенд, но пока не различается.
-          toaster.add({ name: 'diet-deleted', title: 'Диета удалена', theme: 'success' });
+          toaster.add({ name: 'diet-deleted', title: t('diets.deletedToast'), theme: 'success' });
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'diet-delete',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -165,7 +167,7 @@ export function DietDialog({
           <div className="diet-dialog__meta">
             <div className="diet-dialog__applies-row">
               <Text variant="body-2" className="diet-dialog__meta-label">
-                Доступна для:
+                {t('diets.availableFor')}
               </Text>
               <div className="diet-dialog__tags">
                 {view.appliesTo.length === 0 ? (
@@ -173,7 +175,7 @@ export function DietDialog({
                 ) : (
                   view.appliesTo.map((type) => (
                     <span key={type} className="diet-dialog__tag">
-                      {FACILITY_TYPE_LABELS[type] ?? type}
+                      {t(FACILITY_TYPE_LABEL_KEYS[type] ?? type)}
                     </span>
                   ))
                 )}
@@ -184,17 +186,20 @@ export function DietDialog({
           <div className="diet-dialog__meta">
             <div className="diet-dialog__applies-row">
               <Text variant="body-2" className="diet-dialog__meta-label">
-                Приёмы пищи:
+                {t('diets.mealsTitle')}
               </Text>
               <div className="diet-dialog__tags">
                 {view.mealIds.length === 0 ? (
-                  <Text variant="body-2">Все</Text>
+                  <Text variant="body-2">{t('common.all')}</Text>
                 ) : (
-                  view.mealIds.map((meal) => (
-                    <span key={meal} className="diet-dialog__tag">
-                      {MEALS.find((item) => item.id === meal)?.label ?? meal}
-                    </span>
-                  ))
+                  view.mealIds.map((meal) => {
+                    const mealDef = MEALS.find((item) => item.id === meal);
+                    return (
+                      <span key={meal} className="diet-dialog__tag">
+                        {mealDef ? t(mealDef.labelKey) : meal}
+                      </span>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -204,14 +209,30 @@ export function DietDialog({
             variant="subheader-2"
             className="diet-dialog__section-title diet-dialog__section-title_wide"
           >
-            Норма на день
+            {t('diets.dailyNorm')}
           </Text>
           <div className="diet-dialog__meta">
-            <NutritionRow label="Цена:" value={view.pricePerDay} suffix="₽" />
-            <NutritionRow label="Калорийность:" value={view.kcal} suffix="ккал" />
-            <NutritionRow label="Белки:" value={view.protein} suffix="г" />
-            <NutritionRow label="Жиры:" value={view.fat} suffix="г" />
-            <NutritionRow label="Углеводы:" value={view.carbs} suffix="г" />
+            <NutritionRow
+              label={t('diets.viewPrice')}
+              value={view.pricePerDay}
+              suffix={t('units.ruble')}
+            />
+            <NutritionRow
+              label={t('diets.viewKcal')}
+              value={view.kcal}
+              suffix={t('menu.kcalUnit')}
+            />
+            <NutritionRow
+              label={t('diets.viewProtein')}
+              value={view.protein}
+              suffix={t('units.gram')}
+            />
+            <NutritionRow label={t('diets.viewFat')} value={view.fat} suffix={t('units.gram')} />
+            <NutritionRow
+              label={t('diets.viewCarbs')}
+              value={view.carbs}
+              suffix={t('units.gram')}
+            />
           </div>
         </Dialog.Body>
         <Dialog.Divider />
@@ -224,12 +245,12 @@ export function DietDialog({
           >
             <Button view="outlined-danger" size="l" onClick={startDelete}>
               <Icon data={TrashBin} size={16} />
-              Удалить
+              {t('common.delete')}
             </Button>
             <Flex gap={2}>
               <Button view="normal" size="l" onClick={startEdit}>
                 <Icon data={Pencil} size={16} />
-                Редактировать
+                {t('common.edit')}
               </Button>
             </Flex>
           </Flex>
@@ -237,14 +258,14 @@ export function DietDialog({
       </div>
 
       <div hidden={mode !== 'edit'}>
-        <Dialog.Header caption="Редактировать диету" />
+        <Dialog.Header caption={t('diets.editDietTitle')} />
         <Dialog.Divider />
         <Dialog.Body>{form.fields}</Dialog.Body>
         <Dialog.Divider />
         <Dialog.Footer>
           <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
             <Button view="outlined" size="l" onClick={cancelEdit}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button
               view="action"
@@ -253,20 +274,18 @@ export function DietDialog({
               disabled={!form.canSubmit}
               loading={update.isPending}
             >
-              Сохранить
+              {t('common.save')}
             </Button>
           </Flex>
         </Dialog.Footer>
       </div>
 
       <div hidden={mode !== 'confirm-delete'}>
-        <Dialog.Header caption={`Удалить «${view.name}»?`} />
+        <Dialog.Header caption={t('diets.deleteConfirmTitle', { name: view.name })} />
         <Dialog.Divider />
         <Dialog.Body>
           <Flex direction="column" gap={3}>
-            <Text variant="body-2">
-              Диета используется в объектах и меню. Выберите, как её удалить.
-            </Text>
+            <Text variant="body-2">{t('diets.deleteConfirmText')}</Text>
             <Flex direction="column" gap={2}>
               <Button
                 view="outlined-danger"
@@ -274,10 +293,10 @@ export function DietDialog({
                 onClick={() => runDelete('soft')}
                 loading={remove.isPending}
               >
-                Удалить после конца периода
+                {t('diets.deleteAfterPeriod')}
               </Button>
               <Text variant="body-1" color="secondary">
-                До конца периода диета останется в объектах и меню
+                {t('diets.deleteAfterPeriodHint')}
               </Text>
             </Flex>
             <Flex direction="column" gap={2}>
@@ -287,14 +306,14 @@ export function DietDialog({
                 onClick={() => runDelete('immediate')}
                 loading={remove.isPending}
               >
-                Удалить сейчас
+                {t('diets.deleteNow')}
               </Button>
               <Text variant="body-1" color="secondary">
-                Будет убрана из всех разделов немедленно
+                {t('diets.deleteNowHint')}
               </Text>
             </Flex>
             <Button view="flat" size="l" onClick={cancelDelete} disabled={remove.isPending}>
-              Отмена
+              {t('common.cancel')}
             </Button>
           </Flex>
         </Dialog.Body>

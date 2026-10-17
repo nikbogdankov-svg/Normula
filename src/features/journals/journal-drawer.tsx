@@ -1,6 +1,7 @@
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { Printer, Xmark } from '@gravity-ui/icons';
-import { JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
+import { useTranslation } from 'react-i18next';
+import { JOURNAL_SOURCE_KEYS, type AutoJournal } from './types';
 
 function FieldList({
   title,
@@ -35,6 +36,7 @@ export function JournalDrawer({
   journal: AutoJournal | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const requestClose = () => onClose();
 
   return (
@@ -56,12 +58,12 @@ export function JournalDrawer({
             gap={3}
           >
             <Flex direction="column" gap={1}>
-              <Text variant="header-1">{journal.title}</Text>
+              <Text variant="header-1">{t(journal.titleKey)}</Text>
               <Text variant="body-2" color="secondary">
-                {journal.description}
+                {t(journal.descriptionKey)}
               </Text>
             </Flex>
-            <Button view="flat" size="l" onClick={requestClose} title="Закрыть">
+            <Button view="flat" size="l" onClick={requestClose} title={t('journals.close')}>
               <Icon data={Xmark} size={16} />
             </Button>
           </Flex>
@@ -70,24 +72,31 @@ export function JournalDrawer({
             <Flex gap={2} wrap>
               {journal.sources.map((source) => (
                 <Label key={source} theme="info" size="m">
-                  {JOURNAL_SOURCE_LABELS[source]}
+                  {t(JOURNAL_SOURCE_KEYS[source])}
                 </Label>
               ))}
             </Flex>
 
-            <FieldList title="Заполняет программа" fields={journal.autoFields} theme="info" />
-            <FieldList title="Заполняет вручную" fields={journal.manualFields} theme="warning" />
+            <FieldList
+              title={t('journals.drawerAutoTitle')}
+              fields={journal.autoFieldKeys.map((key) => t(key))}
+              theme="info"
+            />
+            <FieldList
+              title={t('journals.drawerManualTitle')}
+              fields={journal.manualFieldKeys.map((key) => t(key))}
+              theme="warning"
+            />
 
             <Text variant="body-2" color="secondary">
-              Журнал формируется из данных меню, порционника, накладных и ТТК. Поля с оценкой и
-              подписью заполняются на месте после печати или в электронном виде.
+              {t('journals.drawerDesc')}
             </Text>
           </Flex>
 
           <Flex className="journal-drawer__footer" gap={2}>
             <Button view="action" size="l" onClick={() => window.print()}>
               <Icon data={Printer} size={16} />
-              Печать
+              {t('journals.print')}
             </Button>
           </Flex>
         </div>

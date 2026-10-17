@@ -13,6 +13,7 @@ import { useOpenBatches } from '@/features/warehouse/api';
 import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/format';
 import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
 import type { Batch } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import './warehouse-balances-route.css';
 
 /** Карточка продукта: открытые партии и итог по ним. */
@@ -68,6 +69,7 @@ function buildCards(batches: Batch[], search: string): ProductCard[] {
 /** Раздел «Склад → Остатки»: открытые партии объекта в разрезе продуктов. */
 export function WarehouseBalancesRoute() {
   const api = useApi();
+  const { t } = useTranslation();
   const [objectId, setObjectId] = useState('');
   const { options, objects, changeObjectId } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
@@ -112,7 +114,7 @@ export function WarehouseBalancesRoute() {
         />
         <TextInput
           size="l"
-          placeholder="Поиск по товару или накладной"
+          placeholder={t('balances.searchPlaceholder')}
           value={search}
           onUpdate={setSearch}
           hasClear
@@ -128,7 +130,7 @@ export function WarehouseBalancesRoute() {
       {objects.isError && (
         <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       )}
-      {noObjects && <EmptyState text="Сначала заведите объект в справочнике «Объекты»" />}
+      {noObjects && <EmptyState text={t('balances.emptyNoObjects')} />}
       {!noObjects && !objects.isError && (objects.isPending || batches.isPending) && (
         <LoadingState />
       )}
@@ -136,7 +138,7 @@ export function WarehouseBalancesRoute() {
         <ErrorState error={batches.error} onRetry={() => void batches.refetch()} />
       )}
       {batches.isSuccess && cards.length === 0 && (
-        <EmptyState text={search.trim() ? 'Ничего не найдено по запросу' : 'Нет остатков'} />
+        <EmptyState text={search.trim() ? t('balances.emptySearch') : t('balances.emptyNone')} />
       )}
 
       {batches.isSuccess && cards.length > 0 && (
@@ -151,9 +153,9 @@ export function WarehouseBalancesRoute() {
               </colgroup>
               <thead>
                 <tr>
-                  <th>Товар</th>
-                  <th className="warehouse-balances-col-price">Средняя цена</th>
-                  <th className="warehouse-balances-col-rest">Остаток</th>
+                  <th>{t('balances.colProduct')}</th>
+                  <th className="warehouse-balances-col-price">{t('balances.colAvgPrice')}</th>
+                  <th className="warehouse-balances-col-rest">{t('balances.colRemaining')}</th>
                   <th className="warehouse-balances-col-chevron" />
                 </tr>
               </thead>
@@ -182,8 +184,10 @@ export function WarehouseBalancesRoute() {
                             toggleExpanded(card.productId);
                           }
                         }}
-                        title={open ? 'Свернуть' : 'Раскрыть'}
-                        aria-label={open ? 'Свернуть товар' : 'Раскрыть товар'}
+                        title={open ? t('receipt.collapse') : t('receipt.expand')}
+                        aria-label={
+                          open ? t('receipt.collapseProduct') : t('receipt.expandProduct')
+                        }
                         aria-expanded={open}
                       >
                         <td colSpan={4}>
@@ -207,7 +211,7 @@ export function WarehouseBalancesRoute() {
                                 event.stopPropagation();
                                 toggleExpanded(card.productId);
                               }}
-                              title={open ? 'Свернуть' : 'Раскрыть'}
+                              title={open ? t('receipt.collapse') : t('receipt.expand')}
                             >
                               <Icon data={open ? ChevronUp : ChevronDown} size={16} />
                             </div>
@@ -218,11 +222,15 @@ export function WarehouseBalancesRoute() {
                               <table className="warehouse-balances-batches">
                                 <thead>
                                   <tr>
-                                    <th>Накладная</th>
-                                    <th>Дата</th>
-                                    <th style={{ textAlign: 'right' }}>Цена</th>
-                                    <th style={{ textAlign: 'right' }}>Приход</th>
-                                    <th style={{ textAlign: 'right' }}>Остаток</th>
+                                    <th>{t('balances.colInvoice')}</th>
+                                    <th>{t('balances.colDate')}</th>
+                                    <th style={{ textAlign: 'right' }}>{t('balances.colPrice')}</th>
+                                    <th style={{ textAlign: 'right' }}>
+                                      {t('balances.colReceived')}
+                                    </th>
+                                    <th style={{ textAlign: 'right' }}>
+                                      {t('balances.colRemaining')}
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>

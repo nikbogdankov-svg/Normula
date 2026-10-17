@@ -7,6 +7,7 @@ import { useWriteOff } from '@/features/warehouse/api';
 import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/format';
 import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
 import type { WriteOff } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import './write-off-drawer.css';
 
 function WriteOffView({
@@ -16,17 +17,22 @@ function WriteOffView({
   writeOff: WriteOff;
   objectOptions: ObjectOption[];
 }) {
+  const { t } = useTranslation();
   return (
     <Flex direction="column" gap={3}>
       <Flex direction="column" gap={1}>
         <Text variant="body-2" color="secondary">
-          Объект: <strong>{objectName(objectOptions, writeOff.objectId)}</strong>
+          {t('writeOff.objectLabel')}{' '}
+          <strong>{objectName(objectOptions, writeOff.objectId)}</strong>
         </Text>
         <Text variant="body-2" color="secondary">
-          Дата: <strong>{formatDate(writeOff.date)}</strong>
+          {t('writeOff.dateLabel')} <strong>{formatDate(writeOff.date)}</strong>
         </Text>
         <Text variant="body-2" color="secondary">
-          Тип: <strong>{writeOff.kind === 'auto' ? 'Автоматическое' : 'Исключительное'}</strong>
+          {t('writeOff.typeLabel')}{' '}
+          <strong>
+            {writeOff.kind === 'auto' ? t('writeOff.kindAuto') : t('writeOff.kindManual')}
+          </strong>
         </Text>
       </Flex>
 
@@ -34,11 +40,11 @@ function WriteOffView({
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Накладная</th>
-              <th>Товар</th>
-              <th style={{ width: 120, textAlign: 'right' }}>Кол-во</th>
-              <th style={{ width: 120, textAlign: 'right' }}>Цена</th>
-              <th style={{ width: 140, textAlign: 'right' }}>Сумма</th>
+              <th>{t('writeOff.invoiceCol')}</th>
+              <th>{t('writeOff.productCol')}</th>
+              <th style={{ width: 120, textAlign: 'right' }}>{t('writeOff.qtyCol')}</th>
+              <th style={{ width: 120, textAlign: 'right' }}>{t('writeOff.priceCol')}</th>
+              <th style={{ width: 140, textAlign: 'right' }}>{t('writeOff.sumCol')}</th>
             </tr>
           </thead>
           <tbody>
@@ -53,7 +59,7 @@ function WriteOffView({
             ))}
             <tr className="admin-table__row_total">
               <td>
-                <strong>Всего</strong>
+                <strong>{t('writeOff.grandTotal')}</strong>
               </td>
               <td />
               <td />
@@ -85,6 +91,7 @@ export function WriteOffDrawer({
   const [open, setOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
   const writeOff = useWriteOff(viewId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (writeOffId) {
@@ -118,14 +125,18 @@ export function WriteOffDrawer({
       <div className="write-off-drawer__card">
         <div className="write-off-drawer__header">
           <Flex alignItems="center" gap={2}>
-            <Text variant="subheader-2">{view ? `Списание: ${view.reason}` : 'Списание'}</Text>
+            <Text variant="subheader-2">
+              {view
+                ? t('writeOff.viewTitleWith', { reason: view.reason })
+                : t('writeOff.viewTitle')}
+            </Text>
             {view && (
               <Label theme="normal" size="m">
                 {formatDate(view.date)}
               </Label>
             )}
           </Flex>
-          <Button view="flat" size="l" onClick={onClose} aria-label="Закрыть">
+          <Button view="flat" size="l" onClick={onClose} aria-label={t('common.close')}>
             <Icon data={Xmark} size={20} />
           </Button>
         </div>
@@ -140,7 +151,7 @@ export function WriteOffDrawer({
 
         <div className="write-off-drawer__footer">
           <Button view="outlined" size="l" onClick={onClose}>
-            Закрыть
+            {t('writeOff.close')}
           </Button>
           <Button
             view="normal"
@@ -148,7 +159,7 @@ export function WriteOffDrawer({
             disabled={!view || view.kind === 'auto'}
             onClick={() => view && onEdit(view)}
           >
-            Редактировать
+            {t('writeOff.edit')}
           </Button>
         </div>
       </div>

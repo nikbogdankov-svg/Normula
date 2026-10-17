@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Flex, Icon, Label, Text, TextInput } from '@gravity-ui/uikit';
 import { Magnifier, Pencil, Plus, TrashBin } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { useTranslation } from '@/shared/i18n';
 import {
   EmptyState,
   ErrorState,
@@ -15,11 +16,11 @@ import { CreateDietDialog } from './create-diet-dialog';
 import { MEALS } from '@/features/menu/types';
 import './diets-route.css';
 
-const FACILITY_TYPE_LABELS: Record<string, string> = {
-  school: 'Школа',
-  kindergarten: 'Детский сад',
-  hospital: 'Больница',
-  warehouse: 'Склад',
+const FACILITY_TYPE_LABEL_KEYS: Record<string, string> = {
+  school: 'facility.school',
+  kindergarten: 'facility.kindergarten',
+  hospital: 'facility.hospital',
+  warehouse: 'facility.warehouse',
 };
 
 /** Цвет тэга заведения: дружелюбный к виду организации. */
@@ -40,9 +41,10 @@ function DietCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const meals = diet.mealIds
-    .map((mealId) => MEALS.find((meal) => meal.id === mealId)?.label)
-    .filter(Boolean);
+    .map((mealId) => MEALS.find((meal) => meal.id === mealId))
+    .filter((meal): meal is NonNullable<typeof meal> => Boolean(meal));
 
   return (
     <div className="diets-card">
@@ -52,7 +54,7 @@ function DietCard({
           <div className="diets-card__tags">
             {diet.appliesTo.map((type) => (
               <Label key={type} theme={FACILITY_THEME[type]}>
-                {FACILITY_TYPE_LABELS[type] ?? type}
+                {t(FACILITY_TYPE_LABEL_KEYS[type] ?? type)}
               </Label>
             ))}
           </div>
@@ -61,7 +63,7 @@ function DietCard({
           <Button
             size="m"
             view="flat"
-            title="Редактировать"
+            title={t('common.edit')}
             onClick={(event) => {
               event.stopPropagation();
               onEdit();
@@ -72,7 +74,7 @@ function DietCard({
           <Button
             size="m"
             view="flat"
-            title="Удалить"
+            title={t('common.delete')}
             onClick={(event) => {
               event.stopPropagation();
               onDelete();
@@ -83,17 +85,20 @@ function DietCard({
         </Flex>
       </Flex>
       <div className="diets-card__tags">
-        {meals.length === 0
-          ? null
-          : meals.map((label) => (
-              <span key={label} className="diets-card__tag">
-                {label}
-              </span>
-            ))}
+        {meals.map((meal) => (
+          <span key={meal.id} className="diets-card__tag">
+            {t(meal.labelKey)}
+          </span>
+        ))}
       </div>
       <Text variant="body-2" style={{ marginTop: 4 }}>
-        {diet.pricePerDay} ₽ · {diet.kcal}ккал · Б: {diet.protein}г · Ж: {diet.fat}г · У:{' '}
-        {diet.carbs}г
+        {t('diets.summary', {
+          price: diet.pricePerDay,
+          kcal: diet.kcal,
+          protein: diet.protein,
+          fat: diet.fat,
+          carbs: diet.carbs,
+        })}
       </Text>
     </div>
   );
@@ -102,6 +107,7 @@ function DietCard({
 /** Раздел «Диеты»: справочник рационов питания в виде карточек. */
 export function DietsRoute() {
   const { current } = useOrganizations();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState<Diet | null>(null);
   const [deleting, setDeleting] = useState<Diet | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -127,7 +133,7 @@ export function DietsRoute() {
         <Flex alignItems="center" gap={2} wrap>
           <TextInput
             size="l"
-            placeholder="Поиск по названию диеты"
+            placeholder={t('diets.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -139,12 +145,12 @@ export function DietsRoute() {
             style={{ width: 280 }}
           />
           <Text variant="body-1" color="secondary">
-            {data ? `Всего диет: ${diets.length}` : ''}
+            {data ? t('diets.total', { count: diets.length }) : ''}
           </Text>
         </Flex>
         <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
           <Icon data={Plus} size={16} />
-          Создать диету
+          {t('diets.createDiet')}
         </Button>
       </Flex>
 
@@ -155,7 +161,7 @@ export function DietsRoute() {
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
           {data && !isPending && !isError && filteredDiets.length === 0 && (
             <EmptyState
-              text={query ? `Ничего не нашли по запросу «${search.trim()}»` : 'Диет пока нет'}
+              text={query ? t('diets.emptySearch', { query: search.trim() }) : t('diets.emptyNone')}
             />
           )}
 

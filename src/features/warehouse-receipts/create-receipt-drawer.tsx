@@ -33,6 +33,7 @@ import {
   type ReceiptItemInput,
   type ReceiptRequest,
 } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import './create-receipt-drawer.css';
 
 /**
@@ -84,6 +85,8 @@ function ItemInput({
   invalid?: boolean;
   endContent?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
+
   return (
     <TextInput
       size="l"
@@ -98,7 +101,7 @@ function ItemInput({
         (optional ? (
           <div style={{ marginRight: 4 }}>
             <Text variant="body-1" color="secondary">
-              необязательно
+              {t('receipt.optional')}
             </Text>
           </div>
         ) : undefined)
@@ -150,13 +153,15 @@ function ItemDate({
   onUpdate: (value: string) => void;
   flex?: number;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div style={{ flex }}>
       <DatePicker
         size="l"
         view="normal"
         label={label}
-        placeholder="дд/мм/гггг"
+        placeholder={t('receipt.datePlaceholder')}
         value={value ? dateTime({ input: value, format: 'DD/MM/YYYY' }) : null}
         onUpdate={(next) => onUpdate(next ? next.format('DD/MM/YYYY') : '')}
         style={{ width: '100%' }}
@@ -329,6 +334,7 @@ export function CreateReceiptDrawer({
   const create = useCreateReceipt();
   const update = useUpdateReceipt();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -405,7 +411,7 @@ export function CreateReceiptDrawer({
     const onSuccess = () => {
       toaster.add({
         name: initial ? 'receipt-updated' : 'receipt-created',
-        title: initial ? 'Приход обновлён' : 'Приход создан',
+        title: initial ? t('receipt.toastUpdated') : t('receipt.toastCreated'),
         theme: 'success',
       });
       requestClose();
@@ -413,7 +419,7 @@ export function CreateReceiptDrawer({
     const onError = (e: Error) =>
       toaster.add({
         name: initial ? 'receipt-update' : 'receipt-create',
-        title: 'Ошибка',
+        title: t('common.error'),
         content: e.message,
         theme: 'danger',
       });
@@ -444,9 +450,9 @@ export function CreateReceiptDrawer({
         <div className="create-receipt-drawer__header">
           <div className="create-receipt-drawer__header-inner">
             <Text variant="subheader-3">
-              {initial ? 'Редактировать приход' : 'Добавить приход'}{' '}
+              {initial ? t('receipt.editTitle') : t('receipt.addTitle')}{' '}
             </Text>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+            <Button view="flat" size="l" onClick={requestClose} aria-label={t('receipt.close')}>
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -457,13 +463,13 @@ export function CreateReceiptDrawer({
             <Flex gap={2}>
               <TextInput
                 size="l"
-                label="Номер накладной:"
-                placeholder="НАК-2026-001"
+                label={t('receipt.invoiceNumberLabel')}
+                placeholder={t('receipt.invoiceNumberPlaceholder')}
                 value={invoiceNumber}
                 onUpdate={setInvoiceNumber}
                 style={{ flex: 1 }}
               />
-              <ItemDate label="Дата:" value={date} onUpdate={setDate} flex={1} />
+              <ItemDate label={t('receipt.dateLabel')} value={date} onUpdate={setDate} flex={1} />
               <div style={{ flex: 1 }}>
                 <ObjectSelect
                   value={draftObjectId}
@@ -482,7 +488,7 @@ export function CreateReceiptDrawer({
                       <ProductPicker
                         value={row.productId}
                         valueLabel={row.productName}
-                        placeholder="Название товара"
+                        placeholder={t('receipt.productPlaceholder')}
                         size="l"
                         onChange={(product) =>
                           updateItem(index, {
@@ -494,7 +500,7 @@ export function CreateReceiptDrawer({
                       />
                     </div>
                     <ItemInput
-                      label="Кол-во:"
+                      label={t('receipt.quantityLabel')}
                       placeholder="0"
                       value={row.quantity}
                       onUpdate={(v) => updateItem(index, { quantity: v })}
@@ -513,7 +519,7 @@ export function CreateReceiptDrawer({
                       }
                     />
                     <ItemInput
-                      label="Цена за шт, ₽:"
+                      label={t('receipt.unitPriceLabel')}
                       placeholder="0.00"
                       value={row.unitPrice}
                       onUpdate={(v) => updateItem(index, { unitPrice: v })}
@@ -524,8 +530,8 @@ export function CreateReceiptDrawer({
                       view="flat"
                       size="l"
                       onClick={() => removeItem(index)}
-                      title="Удалить"
-                      aria-label="Удалить товар"
+                      title={t('common.delete')}
+                      aria-label={t('receipt.deleteProduct')}
                       disabled={items.length <= 1}
                     >
                       <Icon data={TrashBin} size={18} />
@@ -536,8 +542,12 @@ export function CreateReceiptDrawer({
                       onClick={() =>
                         setExpandedIndex((current) => (current === index ? null : index))
                       }
-                      title={expandedIndex === index ? 'Свернуть' : 'Раскрыть'}
-                      aria-label={expandedIndex === index ? 'Свернуть товар' : 'Раскрыть товар'}
+                      title={expandedIndex === index ? t('receipt.collapse') : t('receipt.expand')}
+                      aria-label={
+                        expandedIndex === index
+                          ? t('receipt.collapseProduct')
+                          : t('receipt.expandProduct')
+                      }
                       aria-expanded={expandedIndex === index}
                     >
                       <Icon data={expandedIndex === index ? ChevronUp : ChevronDown} size={18} />
@@ -549,64 +559,64 @@ export function CreateReceiptDrawer({
                       <Flex direction="column" gap={3}>
                         <Flex gap={3}>
                           <ItemInput
-                            label="Изготовитель:"
+                            label={t('receipt.manufacturerLabel')}
                             value={row.manufacturer}
                             onUpdate={(v) => updateItem(index, { manufacturer: v })}
                           />
                           <ItemInput
-                            label="Поставщик:"
+                            label={t('receipt.supplierLabel')}
                             value={row.supplier}
                             onUpdate={(v) => updateItem(index, { supplier: v })}
                           />
                           <ItemInput
-                            label="Фасовка:"
+                            label={t('receipt.packagingLabel')}
                             value={row.packaging}
                             onUpdate={(v) => updateItem(index, { packaging: v })}
                           />
                         </Flex>
                         <Flex gap={3}>
                           <ItemDate
-                            label="Дата выработки:"
+                            label={t('receipt.productionDateLabel')}
                             value={row.productionDate}
                             onUpdate={(v) => updateItem(index, { productionDate: v })}
                           />
                           <ItemSelect
-                            label="Тип документа:"
-                            placeholder="Выберите тип"
+                            label={t('receipt.documentTypeLabel')}
+                            placeholder={t('receipt.documentTypePlaceholder')}
                             value={row.documentType}
                             options={selectOptions(DOCUMENT_TYPE_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { documentType: v })}
                           />
                           <ItemInput
-                            label="Номер документа:"
+                            label={t('receipt.documentNumberLabel')}
                             value={row.documentNumber}
                             onUpdate={(v) => updateItem(index, { documentNumber: v })}
                           />
                         </Flex>
                         <Flex gap={3}>
                           <ItemDate
-                            label="Срок реализации:"
+                            label={t('receipt.expiryDateLabel')}
                             value={row.expiryDate}
                             onUpdate={(v) => updateItem(index, { expiryDate: v })}
                           />
                           <ItemSelect
-                            label="Органолептика:"
-                            placeholder="Выберите"
+                            label={t('receipt.organolepticLabel')}
+                            placeholder={t('receipt.organolepticPlaceholder')}
                             value={row.organoleptic}
                             options={selectOptions(ORGANOLEPTIC_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { organoleptic: v })}
                           />
                           <ItemSelect
-                            label="Условия хранения:"
-                            placeholder="Выберите"
+                            label={t('receipt.storageConditionsLabel')}
+                            placeholder={t('receipt.storageConditionsPlaceholder')}
                             value={row.storageConditions}
                             options={selectOptions(STORAGE_CONDITIONS_OPTIONS)}
                             onUpdate={(v) => updateItem(index, { storageConditions: v })}
                           />
                         </Flex>
                         <ItemInput
-                          label="Примечание:"
-                          placeholder="Необязательное поле"
+                          label={t('receipt.noteLabel')}
+                          placeholder={t('receipt.notePlaceholder')}
                           value={row.note}
                           onUpdate={(v) => updateItem(index, { note: v })}
                           optional
@@ -627,7 +637,7 @@ export function CreateReceiptDrawer({
                 style={{ alignSelf: 'flex-start' }}
               >
                 <Icon data={Plus} size={16} />
-                Добавить товар
+                {t('receipt.addProduct')}
               </Button>
             </Flex>
           </Flex>
@@ -636,10 +646,10 @@ export function CreateReceiptDrawer({
         <div className="create-receipt-drawer__footer">
           <div className="create-receipt-drawer__footer-inner">
             <Text variant="subheader-2" style={{ marginInlineEnd: 'auto' }}>
-              Итого: {formatMoney(total)}
+              {t('receipt.total', { value: formatMoney(total) })}
             </Text>
             <Button view="outlined" size="l" onClick={requestClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button
               view={canSubmit ? 'action' : 'normal'}
@@ -649,7 +659,7 @@ export function CreateReceiptDrawer({
               loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={Plus} size={16} />
-              {initial ? 'Сохранить' : 'Создать приход'}
+              {initial ? t('common.save') : t('receipt.submit')}
             </Button>
           </div>
         </div>

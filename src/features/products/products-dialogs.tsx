@@ -1,5 +1,6 @@
 import { Button, Dialog, Flex, Icon, Text, useToaster } from '@gravity-ui/uikit';
 import { Pencil } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useDeleteProduct, useUpdateProduct } from './api';
 import { useProductForm } from './product-form';
 import type { Product } from './types';
@@ -15,6 +16,7 @@ export function EditProductDialog({
 }) {
   const update = useUpdateProduct();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const form = useProductForm(product, product?.id);
 
   if (!product) return null;
@@ -24,13 +26,13 @@ export function EditProductDialog({
       { id: product.id, body: form.getBody() },
       {
         onSuccess: () => {
-          toaster.add({ name: 'product-updated', title: 'Продукт обновлён', theme: 'success' });
+          toaster.add({ name: 'product-updated', title: t('products.updated'), theme: 'success' });
           onClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'product-update',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -40,14 +42,14 @@ export function EditProductDialog({
 
   return (
     <Dialog open onClose={onClose} size="s" className="product-dialog">
-      <Dialog.Header caption="Редактирование продукта" />
+      <Dialog.Header caption={t('products.editTitle')} />
       <Dialog.Divider />
       <Dialog.Body>{form.fields}</Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="outlined" size="l" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             view="action"
@@ -57,7 +59,7 @@ export function EditProductDialog({
             loading={update.isPending}
           >
             <Icon data={Pencil} size={16} />
-            Изменить
+            {t('products.change')}
           </Button>
         </Flex>
       </Dialog.Footer>
@@ -75,6 +77,7 @@ export function DeleteProductDialog({
 }) {
   const remove = useDeleteProduct();
   const toaster = useToaster();
+  const { t } = useTranslation();
 
   if (!product) return null;
 
@@ -85,13 +88,13 @@ export function DeleteProductDialog({
         onSuccess: () => {
           // Режим уходит на бэкенд, но пока не различается: периодов ещё нет,
           // и в обоих случаях продукт пропадает из справочника сразу.
-          toaster.add({ name: 'product-deleted', title: 'Продукт удалён', theme: 'success' });
+          toaster.add({ name: 'product-deleted', title: t('products.deleted'), theme: 'success' });
           onClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'product-delete',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -101,13 +104,11 @@ export function DeleteProductDialog({
 
   return (
     <Dialog open onClose={onClose} size="s">
-      <Dialog.Header caption={`Удалить «${product.name}»?`} />
+      <Dialog.Header caption={t('products.deleteTitle', { name: product.name })} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
-          <Text variant="body-2">
-            Продукт может использоваться в ТТК и закупках. Выберите, как его удалить.
-          </Text>
+          <Text variant="body-2">{t('products.deleteDescription')}</Text>
           <Flex direction="column" gap={2}>
             <Button
               view="outlined-danger"
@@ -115,10 +116,10 @@ export function DeleteProductDialog({
               onClick={() => runDelete('soft')}
               loading={remove.isPending}
             >
-              Удалить после конца периода
+              {t('products.deleteAfterPeriod')}
             </Button>
             <Text variant="body-1" color="secondary">
-              До конца периода продукт останется в ТТК и приходных
+              {t('products.deleteAfterPeriodHint')}
             </Text>
           </Flex>
           <Flex direction="column" gap={2}>
@@ -128,14 +129,14 @@ export function DeleteProductDialog({
               onClick={() => runDelete('immediate')}
               loading={remove.isPending}
             >
-              Удалить сейчас
+              {t('products.deleteNow')}
             </Button>
             <Text variant="body-1" color="secondary">
-              Будет убран из всех разделов немедленно
+              {t('products.deleteNowHint')}
             </Text>
           </Flex>
           <Button view="flat" size="l" onClick={onClose} disabled={remove.isPending}>
-            Отмена
+            {t('common.cancel')}
           </Button>
         </Flex>
       </Dialog.Body>

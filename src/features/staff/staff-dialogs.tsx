@@ -10,6 +10,7 @@ import {
   TextInput,
 } from '@gravity-ui/uikit';
 import { ArrowRight, Envelope, Pencil } from '@gravity-ui/icons';
+import { Trans, useTranslation } from 'react-i18next';
 import { ErrorState, LoadingState } from '@/shared/ui/states';
 import {
   useCreateEmployee,
@@ -68,6 +69,7 @@ function ProfileFields({
   withOrgEmail?: boolean;
   showPasswordNote?: boolean;
 }) {
+  const { t } = useTranslation();
   const roles = useStaffRoles();
 
   return (
@@ -75,8 +77,8 @@ function ProfileFields({
       <Flex gap={2}>
         <TextInput
           size="l"
-          label="Имя:"
-          placeholder="Иван"
+          label={t('staff.firstNameLabel')}
+          placeholder={t('staff.firstNamePlaceholder')}
           value={form.firstName}
           onUpdate={(v) => onChange({ firstName: v })}
           autoFocus
@@ -84,8 +86,8 @@ function ProfileFields({
         />
         <TextInput
           size="l"
-          label="Фамилия:"
-          placeholder="Иванов"
+          label={t('staff.lastNameLabel')}
+          placeholder={t('staff.lastNamePlaceholder')}
           value={form.lastName}
           onUpdate={(v) => onChange({ lastName: v })}
           style={{ flex: 1 }}
@@ -93,7 +95,7 @@ function ProfileFields({
       </Flex>
       <TextInput
         size="l"
-        label="Почта:"
+        label={t('staff.emailLabel')}
         placeholder="example@mail.ru"
         type="email"
         value={form.email}
@@ -101,15 +103,15 @@ function ProfileFields({
         note={
           showPasswordNote ? (
             <Text variant="caption-2" color="secondary" style={{ textAlign: 'left' }}>
-              На эту почту придет ссылка, с которым сотрудник войдет в систему
+              {t('staff.emailNote')}
             </Text>
           ) : undefined
         }
       />
       <Select
         size="l"
-        label="Роль:"
-        placeholder="Выберите роль"
+        label={t('staff.roleLabel')}
+        placeholder={t('staff.rolePlaceholder')}
         width="max"
         value={form.roleId ? [form.roleId] : []}
         onUpdate={(v) => onChange({ roleId: v[0] ?? '' })}
@@ -125,7 +127,7 @@ function ProfileFields({
       {withOrgEmail && (
         <TextInput
           size="l"
-          label="E-mail организации:"
+          label={t('staff.orgEmailLabel')}
           placeholder="i.ivanov"
           value={workEmailLocalPart(form.orgEmail)}
           onUpdate={(v) => onChange({ orgEmail: toWorkEmail(v) })}
@@ -150,12 +152,13 @@ function DocumentFields({
   onChange: (patch: Partial<EmployeeDocuments>) => void;
   showOtherDoc?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <Flex gap={2}>
         <TextInput
           size="l"
-          label="СНИЛС:"
+          label={t('staff.snilsLabel')}
           placeholder="112-233-445 95"
           value={maskSnils(documents.snils)}
           onUpdate={(v) => onChange({ snils: digitsOnly(v, 11) })}
@@ -164,8 +167,8 @@ function DocumentFields({
         />
         <TextInput
           size="l"
-          label="ИНН:"
-          placeholder="12 цифр"
+          label={t('staff.innLabel')}
+          placeholder={t('staff.innPlaceholder')}
           value={documents.inn}
           onUpdate={(v) => onChange({ inn: digitsOnly(v, 12) })}
           style={{ flex: 1 }}
@@ -175,7 +178,7 @@ function DocumentFields({
           (ведущий ноль серии значащий) и разделяются на лету. */}
       <TextInput
         size="l"
-        label="Паспорт:"
+        label={t('staff.passportLabel')}
         placeholder="0123 456789"
         value={maskPassport(documents.passportSeries, documents.passportNumber)}
         onUpdate={(v) => {
@@ -186,8 +189,8 @@ function DocumentFields({
       {showOtherDoc && (
         <TextInput
           size="l"
-          label="Другой док:"
-          placeholder="Необязательно"
+          label={t('staff.otherDocLabel')}
+          placeholder={t('staff.otherDocPlaceholder')}
           value={documents.otherDoc}
           onUpdate={(v) => onChange({ otherDoc: v })}
         />
@@ -222,6 +225,7 @@ function maskPassport(series: string, number: string): string {
 
 /** Двухшаговое добавление сотрудника из макета. */
 export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const create = useCreateEmployee();
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState(EMPTY);
@@ -245,12 +249,12 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
 
   return (
     <Dialog open={open} onClose={close} size="s">
-      <Dialog.Header caption="Добавление нового сотрудника" />
+      <Dialog.Header caption={t('staff.addTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
           <Text variant="body-1" color="secondary">
-            Шаг {step}/2
+            {t('staff.addStep', { step })}
           </Text>
           {step === 1 ? (
             <ProfileFields form={form} onChange={set} withOrgEmail={false} />
@@ -263,7 +267,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="flat" size="l" onClick={step === 1 ? close : () => setStep(1)}>
-            {step === 1 ? 'Отмена' : 'Назад'}
+            {step === 1 ? t('common.cancel') : t('staff.back')}
           </Button>
           <Button
             view="action"
@@ -273,7 +277,7 @@ export function AddEmployeeDialog({ open, onClose }: { open: boolean; onClose: (
             loading={create.isPending}
           >
             <Icon data={step === 1 ? ArrowRight : Envelope} size={16} />
-            {step === 1 ? 'Дальше' : 'Добавить и отправить приглашение'}
+            {step === 1 ? t('staff.next') : t('staff.addAndInvite')}
           </Button>
         </Flex>
       </Dialog.Footer>
@@ -297,6 +301,7 @@ export function EditEmployeeDialog({
   employee: Employee | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const card = useEmployeeCard(employee?.id ?? null);
   const update = useUpdateEmployee();
   const [tab, setTab] = useState<EditTab>('general');
@@ -365,7 +370,7 @@ export function EditEmployeeDialog({
 
   return (
     <Dialog open onClose={close} size="s">
-      <Dialog.Header caption="Редактирование данных сотрудника" />
+      <Dialog.Header caption={t('staff.editTitle')} />
       <Dialog.Divider />
       <div style={{ padding: '12px 16px 0' }}>
         <SegmentedRadioGroup
@@ -375,8 +380,8 @@ export function EditEmployeeDialog({
           value={tab}
           onUpdate={(value) => setTab(value as EditTab)}
         >
-          <SegmentedRadioGroup.Option value="general" content="Общая информация" />
-          <SegmentedRadioGroup.Option value="documents" content="Документы" />
+          <SegmentedRadioGroup.Option value="general" content={t('staff.tabGeneral')} />
+          <SegmentedRadioGroup.Option value="documents" content={t('staff.tabDocuments')} />
         </SegmentedRadioGroup>
         {/* Линия по ширине сегмента, не на всю ширину диалога. */}
         <div style={{ marginTop: 12, borderBottom: '1px solid var(--g-color-line-generic)' }} />
@@ -412,7 +417,7 @@ export function EditEmployeeDialog({
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="flat" size="l" onClick={close}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             view="action"
@@ -422,7 +427,7 @@ export function EditEmployeeDialog({
             loading={update.isPending}
           >
             <Icon data={Pencil} size={16} />
-            Изменить
+            {t('staff.change')}
           </Button>
         </Flex>
       </Dialog.Footer>
@@ -438,6 +443,7 @@ export function DeleteEmployeeDialog({
   employee: Employee | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const remove = useDeleteEmployee();
 
   if (!employee) return null;
@@ -448,18 +454,19 @@ export function DeleteEmployeeDialog({
 
   return (
     <Dialog open onClose={onClose} size="s">
-      <Dialog.Header caption="Удаление сотрудника" />
+      <Dialog.Header caption={t('staff.deleteTitle')} />
       <Dialog.Body>
         <Text variant="body-2">
-          Удалить {employee.lastName} {employee.firstName}? Доступ к системе закроется сразу.
-          Учётная запись человека останется — он может работать и в другой организации.
+          {t('staff.deleteBody', {
+            name: `${employee.lastName} ${employee.firstName}`.trim(),
+          })}
         </Text>
       </Dialog.Body>
       <Dialog.Footer
         onClickButtonCancel={onClose}
         onClickButtonApply={submit}
-        textButtonCancel="Отмена"
-        textButtonApply="Удалить"
+        textButtonCancel={t('common.cancel')}
+        textButtonApply={t('common.delete')}
         propsButtonApply={{ view: 'outlined-danger' }}
         loading={remove.isPending}
       />
@@ -482,6 +489,7 @@ export function ResendInvitationDialog({
   employee: Employee | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const resend = useResendInvitation();
 
   if (!employee) return null;
@@ -494,26 +502,26 @@ export function ResendInvitationDialog({
 
   return (
     <Dialog open onClose={onClose} size="s">
-      <Dialog.Header caption="Отправить приглашение заново" />
+      <Dialog.Header caption={t('staff.resendTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Text variant="body-2">
-          Выслать{' '}
-          <Text variant="body-2" style={{ fontWeight: 600 }}>
-            {fullName}
-          </Text>{' '}
-          новое приглашение на {employee.email}? Прежняя ссылка перестанет работать.
+          <Trans
+            i18nKey="staff.resendBody"
+            values={{ name: fullName, email: employee.email }}
+            components={{ bold: <Text variant="body-2" style={{ fontWeight: 600 }} /> }}
+          />
         </Text>
       </Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="flat" size="l" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button view="action" size="l" onClick={submit} loading={resend.isPending}>
             <Icon data={Envelope} size={16} />
-            Отправить
+            {t('staff.send')}
           </Button>
         </Flex>
       </Dialog.Footer>

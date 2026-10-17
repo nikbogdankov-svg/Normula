@@ -19,6 +19,7 @@ import type { TableColumnConfig } from '@gravity-ui/uikit';
 import { ChevronLeft, ChevronRight, CircleCheck, Magnifier, Printer } from '@gravity-ui/icons';
 import { useObjects } from '@/features/objects/api';
 import { useOrganizations } from '@/shared/auth';
+import { useTranslation } from '@/shared/i18n';
 import { usePageObjectChoice } from '@/shared/object-selection';
 import {
   EmptyState,
@@ -69,6 +70,7 @@ function formatDisplayDate(date: string): string {
 /** Раскладка продуктов на день: тулбар закреплён, скроллится таблица. */
 export function ProductsSpreadRoute() {
   const { current } = useOrganizations();
+  const { t } = useTranslation();
   const objects = useObjects();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawDate = searchParams.get('date');
@@ -115,14 +117,14 @@ export function ProductsSpreadRoute() {
           setConfirmOpen(false);
           toaster.add({
             name: 'products-spread-confirmed',
-            title: 'Товары списаны со склада',
+            title: t('spread.confirmedToast'),
             theme: 'success',
           });
         },
         onError: (e) =>
           toaster.add({
             name: 'products-spread-confirm',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -157,7 +159,7 @@ export function ProductsSpreadRoute() {
     const printData = buildProductSpreadPrint(spread.data.items);
     void downloadProductSpreadDoc({
       displayDate: formatDisplayDate(date),
-      objectName: activeObjectName ?? 'Вся организация',
+      objectName: activeObjectName ?? t('spread.wholeOrg'),
       ...printData,
     });
   };
@@ -175,19 +177,19 @@ export function ProductsSpreadRoute() {
               <Select
                 size="l"
                 width={280}
-                label="Объект:"
-                title="Объект:"
+                label={t('spread.objectLabel')}
+                title={t('spread.objectLabel')}
                 value={[selectedObjectId]}
                 onUpdate={(value) => setSelectedObjectId(value[0] ?? ALL_OBJECTS)}
-                placeholder="Выберите объект"
-                options={[{ value: ALL_OBJECTS, content: 'Вся организация' }, ...objectOptions]}
+                placeholder={t('spread.objectPlaceholder')}
+                options={[{ value: ALL_OBJECTS, content: t('spread.wholeOrg') }, ...objectOptions]}
               />
             )}
             <Flex alignItems="center" gap={1}>
               <Button
                 view="outlined"
                 size="l"
-                title="Предыдущий день"
+                title={t('spread.prevDay')}
                 onClick={() => setDate(shiftIso(date, -1))}
               >
                 <Icon data={ChevronLeft} size={16} />
@@ -201,7 +203,7 @@ export function ProductsSpreadRoute() {
               <Button
                 view="outlined"
                 size="l"
-                title="Следующий день"
+                title={t('spread.nextDay')}
                 onClick={() => setDate(shiftIso(date, 1))}
               >
                 <Icon data={ChevronRight} size={16} />
@@ -215,14 +217,18 @@ export function ProductsSpreadRoute() {
               value={viewMode}
               onUpdate={(value) => setViewMode(value as SpreadView)}
             >
-              <SegmentedRadioGroup.Option value="meals">По приёмам пищи</SegmentedRadioGroup.Option>
-              <SegmentedRadioGroup.Option value="products">По продуктам</SegmentedRadioGroup.Option>
+              <SegmentedRadioGroup.Option value="meals">
+                {t('spread.byMeals')}
+              </SegmentedRadioGroup.Option>
+              <SegmentedRadioGroup.Option value="products">
+                {t('spread.byProducts')}
+              </SegmentedRadioGroup.Option>
             </SegmentedRadioGroup>
             <Button
               size="l"
               view="normal-contrast"
               onClick={handlePrint}
-              title="Скачать раскладку PDF"
+              title={t('spread.printPdf')}
             >
               <Icon data={Printer} size={16} />
             </Button>
@@ -231,7 +237,7 @@ export function ProductsSpreadRoute() {
         <Flex direction="column" gap={2}>
           <TextInput
             size="xl"
-            placeholder="Поиск по продуктам..."
+            placeholder={t('spread.searchPlaceholder')}
             value={searchQuery}
             onUpdate={setSearchQuery}
             hasClear
@@ -251,29 +257,27 @@ export function ProductsSpreadRoute() {
           >
             {spread.data && (
               <Text variant="body-1" color="secondary">
-                {hasFilters ? `Найдено: ${items.length} продуктов` : `Всего продуктов: ${total}`}
+                {hasFilters
+                  ? t('spread.foundProducts', { count: items.length })
+                  : t('spread.totalProducts', { count: total })}
               </Text>
             )}
             {confirmed ? (
               <Text variant="body-1" color="secondary">
-                Товары уже списаны со склада
+                {t('spread.alreadyConfirmed')}
               </Text>
             ) : (
-              <Tooltip
-                content="Подтвердить списание можно за прошедшие дни, сегодня и завтра"
-                disabled={canConfirm}
-                openDelay={0}
-              >
+              <Tooltip content={t('spread.confirmHint')} disabled={canConfirm} openDelay={0}>
                 <span tabIndex={canConfirm ? undefined : 0}>
                   <Button
                     size="l"
                     view="action"
-                    title={canConfirm ? 'Подтвердить списание товаров' : undefined}
+                    title={canConfirm ? t('spread.confirmProducts') : undefined}
                     disabled={!canConfirm}
                     onClick={() => setConfirmOpen(true)}
                   >
                     <Icon data={CircleCheck} size={16} />
-                    Подтвердить списание товаров
+                    {t('spread.confirmProducts')}
                   </Button>
                 </span>
               </Tooltip>
@@ -287,9 +291,7 @@ export function ProductsSpreadRoute() {
           {current === null && <NoOrganizationSelectedState />}
           {current !== null && loading && <LoadingState />}
           {error && <ErrorState error={undefined} onRetry={() => void spread.refetch()} />}
-          {spread.data && items.length === 0 && (
-            <EmptyState text="Раскладки нет: заполните порционник на эту дату" />
-          )}
+          {spread.data && items.length === 0 && <EmptyState text={t('spread.emptySpread')} />}
           {spread.data &&
             items.length > 0 &&
             (viewMode === 'meals' ? (
@@ -328,19 +330,20 @@ function ConfirmSpreadDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onClose={onClose} size="s" className="products-spread-confirm-dialog">
-      <Dialog.Header caption="Подтверждение списания" />
+      <Dialog.Header caption={t('spread.confirmTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={2}>
-          <Text variant="body-2">Проверьте информацию, изменить это будет нельзя.</Text>
+          <Text variant="body-2">{t('spread.confirmText')}</Text>
         </Flex>
       </Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer
-        textButtonApply="Подтвердить"
-        textButtonCancel="Отмена"
+        textButtonApply={t('common.confirm')}
+        textButtonCancel={t('common.cancel')}
         loading={loading}
         onClickButtonApply={onConfirm}
         onClickButtonCancel={onClose}
@@ -360,10 +363,11 @@ function ProductsSpreadTable({
   searchQuery: string;
   onSelect: (item: ProductSpreadItem) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<ProductSpreadItem>[] = [
     {
       id: 'productName',
-      name: 'Продукт',
+      name: t('spread.colProduct'),
       width: '28%',
       template: (row) => (
         <Flex alignItems="baseline" gap={4}>
@@ -378,7 +382,7 @@ function ProductsSpreadTable({
     },
     ...MEALS.map((meal) => ({
       id: `meal-${meal.id}`,
-      name: meal.label,
+      name: t(meal.labelKey),
       width: '9%',
       align: 'end' as const,
       template: (row: ProductSpreadItem) =>
@@ -392,7 +396,7 @@ function ProductsSpreadTable({
     })),
     {
       id: 'total',
-      name: 'Всего на день',
+      name: t('spread.colTotalDay'),
       width: '27%',
       align: 'end',
       template: (row) => (
@@ -431,6 +435,7 @@ function ProductsSpreadSections({
   searchQuery: string;
   onSelect: (item: ProductSpreadItem) => void;
 }) {
+  const { t } = useTranslation();
   const sections = useMemo(
     () =>
       MEALS.map((meal) => ({
@@ -445,7 +450,7 @@ function ProductsSpreadSections({
       {sections.map(({ meal, rows }) => (
         <section key={meal.id} className="products-spread-section">
           <div className="products-spread-section__header">
-            <Text variant="subheader-2">{meal.label}</Text>
+            <Text variant="subheader-2">{t(meal.labelKey)}</Text>
           </div>
           <div className="products-spread-section__rows">
             {rows.map((row) => (
@@ -483,6 +488,7 @@ function ProductSpreadDialog({
   item: ProductSpreadItem | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={item !== null} onClose={onClose} size="l" className="products-spread-dialog">
       {item && (
@@ -494,32 +500,35 @@ function ProductSpreadDialog({
               <table className="products-spread-dishes">
                 <thead>
                   <tr>
-                    <th>Блюдо</th>
-                    <th>Приём пищи</th>
-                    <th className="products-spread-dishes__right">Порций</th>
-                    <th className="products-spread-dishes__right">Кол-во</th>
+                    <th>{t('spread.colDish')}</th>
+                    <th>{t('spread.colMeal')}</th>
+                    <th className="products-spread-dishes__right">{t('spread.colPortions')}</th>
+                    <th className="products-spread-dishes__right">{t('spread.colQuantity')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {item.dishes
                     .filter((row) => row.quantity > 0)
-                    .map((row) => (
-                      <tr key={`${row.mealId}-${row.dishName}`}>
-                        <td>{row.dishName}</td>
-                        <td>{MEALS.find((meal) => meal.id === row.mealId)?.label}</td>
-                        <td className="products-spread-dishes__right">{row.portions}</td>
-                        <td className="products-spread-dishes__right">
-                          {formatQuantity(row.quantity, item.unit)}
-                        </td>
-                      </tr>
-                    ))}
+                    .map((row) => {
+                      const mealDef = MEALS.find((meal) => meal.id === row.mealId);
+                      return (
+                        <tr key={`${row.mealId}-${row.dishName}`}>
+                          <td>{row.dishName}</td>
+                          <td>{mealDef ? t(mealDef.labelKey) : row.mealId}</td>
+                          <td className="products-spread-dishes__right">{row.portions}</td>
+                          <td className="products-spread-dishes__right">
+                            {formatQuantity(row.quantity, item.unit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </Flex>
           </Dialog.Body>
           <Dialog.Divider />
           <Dialog.Footer
-            textButtonApply="ОК"
+            textButtonApply={t('spread.ok')}
             propsButtonApply={{ view: 'normal' }}
             onClickButtonApply={onClose}
           />

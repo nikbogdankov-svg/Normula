@@ -9,6 +9,7 @@ import {
   type TableColumnConfig,
 } from '@gravity-ui/uikit';
 import { Magnifier, Pencil, Plus, TrashBin } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -25,6 +26,7 @@ import './products-route.css';
 
 /** Раздел «Продукты»: справочник SKU — название и единица закупки. */
 export function ProductsRoute() {
+  const { t } = useTranslation();
   const { current } = useOrganizations();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -44,13 +46,13 @@ export function ProductsRoute() {
           <Text variant="body-1" color="secondary"></Text>
           <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
-            Создать продукт
+            {t('products.createButton')}
           </Button>
         </Flex>
         <Flex direction="column" gap={2}>
           <TextInput
             size="xl"
-            placeholder="Поиск по названию"
+            placeholder={t('products.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -62,7 +64,9 @@ export function ProductsRoute() {
           />
           {data && (
             <Text variant="body-1" color="secondary">
-              {hasQuery ? `Найдено: ${products.length}` : `Всего продуктов: ${data.total}`}
+              {hasQuery
+                ? t('products.foundCount', { count: products.length })
+                : t('products.totalCount', { total: data.total })}
             </Text>
           )}
         </Flex>
@@ -74,7 +78,7 @@ export function ProductsRoute() {
           {current !== null && isPending && <LoadingState />}
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
           {data && !isPending && !isError && products.length === 0 && (
-            <EmptyState text={hasQuery ? 'Ничего не нашли по запросу' : 'Продуктов пока нет'} />
+            <EmptyState text={hasQuery ? t('products.emptySearch') : t('products.empty')} />
           )}
 
           {data && products.length > 0 && (
@@ -112,10 +116,11 @@ function ProductsTable({
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<Product>[] = [
     {
       id: 'name',
-      name: 'Название',
+      name: t('products.colName'),
       template: (row) => (
         <Text variant="body-2">
           <HighlightText text={row.name} query={query} />
@@ -124,7 +129,7 @@ function ProductsTable({
     },
     {
       id: 'unit',
-      name: 'Единица измерения',
+      name: t('products.colUnit'),
       template: (row) => <Text variant="body-2">{row.unit}</Text>,
     },
     {
@@ -134,10 +139,20 @@ function ProductsTable({
       align: 'end',
       template: (row) => (
         <Flex alignItems="center" justifyContent="flex-end" gap={1}>
-          <Button view="flat-secondary" size="s" title="Изменить" onClick={() => onEdit(row)}>
+          <Button
+            view="flat-secondary"
+            size="s"
+            title={t('products.change')}
+            onClick={() => onEdit(row)}
+          >
             <Icon data={Pencil} size={16} />
           </Button>
-          <Button view="flat-secondary" size="s" title="Удалить" onClick={() => onDelete(row)}>
+          <Button
+            view="flat-secondary"
+            size="s"
+            title={t('common.delete')}
+            onClick={() => onDelete(row)}
+          >
             <Icon data={TrashBin} size={16} />
           </Button>
         </Flex>

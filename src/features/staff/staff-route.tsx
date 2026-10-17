@@ -12,6 +12,7 @@ import {
   TrashBin,
 } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
   ErrorState,
@@ -72,6 +73,7 @@ function StaffCard({
   onDelete: (employee: Employee) => void;
   onInvite: (employee: Employee) => void;
 }) {
+  const { t } = useTranslation();
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useEmployees(search);
   const [sort, setSort] = useState<StaffSort>('registeredAt');
@@ -126,12 +128,12 @@ function StaffCard({
       >
         <Flex alignItems="center" gap={2}>
           <Icon data={Persons} size={16} />
-          <Text variant="subheader-2">Персонал</Text>
+          <Text variant="subheader-2">{t('staff.personnel')}</Text>
         </Flex>
 
         <Flex alignItems="center" gap={2}>
           <TextInput
-            placeholder="Найти сотрудника"
+            placeholder={t('staff.searchPlaceholder')}
             value={search}
             onUpdate={onSearch}
             hasClear
@@ -144,7 +146,7 @@ function StaffCard({
           />
           <Button view="normal" onClick={onAdd}>
             <Icon data={Plus} size={16} />
-            Добавить
+            {t('common.add')}
           </Button>
         </Flex>
       </Flex>
@@ -161,9 +163,7 @@ function StaffCard({
         {current !== null && isPending && <LoadingState />}
         {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
         {data && employees.length === 0 && (
-          <EmptyState
-            text={search ? `Никого не нашли по запросу «${search}»` : 'Сотрудников пока нет'}
-          />
+          <EmptyState text={search ? t('staff.emptySearch', { search }) : t('staff.empty')} />
         )}
         {data && employees.length > 0 && (
           <>
@@ -173,7 +173,7 @@ function StaffCard({
               <div style={{ padding: '0 16px 8px' }}>
                 <Alert
                   theme="info"
-                  message={`Показаны первые ${PAGE_SIZE} из ${data.total}. Уточните поиск, чтобы найти нужного.`}
+                  message={t('staff.pageLimit', { shown: PAGE_SIZE, total: data.total })}
                 />
               </div>
             )}
@@ -210,6 +210,7 @@ function EmployeesTable({
   onDelete: (employee: Employee) => void;
   onInvite: (employee: Employee) => void;
 }) {
+  const { t } = useTranslation();
   const roles = useStaffRoles();
   const roleName = (roleId: string) =>
     roles.data?.roles.find((role) => role.id === roleId)?.name ?? '—';
@@ -225,7 +226,7 @@ function EmployeesTable({
             id: 'name',
             name: () => (
               <SortableHeader
-                label="Имя"
+                label={t('staff.colName')}
                 column="name"
                 sort={sort}
                 ascending={ascending}
@@ -239,7 +240,7 @@ function EmployeesTable({
           },
           {
             id: 'email',
-            name: () => <Text variant="body-2">Почта</Text>,
+            name: () => <Text variant="body-2">{t('staff.colEmail')}</Text>,
             width: '32%',
             template: (row) => <Text variant="body-2">{row.email}</Text>,
           },
@@ -247,7 +248,7 @@ function EmployeesTable({
             id: 'registeredAt',
             name: () => (
               <SortableHeader
-                label="Регистрация"
+                label={t('staff.colRegisteredAt')}
                 column="registeredAt"
                 sort={sort}
                 ascending={ascending}
@@ -258,7 +259,7 @@ function EmployeesTable({
           },
           {
             id: 'role',
-            name: () => <Text variant="body-2">Роль</Text>,
+            name: () => <Text variant="body-2">{t('staff.colRole')}</Text>,
             width: '22%',
             template: (row) => <Text variant="body-2">{roleName(row.roleId)}</Text>,
           },
@@ -276,17 +277,22 @@ function EmployeesTable({
                 {row.status !== 'EMPLOYEE_STATUS_ACTIVE' && (
                   <Button view="flat-secondary" size="s" onClick={() => onInvite(row)}>
                     <Icon data={Envelope} size={14} />
-                    Пригласить заново
+                    {t('staff.inviteAgain')}
                   </Button>
                 )}
-                <Button view="flat-secondary" size="s" title="Изменить" onClick={() => onEdit(row)}>
+                <Button
+                  view="flat-secondary"
+                  size="s"
+                  title={t('staff.change')}
+                  onClick={() => onEdit(row)}
+                >
                   <Icon data={Pencil} size={16} />
                 </Button>
                 <Button
                   view="flat-secondary"
                   size="s"
                   onClick={() => onDelete(row)}
-                  title="Удалить"
+                  title={t('common.delete')}
                 >
                   <Icon data={TrashBin} size={16} />
                 </Button>
@@ -307,20 +313,21 @@ function EmployeesTable({
  * ждём.
  */
 function RegisteredCell({ employee }: { employee: Employee }) {
+  const { t, i18n } = useTranslation();
   const millis = Number(employee.registeredAt);
 
   if (Number.isFinite(millis) && millis > 0) {
-    return <Text variant="body-2">{new Date(millis).toLocaleDateString('ru-RU')}</Text>;
+    return <Text variant="body-2">{new Date(millis).toLocaleDateString(i18n.language)}</Text>;
   }
 
-  return <Label theme={STATUS_THEME[employee.status]}>{STATUS_LABEL[employee.status]}</Label>;
+  return <Label theme={STATUS_THEME[employee.status]}>{t(STATUS_KEY[employee.status])}</Label>;
 }
 
-const STATUS_LABEL: Record<EmployeeStatus, string> = {
-  EMPLOYEE_STATUS_UNSPECIFIED: 'неизвестно',
-  EMPLOYEE_STATUS_INVITED: 'ждёт входа',
-  EMPLOYEE_STATUS_ACTIVE: 'активен',
-  EMPLOYEE_STATUS_EXPIRED: 'приглашение истекло',
+const STATUS_KEY: Record<EmployeeStatus, string> = {
+  EMPLOYEE_STATUS_UNSPECIFIED: 'staff.statusUnspecified',
+  EMPLOYEE_STATUS_INVITED: 'staff.statusInvited',
+  EMPLOYEE_STATUS_ACTIVE: 'staff.statusActive',
+  EMPLOYEE_STATUS_EXPIRED: 'staff.statusExpired',
 };
 
 const STATUS_THEME: Record<EmployeeStatus, 'normal' | 'warning' | 'success'> = {
@@ -343,6 +350,7 @@ function SortableHeader({
   ascending: boolean;
   onSort: (column: StaffSort) => void;
 }) {
+  const { t } = useTranslation();
   const active = sort === column;
   const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
 
@@ -355,9 +363,9 @@ function SortableHeader({
       title={
         active
           ? ascending
-            ? 'По возрастанию — нажмите для убывания'
-            : 'По убыванию — нажмите для возрастания'
-          : `Сортировать по: ${label}`
+            ? t('staff.sortAsc')
+            : t('staff.sortDesc')
+          : t('staff.sortBy', { label })
       }
     >
       <Text variant="body-2">{label}</Text>

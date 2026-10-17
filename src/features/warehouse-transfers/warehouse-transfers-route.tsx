@@ -22,6 +22,7 @@ import { objectName, objectOptions, type ObjectOption } from '@/features/warehou
 import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
 import { useObjects } from '@/features/objects/api';
 import type { Transfer, TransferSummary } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import { TransferDrawer } from './transfer-drawer';
 import { CreateTransferDialog } from './create-transfer-dialog';
 import './warehouse-transfers-route.css';
@@ -41,27 +42,28 @@ function TransfersTable({
   onLoadMore: () => void;
   onOpen: (transfer: TransferSummary) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<TransferSummary>[] = [
     {
       id: 'date',
-      name: 'Дата',
+      name: t('transfer.colDate'),
       template: (row) => <Text variant="body-2">{formatDate(row.date)}</Text>,
     },
     {
       id: 'from',
-      name: 'Откуда',
+      name: t('transfer.colFrom'),
       template: (row) => (
         <Text variant="body-2">{objectName(objectOptions, row.fromObjectId)}</Text>
       ),
     },
     {
       id: 'to',
-      name: 'Куда',
+      name: t('transfer.colTo'),
       template: (row) => <Text variant="body-2">{objectName(objectOptions, row.toObjectId)}</Text>,
     },
     {
       id: 'itemsCount',
-      name: 'Кол-во товаров',
+      name: t('transfer.colItemsCount'),
       template: (row) => (
         <Text variant="body-2" color="secondary">
           {row.itemsCount}
@@ -87,7 +89,7 @@ function TransfersTable({
           {hasMore && (
             <Flex justifyContent="center" style={{ padding: 8 }}>
               <Button view="flat" size="l" loading={loadingMore} onClick={onLoadMore}>
-                Загрузить ещё
+                {t('common.loadMore')}
               </Button>
             </Flex>
           )}
@@ -100,6 +102,7 @@ function TransfersTable({
 export function WarehouseTransfersRoute() {
   const api = useApi();
   const objects = useObjects();
+  const { t } = useTranslation();
   const options = useMemo(() => objectOptions(objects.data?.objects ?? []), [objects.data]);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search.trim());
@@ -124,7 +127,7 @@ export function WarehouseTransfersRoute() {
         <Flex alignItems="center" gap={2} wrap>
           <TextInput
             size="l"
-            placeholder="Поиск по дате или объекту"
+            placeholder={t('transfer.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -138,7 +141,7 @@ export function WarehouseTransfersRoute() {
         </Flex>
         <Button view="normal-contrast" size="l" onClick={() => setCreateOpen(true)}>
           <Icon data={Plus} size={16} />
-          Добавить перемещение
+          {t('transfer.addTitle')}
         </Button>
       </Flex>
 
@@ -152,7 +155,9 @@ export function WarehouseTransfersRoute() {
       {transfers.isSuccess && rows.length === 0 && (
         <EmptyState
           text={
-            debouncedSearch ? `Ничего не нашли по запросу «${debouncedSearch}»` : 'Нет перемещений'
+            debouncedSearch
+              ? t('transfer.noResultsSearch', { query: debouncedSearch })
+              : t('transfer.empty')
           }
         />
       )}

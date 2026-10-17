@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Alert, Button, Flex } from '@gravity-ui/uikit';
+import { i18n } from '@/shared/i18n';
 
 interface State {
   error: Error | null;
@@ -28,11 +29,11 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
       <Flex justifyContent="center" style={{ padding: 48 }}>
         <Alert
           theme="danger"
-          title="Приложение упало"
+          title={i18n.t('error.title')}
           message={error.message}
           actions={
             <Button view="outlined" onClick={() => window.location.reload()}>
-              Перезагрузить
+              {i18n.t('error.reload')}
             </Button>
           }
         />

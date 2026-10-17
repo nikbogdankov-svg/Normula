@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Card, Flex, Text } from '@gravity-ui/uikit';
+import { useTranslation } from '@/shared/i18n';
 
 /** Путь к картинке-заглушке; лежит в public/ и отдаётся статикой. */
 const CAT_SRC = '/wip-cat.jpg';
@@ -12,10 +13,11 @@ const CAT_SRC = '/wip-cat.jpg';
  */
 export function WipPage({ title }: { title: string }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <Flex direction="column" gap={4} style={{ padding: 16 }}>
-      <Text variant="header-1">{title}</Text>
+      <Text variant="header-1">{t(title)}</Text>
 
       <Card view="filled" style={{ padding: 24 }}>
         <Flex direction="column" alignItems="center" gap={4}>
@@ -24,14 +26,14 @@ export function WipPage({ title }: { title: string }) {
           ) : (
             <img
               src={CAT_SRC}
-              alt="Ваш проект находится на этапе «пупупу». Ожидайте"
+              alt={t('wip.imageAlt')}
               onError={() => setImageFailed(true)}
               style={{ maxWidth: 420, width: '100%', borderRadius: 'var(--g-border-radius-l)' }}
             />
           )}
 
           <Text variant="body-2" color="secondary">
-            Раздел «{title}» ещё не нарисован — работы ведутся.
+            {t('wip.notDrawn', { title: t(title) })}
           </Text>
         </Flex>
       </Card>

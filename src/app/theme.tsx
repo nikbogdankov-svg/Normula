@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { ThemeProvider } from '@gravity-ui/uikit';
+import { useTranslation } from '@/shared/i18n';
 
 type AppTheme = 'light' | 'dark';
 const STORAGE_KEY = 'onemore.theme';
@@ -34,10 +35,11 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, setTheme, toggleTheme]);
+  const { i18n } = useTranslation();
 
   return (
     <ThemeContext.Provider value={value}>
-      <ThemeProvider theme={theme} lang="ru">
+      <ThemeProvider theme={theme} lang={i18n.language}>
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>

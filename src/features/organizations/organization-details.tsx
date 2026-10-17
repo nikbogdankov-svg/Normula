@@ -12,6 +12,7 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { EnvelopeOpen, PersonPlus, TrashBin, Xmark } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { ErrorState, LoadingState } from '@/shared/ui/states';
 import {
   useInviteMember,
@@ -26,13 +27,13 @@ import { formatDate } from './management-route';
 
 const STATUS_LABEL: Record<
   InvitationStatus,
-  { text: string; theme: 'info' | 'success' | 'warning' | 'danger' | 'normal' }
+  { key: string; theme: 'info' | 'success' | 'warning' | 'danger' | 'normal' }
 > = {
-  INVITATION_STATUS_UNSPECIFIED: { text: 'неизвестно', theme: 'normal' },
-  INVITATION_STATUS_PENDING: { text: 'ожидает', theme: 'info' },
-  INVITATION_STATUS_ACCEPTED: { text: 'принято', theme: 'success' },
-  INVITATION_STATUS_EXPIRED: { text: 'истекло', theme: 'warning' },
-  INVITATION_STATUS_REVOKED: { text: 'отозвано', theme: 'danger' },
+  INVITATION_STATUS_UNSPECIFIED: { key: 'org.statusUnspecified', theme: 'normal' },
+  INVITATION_STATUS_PENDING: { key: 'org.statusPending', theme: 'info' },
+  INVITATION_STATUS_ACCEPTED: { key: 'org.statusAccepted', theme: 'success' },
+  INVITATION_STATUS_EXPIRED: { key: 'org.statusExpired', theme: 'warning' },
+  INVITATION_STATUS_REVOKED: { key: 'org.statusRevoked', theme: 'danger' },
 };
 
 /** Карточка выбранной организации: участники и приглашения. */
@@ -43,6 +44,7 @@ export function OrganizationDetails({
   organization: Organization;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Card view="filled" style={{ padding: 0 }}>
       <Flex
@@ -55,9 +57,9 @@ export function OrganizationDetails({
           <Text variant="body-1" color="secondary">
             {organization.id}
           </Text>
-          {organization.disabled && <Label theme="warning">отключена</Label>}
+          {organization.disabled && <Label theme="warning">{t('org.disabledShort')}</Label>}
         </Flex>
-        <Button view="flat" size="s" onClick={onClose} aria-label="Закрыть">
+        <Button view="flat" size="s" onClick={onClose} aria-label={t('common.close')}>
           <Icon data={Xmark} size={16} />
         </Button>
       </Flex>
@@ -74,17 +76,18 @@ export function OrganizationDetails({
 
 function MembersSection({ organizationId }: { organizationId: string }) {
   const { data, isPending, isError, error, refetch } = useOrganizationMembers(organizationId);
+  const { t } = useTranslation();
   const remove = useRemoveMember(organizationId);
   const toaster = useToaster();
 
   const onRemove = (userId: string, email: string) => {
-    if (!window.confirm(`Исключить ${email} из организации?`)) return;
+    if (!window.confirm(t('org.removeMemberConfirm', { email }))) return;
 
     remove.mutate(userId, {
       onError: (e) =>
         toaster.add({
           name: 'member-remove',
-          title: 'Ошибка',
+          title: t('common.error'),
           content: e.message,
           theme: 'danger',
         }),
@@ -93,24 +96,24 @@ function MembersSection({ organizationId }: { organizationId: string }) {
 
   return (
     <Flex direction="column" gap={2}>
-      <Text variant="subheader-1">Участники</Text>
+      <Text variant="subheader-1">{t('org.membersTitle')}</Text>
 
       {isPending && <LoadingState />}
       {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
       {data && data.members.length === 0 && (
         <Text variant="body-1" color="secondary">
-          В организации пока никого нет — пригласите первого участника ниже.
+          {t('org.membersEmpty')}
         </Text>
       )}
       {data && data.members.length > 0 && (
         <Table
           data={data.members}
           columns={[
-            { id: 'name', name: 'Имя', template: (row) => row.name || '—' },
-            { id: 'primaryEmail', name: 'Почта' },
+            { id: 'name', name: t('org.memberName'), template: (row) => row.name || '—' },
+            { id: 'primaryEmail', name: t('common.email') },
             {
               id: 'roles',
-              name: 'Роли',
+              name: t('org.colRoles'),
               template: (row) => (
                 <Flex gap={1} wrap>
                   {row.roles.map((role) => (
@@ -121,12 +124,12 @@ function MembersSection({ organizationId }: { organizationId: string }) {
             },
             {
               id: 'suspended',
-              name: 'Статус',
+              name: t('org.colStatus'),
               template: (row) =>
                 row.suspended ? (
-                  <Label theme="danger">приостановлен</Label>
+                  <Label theme="danger">{t('org.memberSuspended')}</Label>
                 ) : (
-                  <Label>активен</Label>
+                  <Label>{t('org.memberActive')}</Label>
                 ),
             },
             {
@@ -137,7 +140,7 @@ function MembersSection({ organizationId }: { organizationId: string }) {
                   view="flat"
                   size="s"
                   onClick={() => onRemove(row.userId, row.primaryEmail)}
-                  title="Исключить из организации"
+                  title={t('org.removeFromOrg')}
                 >
                   <Icon data={TrashBin} size={16} />
                 </Button>
@@ -153,6 +156,7 @@ function MembersSection({ organizationId }: { organizationId: string }) {
 function InvitationsSection({ organizationId }: { organizationId: string }) {
   const { data, isPending, isError, error, refetch } = useOrganizationInvitations(organizationId);
   const roles = useOrganizationRoles();
+  const { t } = useTranslation();
   const invite = useInviteMember(organizationId);
   const revoke = useRevokeInvitation(organizationId);
   const toaster = useToaster();
@@ -167,14 +171,19 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
         onSuccess: (result) => {
           toaster.add({
             name: 'invited',
-            title: 'Приглашение отправлено',
+            title: t('org.inviteSent'),
             content: result.invitation.invitee,
             theme: 'success',
           });
           setEmail('');
         },
         onError: (e) =>
-          toaster.add({ name: 'invite', title: 'Ошибка', content: e.message, theme: 'danger' }),
+          toaster.add({
+            name: 'invite',
+            title: t('common.error'),
+            content: e.message,
+            theme: 'danger',
+          }),
       }
     );
   };
@@ -182,24 +191,29 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
   const onRevoke = (invitation: Invitation) => {
     revoke.mutate(invitation.id, {
       onError: (e) =>
-        toaster.add({ name: 'revoke', title: 'Ошибка', content: e.message, theme: 'danger' }),
+        toaster.add({
+          name: 'revoke',
+          title: t('common.error'),
+          content: e.message,
+          theme: 'danger',
+        }),
     });
   };
 
   return (
     <Flex direction="column" gap={2}>
-      <Text variant="subheader-1">Приглашения</Text>
+      <Text variant="subheader-1">{t('org.invitationsTitle')}</Text>
 
       <Flex gap={2} alignItems="flex-end" wrap>
         <TextInput
-          placeholder="почта@example.com"
+          placeholder={t('org.inviteEmailPlaceholder')}
           type="email"
           value={email}
           onUpdate={setEmail}
           style={{ maxWidth: 280 }}
         />
         <Select
-          placeholder="Роль"
+          placeholder={t('org.inviteRolePlaceholder')}
           multiple
           width={220}
           value={roleIds}
@@ -216,7 +230,7 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
           loading={invite.isPending}
         >
           <Icon data={PersonPlus} size={16} />
-          Пригласить
+          {t('org.invite')}
         </Button>
       </Flex>
 
@@ -224,7 +238,7 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
       {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
       {data && data.invitations.length === 0 && (
         <Text variant="body-1" color="secondary">
-          Активных приглашений нет
+          {t('org.noInvitations')}
         </Text>
       )}
       {data && data.invitations.length > 0 && (
@@ -233,7 +247,7 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
           columns={[
             {
               id: 'invitee',
-              name: 'Почта',
+              name: t('common.email'),
               template: (row) => (
                 <Flex alignItems="center" gap={1}>
                   <Icon data={EnvelopeOpen} size={14} />
@@ -243,20 +257,29 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
             },
             {
               id: 'status',
-              name: 'Статус',
+              name: t('org.colStatus'),
               template: (row) => (
                 <Label theme={STATUS_LABEL[row.status].theme}>
-                  {STATUS_LABEL[row.status].text}
+                  {t(STATUS_LABEL[row.status].key)}
                 </Label>
               ),
             },
-            { id: 'expiresAt', name: 'Истекает', template: (row) => formatDate(row.expiresAt) },
+            {
+              id: 'expiresAt',
+              name: t('org.colExpiresAt'),
+              template: (row) => formatDate(row.expiresAt),
+            },
             {
               id: 'actions',
               name: '',
               template: (row) =>
                 row.status === 'INVITATION_STATUS_PENDING' ? (
-                  <Button view="flat" size="s" onClick={() => onRevoke(row)} title="Отозвать">
+                  <Button
+                    view="flat"
+                    size="s"
+                    onClick={() => onRevoke(row)}
+                    title={t('org.revoke')}
+                  >
                     <Icon data={Xmark} size={16} />
                   </Button>
                 ) : null,

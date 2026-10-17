@@ -21,6 +21,7 @@ import { formatDate, formatMoney } from '@/features/warehouse/format';
 import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
 import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
 import type { Receipt, ReceiptSummary } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import { ReceiptDrawer } from './warehouse-receipt-drawer';
 import { CreateReceiptDrawer } from './create-receipt-drawer';
 import './warehouse-receipts-route.css';
@@ -38,20 +39,21 @@ function ReceiptsTable({
   onLoadMore: () => void;
   onOpen: (receipt: ReceiptSummary) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<ReceiptSummary>[] = [
     {
       id: 'date',
-      name: 'Дата',
+      name: t('common.date'),
       template: (row) => <Text variant="body-2">{formatDate(row.date)}</Text>,
     },
     {
       id: 'invoiceNumber',
-      name: 'Накладная',
+      name: t('receipt.viewTitlePlain'),
       template: (row) => <Text variant="body-2">{row.invoiceNumber}</Text>,
     },
     {
       id: 'itemsCount',
-      name: 'Кол-во товаров',
+      name: t('receipt.listColItemsCount'),
       template: (row) => (
         <Text variant="body-2" color="secondary">
           {row.itemsCount}
@@ -60,7 +62,7 @@ function ReceiptsTable({
     },
     {
       id: 'total',
-      name: 'Сумма',
+      name: t('common.amount'),
       align: 'end',
       template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
     },
@@ -83,7 +85,7 @@ function ReceiptsTable({
           {hasMore && (
             <Flex justifyContent="center" style={{ padding: 8 }}>
               <Button view="flat" size="l" loading={loadingMore} onClick={onLoadMore}>
-                Загрузить ещё
+                {t('common.loadMore')}
               </Button>
             </Flex>
           )}
@@ -96,6 +98,7 @@ function ReceiptsTable({
 /** Раздел «Склад → Приход»: накладные выбранного объекта. */
 export function WarehouseReceiptsRoute() {
   const api = useApi();
+  const { t } = useTranslation();
   const [objectId, setObjectId] = useState('');
   const { options, objects, changeObjectId } = useObjectChoice(objectId, setObjectId);
   const [search, setSearch] = useState('');
@@ -129,7 +132,7 @@ export function WarehouseReceiptsRoute() {
           />
           <TextInput
             size="l"
-            placeholder="Поиск по номеру накладной"
+            placeholder={t('receipt.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -148,14 +151,14 @@ export function WarehouseReceiptsRoute() {
           disabled={!objectId}
         >
           <Icon data={Plus} size={16} />
-          Приход
+          {t('receipt.addButton')}
         </Button>
       </Flex>
 
       {objects.isError && (
         <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       )}
-      {noObjects && <EmptyState text="Сначала заведите объект в справочнике «Объекты»" />}
+      {noObjects && <EmptyState text={t('receipt.emptyNoObjects')} />}
       {!noObjects && !objects.isError && (objects.isPending || receipts.isPending) && (
         <LoadingState />
       )}
@@ -165,7 +168,9 @@ export function WarehouseReceiptsRoute() {
       {receipts.isSuccess && rows.length === 0 && (
         <EmptyState
           text={
-            debouncedSearch ? `Ничего не нашли по запросу «${debouncedSearch}»` : 'Нет приходов'
+            debouncedSearch
+              ? t('receipt.emptySearch', { query: debouncedSearch })
+              : t('receipt.emptyNone')
           }
         />
       )}

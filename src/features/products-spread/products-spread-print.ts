@@ -11,6 +11,7 @@ import {
   PDF_TEXT_COLOR_MUTED,
   wrapText,
 } from '@/shared/print';
+import { i18n } from '@/shared/i18n';
 import { MEALS, type ProductSpreadItem } from './types';
 
 /** Строка печатной раскладки: один продукт одного приёма пищи. */
@@ -35,7 +36,7 @@ export function buildProductSpreadPrint(items: ProductSpreadItem[]): {
   const dayItems = items.filter((item) => item.total > 0);
 
   const sections = MEALS.map<[string, ProductSpreadPrintRow[]]>((meal) => [
-    meal.label,
+    i18n.t(meal.labelKey),
     dayItems
       .filter((item) => (item.byMeal[meal.id] ?? 0) > 0)
       .map((item) => ({
@@ -82,7 +83,7 @@ export function writeProductSpreadPdf(
   doc.setFont('PTSans', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(...PDF_TEXT_COLOR);
-  doc.text('Раскладка продуктов', PDF_MARGIN, marginTop);
+  doc.text(i18n.t('spread.printTitle'), PDF_MARGIN, marginTop);
   doc.text(data.displayDate, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop, { align: 'right' });
   doc.setFont('PTSans', 'normal');
   doc.setFontSize(PDF_BODY_SIZE);
@@ -104,7 +105,7 @@ export function writeProductSpreadPdf(
     doc.setFont('PTSans', 'normal');
     doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
     doc.text(
-      `Итого позиций: ${section.rows.length}`,
+      i18n.t('spread.printPositions', { count: section.rows.length }),
       PDF_PAGE_WIDTH - PDF_MARGIN,
       y + PDF_LINE_HEIGHT,
       {
@@ -148,7 +149,11 @@ export function writeProductSpreadPdf(
   doc.setFont('PTSans', 'bold');
   doc.setFontSize(PDF_BODY_SIZE);
   doc.setTextColor(...PDF_TEXT_COLOR);
-  doc.text(`Всего продуктов на день: ${data.totalProducts}`, PDF_MARGIN, y + PDF_LINE_HEIGHT);
+  doc.text(
+    i18n.t('spread.printTotalDay', { count: data.totalProducts }),
+    PDF_MARGIN,
+    y + PDF_LINE_HEIGHT
+  );
 }
 
 /** Скачивает раскладку продуктов на день как PDF. */
@@ -160,5 +165,5 @@ export async function downloadProductSpreadDoc(data: {
 }): Promise<void> {
   const doc = await createPdfDoc();
   writeProductSpreadPdf(doc, data);
-  doc.save(`Раскладка_${data.displayDate.replace(/\./g, '-')}.pdf`);
+  doc.save(i18n.t('spread.printFileName', { date: data.displayDate.replace(/\./g, '-') }));
 }

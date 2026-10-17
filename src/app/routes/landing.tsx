@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Flex, Icon, Text } from '@gravity-ui/uikit';
 import { BookOpen, Boxes3, CircleRuble } from '@gravity-ui/icons';
 import { useAuth } from '@/shared/auth';
+import { useTranslation } from '@/shared/i18n';
 
 /**
  * Чем платформа занимается — вместо пустого экрана с одной кнопкой.
@@ -10,14 +11,15 @@ import { useAuth } from '@/shared/auth';
  * с тем, что человек увидит после входа.
  */
 const FEATURES = [
-  { icon: BookOpen, title: 'Меню и ТТК', text: 'Планирование меню и технологические карты' },
-  { icon: Boxes3, title: 'Склад', text: 'Приход, остатки и списания' },
-  { icon: CircleRuble, title: 'Финансы', text: 'Себестоимость и счета' },
+  { icon: BookOpen, title: 'landing.menuTitle', text: 'landing.menuText' },
+  { icon: Boxes3, title: 'landing.warehouseTitle', text: 'landing.warehouseText' },
+  { icon: CircleRuble, title: 'landing.financeTitle', text: 'landing.financeText' },
 ];
 
 export function LandingRoute() {
   const { isAuthenticated, isLoading, signIn } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) navigate('/app', { replace: true });
@@ -49,8 +51,7 @@ export function LandingRoute() {
         color="secondary"
         style={{ marginTop: 12, maxWidth: 420, textAlign: 'center' }}
       >
-        Управление производством питания: меню, технологические карты, склад и финансы — в одном
-        месте.
+        {t('landing.lead')}
       </Text>
 
       <Button
@@ -60,7 +61,7 @@ export function LandingRoute() {
         onClick={() => void signIn()}
         style={{ marginTop: 32 }}
       >
-        Войти
+        {t('landing.signIn')}
       </Button>
 
       <Flex gap={10} wrap justifyContent="center" style={{ marginTop: 64 }}>
@@ -85,9 +86,9 @@ export function LandingRoute() {
             >
               <Icon data={feature.icon} size={20} />
             </Flex>
-            <Text variant="subheader-2">{feature.title}</Text>
+            <Text variant="subheader-2">{t(feature.title)}</Text>
             <Text variant="body-1" color="secondary" style={{ textAlign: 'center' }}>
-              {feature.text}
+              {t(feature.text)}
             </Text>
           </Flex>
         ))}

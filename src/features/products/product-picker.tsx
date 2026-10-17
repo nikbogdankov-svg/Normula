@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Flex, Icon, Select, type SelectOption } from '@gravity-ui/uikit';
 import { Plus } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { filterProducts, useProducts } from './api';
 import type { Product } from './types';
 import { CreateProductDialog } from './create-product-dialog';
@@ -18,7 +19,7 @@ const CREATE_OPTION = 'create-new-product';
 export function ProductPicker({
   value,
   valueLabel,
-  placeholder = 'Выбрать продукт',
+  placeholder,
   size = 'm',
   products,
   disabled,
@@ -30,6 +31,7 @@ export function ProductPicker({
   value?: string;
   /** Имя продукта, если id нет в справочнике (например, устаревшие приходы). */
   valueLabel?: string;
+  /** Подпись пустого поля; по умолчанию — общая подпись выбора продукта. */
   placeholder?: string;
   size?: 's' | 'm' | 'l' | 'xl';
   /**
@@ -45,6 +47,7 @@ export function ProductPicker({
   showUnitInValue?: boolean;
   onChange: (product: (Product & { unit?: string }) | null) => void;
 }) {
+  const { t } = useTranslation();
   const { data, isPending } = useProducts();
   const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -91,11 +94,11 @@ export function ProductPicker({
   if (showCreate) {
     options.push({
       value: CREATE_OPTION,
-      text: `Создать «${queryText}»`,
+      text: t('products.createOption', { query: queryText }),
       content: (
         <span className="product-picker__create-option">
           <Icon data={Plus} size={14} />
-          Создать «{queryText}»
+          {t('products.createOption', { query: queryText })}
         </span>
       ),
     });
@@ -123,7 +126,7 @@ export function ProductPicker({
         filterable
         filterOption={() => true}
         hasClear
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('products.pickPlaceholder')}
         disabled={disabled || (products === undefined && isPending)}
         renderSelectedOption={(option) => (
           <Flex

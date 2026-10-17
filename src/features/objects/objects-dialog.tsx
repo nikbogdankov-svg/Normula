@@ -10,6 +10,7 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { Check, FloppyDisk, Plus, TrashBin, Xmark } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useDiets } from '@/features/diets/api';
 import type { Diet } from '@/features/diets/types';
 import { useCreateObject, useDeleteObject, useUpdateObject, type ObjectDeleteMode } from './api';
@@ -156,21 +157,22 @@ function DepartmentBlock({
   onRemove: (index: number) => void;
   canRemove: boolean;
 }) {
+  const { t } = useTranslation();
   const isObject = variant === 'object';
   const nameLabel = isObject
-    ? 'Название группы/отделения:'
+    ? t('objects.groupNameObject')
     : variant === 'school'
-      ? 'Класс (параллель):'
+      ? t('objects.groupNameClass')
       : variant === 'kindergarten'
-        ? 'Группа:'
-        : 'Отделение:';
+        ? t('objects.groupNameGroup')
+        : t('objects.groupNameDept');
   const namePlaceholder = isObject
-    ? 'Корпус / отделение'
+    ? t('objects.namePlaceholderObject')
     : variant === 'school'
-      ? '1–4 классы'
+      ? t('objects.namePlaceholderClass')
       : variant === 'kindergarten'
-        ? 'Старшая группа'
-        : 'Терапия';
+        ? t('objects.namePlaceholderGroup')
+        : t('objects.namePlaceholderDept');
 
   // Выбранные видны всегда; невыбранные — только доступные этому типу объекта.
   const visibleDiets = diets.filter(
@@ -210,8 +212,8 @@ function DepartmentBlock({
           <Button
             view="flat"
             size="l"
-            title="Удалить группу"
-            aria-label="Удалить группу"
+            title={t('objects.removeGroup')}
+            aria-label={t('objects.removeGroup')}
             onClick={() => onRemove(index)}
           >
             <Icon data={TrashBin} size={18} />
@@ -220,12 +222,12 @@ function DepartmentBlock({
       </Flex>
 
       <Text variant="body-1" className="kitchen-drawer__table-hint">
-        Рацион (должен быть выбран хотя бы один)
+        {t('objects.dietHint')}
       </Text>
 
       {dietsLoaded && visibleDiets.length === 0 && (
         <Text variant="body-1" color="secondary">
-          Диет нет — добавьте их на вкладке «Диеты».
+          {t('objects.noDiets')}
         </Text>
       )}
 
@@ -265,6 +267,7 @@ function SubObjectBlock({
   onRemove: (index: number) => void;
   canRemove: boolean;
 }) {
+  const { t } = useTranslation();
   const updateDepartment = (deptIndex: number, patch: Partial<DepartmentForm>) => {
     onUpdate(subObjectIndex, {
       departments: subObject.departments.map((d, i) => (i === deptIndex ? { ...d, ...patch } : d)),
@@ -282,8 +285,8 @@ function SubObjectBlock({
       <Flex gap={2} alignItems="flex-end">
         <TextInput
           size="l"
-          label="Название подобъекта:"
-          placeholder="Школа №1"
+          label={t('objects.subNameLabel')}
+          placeholder={t('objects.subNamePlaceholder')}
           value={subObject.name}
           onUpdate={(value) => onUpdate(subObjectIndex, { name: value })}
           autoFocus
@@ -293,8 +296,8 @@ function SubObjectBlock({
           <Button
             view="flat"
             size="l"
-            title="Удалить подобъект"
-            aria-label="Удалить подобъект"
+            title={t('objects.removeSubObject')}
+            aria-label={t('objects.removeSubObject')}
             onClick={() => onRemove(subObjectIndex)}
           >
             <Icon data={TrashBin} size={18} />
@@ -331,10 +334,10 @@ function SubObjectBlock({
           >
             <Icon data={Plus} size={16} />
             {subObject.type === 'school'
-              ? 'Добавить класс'
+              ? t('objects.addClass')
               : subObject.type === 'kindergarten'
-                ? 'Добавить группу'
-                : 'Добавить отделение'}
+                ? t('objects.addGroup')
+                : t('objects.addDepartment')}
           </Button>
         </>
       )}
@@ -399,6 +402,7 @@ function DeleteConfirmDialog({
   onCancel: () => void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Dialog open={open} onClose={onCancel} size="s">
       <Dialog.Header caption={title} />
@@ -408,7 +412,7 @@ function DeleteConfirmDialog({
           <Text variant="body-2">{description}</Text>
           <Flex direction="column" gap={2}>
             <Button view="outlined-danger" size="l" onClick={onAfterPeriod} loading={pending}>
-              Удалить после конца периода
+              {t('objects.deleteAfterPeriod')}
             </Button>
             <Text variant="body-1" color="secondary">
               {afterPeriodHint}
@@ -416,14 +420,14 @@ function DeleteConfirmDialog({
           </Flex>
           <Flex direction="column" gap={2}>
             <Button view="outlined" size="l" onClick={onImmediate} loading={pending}>
-              Удалить сейчас
+              {t('objects.deleteNow')}
             </Button>
             <Text variant="body-1" color="secondary">
-              Будет убран из всех разделов немедленно
+              {t('objects.deleteNowHint')}
             </Text>
           </Flex>
           <Button view="flat" size="l" onClick={onCancel} disabled={pending}>
-            Отмена
+            {t('common.cancel')}
           </Button>
         </Flex>
       </Dialog.Body>
@@ -451,6 +455,7 @@ export function ObjectDrawer({
   const dietsQuery = useDiets();
   const diets = dietOptions(dietsQuery.data?.diets ?? [], object?.groups ?? []);
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [form, setForm] = useState<ObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -519,14 +524,14 @@ export function ObjectDrawer({
     if (mode === 'create') {
       create.mutate(payload, {
         onSuccess: (data) => {
-          toaster.add({ name: 'object-created', title: 'Объект создан', theme: 'success' });
+          toaster.add({ name: 'object-created', title: t('objects.created'), theme: 'success' });
           onCreated?.(data.id);
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'object-create',
-            title: 'Не удалось создать',
+            title: t('objects.createFailed'),
             content: e.message,
             theme: 'danger',
           }),
@@ -542,7 +547,7 @@ export function ObjectDrawer({
         onSuccess: () => {
           toaster.add({
             name: 'object-updated',
-            title: 'Объект обновлён',
+            title: t('objects.updated'),
             theme: 'success',
           });
           requestClose();
@@ -550,7 +555,7 @@ export function ObjectDrawer({
         onError: (e) =>
           toaster.add({
             name: 'object-edit',
-            title: 'Не удалось сохранить',
+            title: t('objects.saveFailed'),
             content: e.message,
             theme: 'danger',
           }),
@@ -571,13 +576,13 @@ export function ObjectDrawer({
       {
         onSuccess: () => {
           // Режим уходит на бэкенд, но пока не различается.
-          toaster.add({ name: 'object-deleted', title: 'Объект удалён', theme: 'success' });
+          toaster.add({ name: 'object-deleted', title: t('objects.deleted'), theme: 'success' });
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'object-delete',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -602,9 +607,9 @@ export function ObjectDrawer({
         <div className="kitchen-drawer__header">
           <div className="kitchen-drawer__header-inner">
             <Text variant="subheader-3">
-              {mode === 'create' ? 'Создать объект' : 'Редактирование объекта'}
+              {mode === 'create' ? t('objects.createTitle') : t('objects.editTitle')}
             </Text>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+            <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -615,8 +620,8 @@ export function ObjectDrawer({
             <Flex gap={2} alignItems="flex-end">
               <TextInput
                 size="l"
-                label="Название объекта:"
-                placeholder="Центральный объект"
+                label={t('objects.nameLabel')}
+                placeholder={t('objects.namePlaceholder')}
                 value={form.name}
                 onUpdate={(value) =>
                   setForm((current) => (current ? { ...current, name: value } : current))
@@ -630,10 +635,10 @@ export function ObjectDrawer({
                   width={240}
                   value={[form.type]}
                   options={[
-                    { value: 'school', content: 'Школа' },
-                    { value: 'kindergarten', content: 'Детский сад' },
-                    { value: 'hospital', content: 'Больница' },
-                    { value: 'warehouse', content: 'Склад' },
+                    { value: 'school', content: t('facility.school') },
+                    { value: 'kindergarten', content: t('facility.kindergarten') },
+                    { value: 'hospital', content: t('facility.hospital') },
+                    { value: 'warehouse', content: t('facility.warehouse') },
                   ]}
                   onUpdate={(newValue) => {
                     const nextType = newValue[0] as FacilityType;
@@ -682,7 +687,7 @@ export function ObjectDrawer({
                   style={{ alignSelf: 'flex-start' }}
                 >
                   <Icon data={Plus} size={16} />
-                  Добавить группу/отделение
+                  {t('objects.addGroupDept')}
                 </Button>
               </>
             )}
@@ -697,12 +702,12 @@ export function ObjectDrawer({
             {mode === 'edit' && (
               <Button view="outlined-danger" size="l" onClick={() => setConfirmingDelete(true)}>
                 <Icon data={TrashBin} size={16} />
-                Удалить
+                {t('common.delete')}
               </Button>
             )}
             <Flex gap={2}>
               <Button view="outlined" size="l" onClick={requestClose}>
-                Отмена
+                {t('common.cancel')}
               </Button>
               <Button
                 view="action"
@@ -712,7 +717,7 @@ export function ObjectDrawer({
                 onClick={submit}
               >
                 <Icon data={mode === 'create' ? Plus : FloppyDisk} size={16} />
-                {mode === 'create' ? 'Создать' : 'Сохранить'}
+                {mode === 'create' ? t('common.create') : t('common.save')}
               </Button>
             </Flex>
           </div>
@@ -721,9 +726,9 @@ export function ObjectDrawer({
 
       <DeleteConfirmDialog
         open={confirmingDelete}
-        title={`Удалить «${object?.name ?? ''}»?`}
-        description="Объект используется в порционнике и меню. Выберите, как его удалить."
-        afterPeriodHint="До конца периода объект останется в порционнике и меню"
+        title={t('objects.deleteTitle', { name: object?.name ?? '' })}
+        description={t('objects.deleteDescription')}
+        afterPeriodHint={t('objects.deleteAfterPeriodHint')}
         onAfterPeriod={() => runDelete('soft')}
         onImmediate={() => runDelete('immediate')}
         onCancel={() => setConfirmingDelete(false)}
@@ -752,13 +757,16 @@ export function SubObjectDrawer({
   const dietsQuery = useDiets();
   const diets = dietOptions(dietsQuery.data?.diets ?? [], subObject?.groups ?? []);
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [form, setForm] = useState<SubObjectForm | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const isCreate = subObject === null;
-  const subtitle = subObject ? `Подобъект «${subObject.name}»` : 'Новый подобъект';
+  const subtitle = subObject
+    ? t('objects.subSubtitle', { name: subObject.name })
+    : t('objects.subNewSubtitle');
 
   useEffect(() => {
     if (!parent) {
@@ -813,13 +821,17 @@ export function SubObjectDrawer({
       },
       {
         onSuccess: () => {
-          toaster.add({ name: 'subobject-created', title: 'Подобъект добавлен', theme: 'success' });
+          toaster.add({
+            name: 'subobject-created',
+            title: t('objects.subCreated'),
+            theme: 'success',
+          });
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'subobject-create',
-            title: 'Не удалось добавить',
+            title: t('objects.subCreateFailed'),
             content: e.message,
             theme: 'danger',
           }),
@@ -839,7 +851,7 @@ export function SubObjectDrawer({
         onSuccess: () => {
           toaster.add({
             name: 'subobject-updated',
-            title: 'Подобъект обновлён',
+            title: t('objects.subUpdated'),
             theme: 'success',
           });
           requestClose();
@@ -847,7 +859,7 @@ export function SubObjectDrawer({
         onError: (e) =>
           toaster.add({
             name: 'subobject-edit',
-            title: 'Не удалось сохранить',
+            title: t('objects.saveFailed'),
             content: e.message,
             theme: 'danger',
           }),
@@ -863,13 +875,17 @@ export function SubObjectDrawer({
       {
         onSuccess: () => {
           // Режим уходит на бэкенд, но пока не различается.
-          toaster.add({ name: 'subobject-deleted', title: 'Подобъект удалён', theme: 'success' });
+          toaster.add({
+            name: 'subobject-deleted',
+            title: t('objects.subDeleted'),
+            theme: 'success',
+          });
           requestClose();
         },
         onError: (e) =>
           toaster.add({
             name: 'subobject-delete',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -898,8 +914,8 @@ export function SubObjectDrawer({
       <div className="kitchen-drawer__card">
         <div className="kitchen-drawer__header">
           <div className="kitchen-drawer__header-inner">
-            <Text variant="subheader-3">{isCreate ? 'Добавить подобъект' : subtitle}</Text>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+            <Text variant="subheader-3">{isCreate ? t('objects.subCreateTitle') : subtitle}</Text>
+            <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -925,12 +941,12 @@ export function SubObjectDrawer({
             {!isCreate && (
               <Button view="outlined-danger" size="l" onClick={() => setConfirmingDelete(true)}>
                 <Icon data={TrashBin} size={16} />
-                Удалить
+                {t('common.delete')}
               </Button>
             )}
             <Flex gap={2}>
               <Button view="outlined" size="l" onClick={requestClose}>
-                Отмена
+                {t('common.cancel')}
               </Button>
               <Button
                 view="action"
@@ -940,7 +956,7 @@ export function SubObjectDrawer({
                 onClick={isCreate ? create : submitEdit}
               >
                 <Icon data={isCreate ? Plus : FloppyDisk} size={16} />
-                {isCreate ? 'Добавить' : 'Сохранить'}
+                {isCreate ? t('common.add') : t('common.save')}
               </Button>
             </Flex>
           </div>
@@ -949,9 +965,9 @@ export function SubObjectDrawer({
 
       <DeleteConfirmDialog
         open={confirmingDelete}
-        title={subObject ? `Удалить «${subObject.name}»?` : ''}
-        description="Подобъект используется в порционнике и меню. Выберите, как его удалить."
-        afterPeriodHint="До конца периода подобъект останется в порционнике и меню"
+        title={subObject ? t('objects.subDeleteTitle', { name: subObject.name }) : ''}
+        description={t('objects.subDeleteDescription')}
+        afterPeriodHint={t('objects.subDeleteAfterPeriodHint')}
         onAfterPeriod={() => runDelete('soft')}
         onImmediate={() => runDelete('immediate')}
         onCancel={() => setConfirmingDelete(false)}

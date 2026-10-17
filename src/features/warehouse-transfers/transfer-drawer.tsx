@@ -7,6 +7,7 @@ import { useTransfer } from '@/features/warehouse/api';
 import { formatDate, formatQuantity } from '@/features/warehouse/format';
 import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
 import type { Transfer } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import './transfer-drawer.css';
 
 function TransferView({
@@ -16,17 +17,19 @@ function TransferView({
   transfer: Transfer;
   objectOptions: ObjectOption[];
 }) {
+  const { t } = useTranslation();
   return (
     <Flex direction="column" gap={3}>
       <Flex direction="column" gap={1}>
         <Text variant="body-2" color="secondary">
-          Откуда: <strong>{objectName(objectOptions, transfer.fromObjectId)}</strong>
+          {t('transfer.fromShort')}{' '}
+          <strong>{objectName(objectOptions, transfer.fromObjectId)}</strong>
         </Text>
         <Text variant="body-2" color="secondary">
-          Куда: <strong>{objectName(objectOptions, transfer.toObjectId)}</strong>
+          {t('transfer.toShort')} <strong>{objectName(objectOptions, transfer.toObjectId)}</strong>
         </Text>
         <Text variant="body-2" color="secondary">
-          Дата: <strong>{formatDate(transfer.date)}</strong>
+          {t('transfer.dateLabel')} <strong>{formatDate(transfer.date)}</strong>
         </Text>
       </Flex>
 
@@ -34,9 +37,9 @@ function TransferView({
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Накладная</th>
-              <th>Товар</th>
-              <th style={{ width: 120, textAlign: 'right' }}>Кол-во</th>
+              <th>{t('transfer.invoiceCol')}</th>
+              <th>{t('transfer.productCol')}</th>
+              <th style={{ width: 120, textAlign: 'right' }}>{t('transfer.qtyCol')}</th>
             </tr>
           </thead>
           <tbody>
@@ -70,6 +73,7 @@ export function TransferDrawer({
   const [open, setOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
   const transfer = useTransfer(viewId);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (transferId) {
@@ -105,8 +109,11 @@ export function TransferDrawer({
           <Flex alignItems="center" gap={2}>
             <Text variant="subheader-2">
               {view
-                ? `Перемещение: ${objectName(objectOptions, view.fromObjectId)} → ${objectName(objectOptions, view.toObjectId)}`
-                : 'Перемещение'}
+                ? t('transfer.viewTitleWith', {
+                    from: objectName(objectOptions, view.fromObjectId),
+                    to: objectName(objectOptions, view.toObjectId),
+                  })
+                : t('transfer.viewTitle')}
             </Text>
             {view && (
               <Label theme="normal" size="m">
@@ -114,7 +121,7 @@ export function TransferDrawer({
               </Label>
             )}
           </Flex>
-          <Button view="flat" size="l" onClick={onClose} aria-label="Закрыть">
+          <Button view="flat" size="l" onClick={onClose} aria-label={t('common.close')}>
             <Icon data={Xmark} size={20} />
           </Button>
         </div>
@@ -129,10 +136,10 @@ export function TransferDrawer({
 
         <div className="transfer-drawer__footer">
           <Button view="outlined" size="l" onClick={onClose}>
-            Закрыть
+            {t('transfer.close')}
           </Button>
           <Button view="normal" size="l" disabled={!view} onClick={() => view && onEdit(view)}>
-            Редактировать
+            {t('transfer.edit')}
           </Button>
         </div>
       </div>
