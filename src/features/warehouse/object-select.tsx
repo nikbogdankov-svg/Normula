@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Select } from '@gravity-ui/uikit';
 import { useObjects } from '@/features/objects/api';
 import { useObjectSelection } from '@/shared/object-selection';
+import { useTranslation } from '@/shared/i18n';
 import type { ObjectItem } from '@/features/objects/types';
 
 /** Объект в селекте склада. */
@@ -53,7 +54,7 @@ export function ObjectSelect({
   value,
   onUpdate,
   options,
-  label = 'Объект:',
+  label,
   width = 280,
   disabled,
 }: {
@@ -64,12 +65,13 @@ export function ObjectSelect({
   width?: number | 'max';
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <Select
       size="l"
       width={width}
-      label={label}
-      placeholder="Выберите объект"
+      label={label ?? t('common.objectLabel')}
+      placeholder={t('common.objectSelectPlaceholder')}
       value={value ? [value] : []}
       options={options}
       onUpdate={(next) => onUpdate(next[0] ?? '')}

@@ -6,16 +6,10 @@ import { useAuth } from '@/shared/auth';
 import { config } from '@/shared/config';
 import { useAppTheme } from '@/app/theme';
 import { LoadingState } from '@/shared/ui/states';
+import { useTranslation, setLanguage, LANGUAGES, i18n, type Language } from '@/shared/i18n';
 
-const LOCALE_KEY = 'onemore.locale';
 const NOTIFY_INVITES_KEY = 'onemore.notify.invites';
 const NOTIFY_IMPORTS_KEY = 'onemore.notify.imports';
-
-type Locale = 'ru' | 'en';
-
-function readLocale(): Locale {
-  return localStorage.getItem(LOCALE_KEY) === 'en' ? 'en' : 'ru';
-}
 
 function readFlag(key: string, fallback: boolean): boolean {
   const saved = localStorage.getItem(key);
@@ -39,26 +33,26 @@ export function ProfileRoute() {
 }
 
 function PersonalCard() {
+  const { t } = useTranslation();
   const { user, isLoading } = useAuth();
 
   return (
-    <ProfileCard icon={Person} title="Личные данные">
+    <ProfileCard icon={Person} title={t('profile.personalTitle')}>
       {isLoading && <LoadingState />}
       {!isLoading && !user && (
         <Text variant="body-2" color="secondary">
-          Не удалось загрузить данные пользователя. Имя и почта появятся, если служба входа отдаёт
-          их в профиле.
+          {t('profile.personalEmpty')}
         </Text>
       )}
       {user && (
         <Flex direction="column" gap={3} style={{ maxWidth: 420 }}>
-          <Field label="Имя">
+          <Field label={t('profile.fieldName')}>
             <TextInput value={user.name || '—'} readOnly />
           </Field>
-          <Field label="Электронная почта">
+          <Field label={t('profile.fieldEmail')}>
             <TextInput value={user.email || '—'} readOnly />
           </Field>
-          <Field label="Идентификатор">
+          <Field label={t('profile.fieldId')}>
             <TextInput value={user.id} readOnly />
           </Field>
         </Flex>
@@ -74,21 +68,22 @@ function SecurityCard() {
     window.open(config.logto.endpoint, '_blank', 'noopener,noreferrer');
   };
 
+  const { t } = useTranslation();
+
   return (
-    <ProfileCard icon={ShieldCheck} title="Безопасность">
+    <ProfileCard icon={ShieldCheck} title={t('profile.securityTitle')}>
       <Flex direction="column" gap={3} style={{ maxWidth: 520 }}>
         <Text variant="body-2" color="secondary">
-          Пароль и сессии управляются службой входа. Здесь можно открыть её настройки или выйти из
-          приложения.
+          {t('profile.securityDesc')}
         </Text>
         <Flex gap={2} wrap>
           <Button view="outlined" onClick={openPasswordSettings}>
             <Icon data={Key} size={16} />
-            Управление паролем
+            {t('profile.managePassword')}
           </Button>
           <Button view="outlined-danger" onClick={() => void signOut()}>
             <Icon data={ArrowRightFromSquare} size={16} />
-            Выйти
+            {t('profile.signOut')}
           </Button>
         </Flex>
       </Flex>
@@ -97,17 +92,13 @@ function SecurityCard() {
 }
 
 function PreferencesCard() {
+  const { t } = useTranslation();
   const { theme, setTheme } = useAppTheme();
-  const [locale, setLocale] = useState<Locale>(readLocale);
-
-  useEffect(() => {
-    localStorage.setItem(LOCALE_KEY, locale);
-  }, [locale]);
 
   return (
-    <ProfileCard icon={Gear} title="Предпочтения">
+    <ProfileCard icon={Gear} title={t('profile.preferencesTitle')}>
       <Flex direction="column" gap={3} style={{ maxWidth: 420 }}>
-        <Field label="Тема оформления">
+        <Field label={t('profile.themeLabel')}>
           <Select
             width="max"
             value={[theme]}
@@ -116,26 +107,23 @@ function PreferencesCard() {
               if (next === 'light' || next === 'dark') setTheme(next);
             }}
             options={[
-              { value: 'light', content: 'Светлая' },
-              { value: 'dark', content: 'Тёмная' },
+              { value: 'light', content: t('profile.themeLight') },
+              { value: 'dark', content: t('profile.themeDark') },
             ]}
           />
         </Field>
-        <Field label="Язык интерфейса">
+        <Field label={t('profile.languageLabel')}>
           <Select
             width="max"
-            value={[locale]}
-            onUpdate={(value) => {
-              const next = value[0];
-              if (next === 'ru' || next === 'en') setLocale(next);
-            }}
-            options={[
-              { value: 'ru', content: 'Русский' },
-              { value: 'en', content: 'English (скоро)' },
-            ]}
+            value={[i18n.language]}
+            onUpdate={(value) => setLanguage(value[0] as Language)}
+            options={LANGUAGES.map((language) => ({
+              value: language.code,
+              content: language.label,
+            }))}
           />
           <Text variant="caption-2" color="secondary">
-            Пока интерфейс всегда на русском — выбор сохраняется для будущей локализации.
+            {t('profile.languageCaption')}
           </Text>
         </Field>
       </Flex>
@@ -155,18 +143,19 @@ function NotificationsCard() {
     localStorage.setItem(NOTIFY_IMPORTS_KEY, String(imports));
   }, [imports]);
 
+  const { t } = useTranslation();
+
   return (
-    <ProfileCard icon={Bell} title="Уведомления">
+    <ProfileCard icon={Bell} title={t('profile.notificationsTitle')}>
       <Flex direction="column" gap={3} style={{ maxWidth: 520 }}>
         <Text variant="body-2" color="secondary">
-          Настройки сохраняются в этом браузере. Доставка писем появится вместе с бэкендом
-          уведомлений.
+          {t('profile.notificationsDesc')}
         </Text>
         <Switch checked={invites} onUpdate={setInvites}>
-          Приглашения в организацию
+          {t('profile.notifyInvites')}
         </Switch>
         <Switch checked={imports} onUpdate={setImports}>
-          Результат импорта сборников ТТК
+          {t('profile.notifyImports')}
         </Switch>
       </Flex>
     </ProfileCard>

@@ -7,6 +7,7 @@ import {
   PDF_TEXT_COLOR,
   wrapText,
 } from '@/shared/print';
+import { i18n } from '@/shared/i18n';
 import type { Recipe } from '@/features/ttk/types';
 
 /**
@@ -123,31 +124,50 @@ function drawSticker(
 
   // Масса одной порции и число порций (с общим весом в кг).
   const kg = (data.portions * data.yieldNet) / 1000;
-  doc.text(`Масса одной порции: ${formatValue(data.yieldNet)} г`, left, y);
-  doc.text(`${data.portions} порций (${formatValue(kg)} кг)`, right, y, { align: 'right' });
+  doc.text(i18n.t('portions.stickerWeight', { grams: formatValue(data.yieldNet) }), left, y);
+  doc.text(
+    i18n.t('portions.stickerPortionsKg', {
+      portions: data.portions,
+      kg: formatValue(kg),
+    }),
+    right,
+    y,
+    { align: 'right' }
+  );
   y += BODY_LINE_HEIGHT;
 
   // Состав — перенос по ширине.
   const composition = compositionOf(data.recipe);
   if (composition) {
-    const compositionLines = wrapText(doc, `Состав: ${composition}`, width);
+    const compositionLines = wrapText(
+      doc,
+      i18n.t('portions.stickerComposition', { composition }),
+      width
+    );
     doc.text(compositionLines, left, y);
     y += compositionLines.length * 3.6 + 1.2;
   }
 
   // КБЖУ из карты.
   if (data.recipe) {
-    const kbju =
-      `КБЖУ: Б ${formatValue(data.recipe.protein)} · Ж ${formatValue(data.recipe.fat)} · ` +
-      `У ${formatValue(data.recipe.carbs)} · ${formatValue(data.recipe.kcal)} ккал`;
+    const kbju = i18n.t('portions.stickerKbju', {
+      protein: formatValue(data.recipe.protein),
+      fat: formatValue(data.recipe.fat),
+      carbs: formatValue(data.recipe.carbs),
+      kcal: formatValue(data.recipe.kcal),
+    });
     doc.text(wrapText(doc, kbju, width), left, y);
     y += BODY_LINE_HEIGHT;
   }
 
   // Дата и срок — прижаты к нижнему краю: дата выше, срок под ней.
   const bottom = slot.y + slot.height - PADDING_BOTTOM;
-  doc.text(`Дата: ${manufactureDate}`, left, bottom - BODY_LINE_HEIGHT);
-  doc.text(`Срок: ${expiry}`, left, bottom);
+  doc.text(
+    i18n.t('portions.stickerDate', { date: manufactureDate }),
+    left,
+    bottom - BODY_LINE_HEIGHT
+  );
+  doc.text(i18n.t('portions.stickerExpiry', { expiry }), left, bottom);
 }
 
 /** Рисует листы A4 с наклейками в переданный jsPDF. */
@@ -174,5 +194,5 @@ export async function downloadStickersDoc(data: {
 }): Promise<void> {
   const doc = await createPdfDoc();
   writeStickersPdf(doc, data);
-  doc.save(`Наклейки_${formatDate(data.manufactureDate)}.pdf`);
+  doc.save(i18n.t('portions.stickerFileName', { date: formatDate(data.manufactureDate) }));
 }

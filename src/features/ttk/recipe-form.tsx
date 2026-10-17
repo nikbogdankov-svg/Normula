@@ -3,8 +3,19 @@ import { Button, Flex, Icon, Text, TextArea, TextInput } from '@gravity-ui/uikit
 import { Plus, TrashBin } from '@gravity-ui/icons';
 import { ProductPicker } from '@/features/products/product-picker';
 import { decimalToInput, parseDecimal } from '@/features/warehouse/format';
+import { useTranslation } from '@/shared/i18n';
 import { RECIPE_DECIMALS, type Recipe, type RecipeRequest } from './types';
 import './recipe-drawer.css';
+
+/** Код проблемы строки ингредиента; текст берётся из словаря по этому коду. */
+type IngredientProblem = 'selectProduct' | 'grossPositive' | 'netRange' | 'duplicate';
+
+const INGREDIENT_PROBLEM_KEYS: Record<IngredientProblem, string> = {
+  selectProduct: 'ttk.errorSelectProduct',
+  grossPositive: 'ttk.errorGrossPositive',
+  netRange: 'ttk.errorNetRange',
+  duplicate: 'ttk.errorDuplicateProduct',
+};
 
 /** Строка ингредиента в форме: числа — строками, как их ввёл пользователь. */
 export interface IngredientDraft {
@@ -117,6 +128,7 @@ function NumberInput({
 
 /** Состояние и разметка формы создания/редактирования ТТК. */
 export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [collectionName, setCollectionName] = useState('');
   const [yieldNet, setYieldNet] = useState('');
@@ -168,19 +180,17 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   // Ингредиент считается активным только если выбран продукт И введено брутто.
   const activeIngredients = ingredients.filter((row) => row.productId && row.gross.trim() !== '');
 
-  const ingredientProblem = (row: IngredientDraft): string | null => {
-    if (!row.productId) return 'Выберите продукт из справочника';
+  const ingredientProblem = (row: IngredientDraft): IngredientProblem | null => {
+    if (!row.productId) return 'selectProduct';
 
     const gross = parseDecimal(row.gross, RECIPE_DECIMALS);
-    if (row.gross.trim() === '' || gross === null || gross <= 0)
-      return 'Брутто должно быть больше нуля';
+    if (gross === null || gross <= 0) return 'grossPositive';
 
     const net = parseOptionalDecimal(row.net);
-    if (row.net.trim() !== '' && (net === null || net < 0 || net > gross))
-      return 'Нетто от нуля до брутто';
+    if (net === null || net > gross) return 'netRange';
 
     if (activeIngredients.some((other) => other !== row && other.productId === row.productId)) {
-      return 'Этот продукт уже есть в карте';
+      return 'duplicate';
     }
 
     return null;
@@ -246,8 +256,8 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       <Flex gap={2} alignItems="center">
         <TextInput
           size="l"
-          label="Название:"
-          placeholder="Название блюда"
+          label={t('ttk.nameLabel')}
+          placeholder={t('ttk.namePlaceholder')}
           value={name}
           onUpdate={setName}
           autoFocus
@@ -273,7 +283,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
               whiteSpace: 'nowrap',
             }}
           >
-            Выход:
+            {t('ttk.yieldLabel')}
           </Text>
           <div
             style={{
@@ -324,24 +334,24 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
 
       <TextInput
         size="l"
-        label="Название сборника:"
-        placeholder="Название сборника"
+        label={t('ttk.collectionNameLabel')}
+        placeholder={t('ttk.collectionNamePlaceholder')}
         value={collectionName}
         onUpdate={setCollectionName}
         endContent={
           <Flex alignItems="center" style={{ paddingInlineEnd: 4 }}>
             <Text variant="body-1" color="secondary">
-              опционально
+              {t('ttk.optional')}
             </Text>
           </Flex>
         }
       />
 
       <Flex direction="column" gap={2}>
-        <Text variant="body-1">Технология приготовления</Text>
+        <Text variant="body-1">{t('ttk.technologySection')}</Text>
         <TextArea
           size="l"
-          placeholder="Опишите технологию приготовления"
+          placeholder={t('ttk.technologyPlaceholder')}
           value={technology}
           onUpdate={setTechnology}
           minRows={3}
@@ -349,28 +359,28 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       </Flex>
 
       <Flex direction="column" gap={2}>
-        <Text variant="body-1">Пищевая ценность на порцию</Text>
+        <Text variant="body-1">{t('ttk.nutritionSection')}</Text>
         <Flex gap={2} wrap>
           <NumberInput
-            label="Белки, г:"
+            label={t('ttk.proteinLabel')}
             value={protein}
             onUpdate={setProtein}
             invalid={numbers.protein === null}
           />
           <NumberInput
-            label="Жиры, г:"
+            label={t('ttk.fatLabel')}
             value={fat}
             onUpdate={setFat}
             invalid={numbers.fat === null}
           />
           <NumberInput
-            label="Углеводы, г:"
+            label={t('ttk.carbsLabel')}
             value={carbs}
             onUpdate={setCarbs}
             invalid={numbers.carbs === null}
           />
           <NumberInput
-            label="Калории, ккал:"
+            label={t('ttk.kcalLabel')}
             value={kcal}
             onUpdate={setKcal}
             invalid={numbers.kcal === null}
@@ -379,7 +389,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
       </Flex>
 
       <Flex direction="column" gap={2}>
-        <Text variant="body-1">Ингредиенты</Text>
+        <Text variant="body-1">{t('ttk.ingredientsSection')}</Text>
 
         {ingredients.map((row, index) => {
           const active = activeIngredients.includes(row);
@@ -392,7 +402,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
                   <ProductPicker
                     value={row.productId}
                     valueLabel={row.productName}
-                    placeholder="Название продукта"
+                    placeholder={t('ttk.productNamePlaceholder')}
                     size="l"
                     onChange={(product) =>
                       updateIngredient(index, {
@@ -404,27 +414,27 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
                   />
                 </div>
                 <NumberInput
-                  label="Брутто на 1 порц:"
+                  label={t('ttk.grossLabel')}
                   placeholder="000"
                   value={row.gross}
                   onUpdate={(value) => updateIngredient(index, { gross: value })}
-                  invalid={active && problem !== null && problem.startsWith('Брутто')}
+                  invalid={active && problem === 'grossPositive'}
                   endContent={unitHint(row.unit)}
                 />
                 <NumberInput
-                  label="Нетто на 1 порц:"
+                  label={t('ttk.netLabel')}
                   placeholder="000"
                   value={row.net}
                   onUpdate={(value) => updateIngredient(index, { net: value })}
-                  invalid={active && problem !== null && problem.startsWith('Нетто')}
+                  invalid={active && problem === 'netRange'}
                   endContent={unitHint(row.unit)}
                 />
                 <Button
                   view="flat"
                   size="l"
                   onClick={() => removeIngredient(index)}
-                  title="Удалить ингредиент"
-                  aria-label="Удалить ингредиент"
+                  title={t('ttk.removeIngredient')}
+                  aria-label={t('ttk.removeIngredient')}
                   disabled={ingredients.length <= 1}
                 >
                   <Icon data={TrashBin} size={18} />
@@ -432,7 +442,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
               </Flex>
               {problem && (
                 <Text variant="body-1" color="danger">
-                  {problem}
+                  {t(INGREDIENT_PROBLEM_KEYS[problem])}
                 </Text>
               )}
             </Flex>
@@ -446,7 +456,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
           style={{ alignSelf: 'flex-start' }}
         >
           <Icon data={Plus} size={16} />
-          Добавить ингредиент
+          {t('ttk.addIngredient')}
         </Button>
       </Flex>
     </Flex>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Dialog, Flex, useToaster } from '@gravity-ui/uikit';
+import { useTranslation } from 'react-i18next';
 import { useCreateProduct } from './api';
 import { useProductForm } from './product-form';
 import './product-dialog.css';
@@ -21,6 +22,7 @@ export function CreateProductDialog({
 }) {
   const create = useCreateProduct();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [formKey, setFormKey] = useState(0);
   const form = useProductForm(null, String(formKey));
 
@@ -35,14 +37,14 @@ export function CreateProductDialog({
   const submit = () => {
     create.mutate(form.getBody(), {
       onSuccess: (data) => {
-        toaster.add({ name: 'product-created', title: 'Продукт создан', theme: 'success' });
+        toaster.add({ name: 'product-created', title: t('products.created'), theme: 'success' });
         onCreated(data.product);
         onClose();
       },
       onError: (e) =>
         toaster.add({
           name: 'product-create',
-          title: 'Ошибка',
+          title: t('common.error'),
           content: e.message,
           theme: 'danger',
         }),
@@ -51,14 +53,14 @@ export function CreateProductDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size="s" className="product-dialog">
-      <Dialog.Header caption="Создать продукт" />
+      <Dialog.Header caption={t('products.createTitle')} />
       <Dialog.Divider />
       <Dialog.Body>{form.fields}</Dialog.Body>
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button view="outlined" size="l" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             view="action"
@@ -67,7 +69,7 @@ export function CreateProductDialog({
             disabled={!form.canSubmit}
             loading={create.isPending}
           >
-            Создать продукт
+            {t('products.createButton')}
           </Button>
         </Flex>
       </Dialog.Footer>

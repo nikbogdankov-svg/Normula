@@ -4,6 +4,7 @@ import { Plus, Xmark } from '@gravity-ui/icons';
 import { useCreateRecipe } from './api';
 import { useRecipeForm } from './recipe-form';
 import { useDrawerHeight } from './use-drawer-height';
+import { useTranslation } from '@/shared/i18n';
 import './recipe-drawer.css';
 
 /**
@@ -17,6 +18,7 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const { t } = useTranslation();
 
   const requestClose = () => {
     setVisible(false);
@@ -50,11 +52,16 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
 
     create.mutate(body, {
       onSuccess: () => {
-        toaster.add({ name: 'ttk-created', title: 'ТТК создана', theme: 'success' });
+        toaster.add({ name: 'ttk-created', title: t('ttk.created'), theme: 'success' });
         requestClose();
       },
       onError: (e) =>
-        toaster.add({ name: 'ttk-create', title: 'Ошибка', content: e.message, theme: 'danger' }),
+        toaster.add({
+          name: 'ttk-create',
+          title: t('common.error'),
+          content: e.message,
+          theme: 'danger',
+        }),
     });
   };
 
@@ -76,9 +83,9 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
       <div className="ttk-recipe-drawer__card">
         <div className="ttk-recipe-drawer__header">
           <div className="ttk-recipe-drawer__title-row">
-            <Text variant="subheader-3">Создать ТТК</Text>
+            <Text variant="subheader-3">{t('ttk.createTitle')}</Text>
           </div>
-          <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+          <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
             <Icon data={Xmark} size={20} />
           </Button>
         </div>
@@ -87,7 +94,7 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
 
         <div className="ttk-recipe-drawer__footer">
           <Button view="outlined" size="l" onClick={requestClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             view="action"
@@ -97,7 +104,7 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
             loading={create.isPending}
           >
             <Icon data={Plus} size={16} />
-            Создать ТТК
+            {t('ttk.createTitle')}
           </Button>
         </div>
       </div>

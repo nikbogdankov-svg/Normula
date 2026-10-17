@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Button, Card, Flex, Icon, Label, Text, useToaster } from '@gravity-ui/uikit';
 import { Printer } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useOrganizations } from '@/shared/auth';
 import { NoOrganizationSelectedState } from '@/shared/ui/states';
 import { JournalDrawer } from './journal-drawer';
-import { AUTO_JOURNALS, JOURNAL_SOURCE_LABELS, type AutoJournal } from './types';
+import { AUTO_JOURNALS, JOURNAL_SOURCE_KEYS, type AutoJournal } from './types';
 import './journals-route.css';
 
 /**
@@ -12,6 +13,7 @@ import './journals-route.css';
  * каталог журналов, которые программа формирует из меню, порционника, накладных и ТТК.
  */
 export function JournalsRoute() {
+  const { t } = useTranslation();
   const { current } = useOrganizations();
   const toaster = useToaster();
   const [opened, setOpened] = useState<AutoJournal | null>(null);
@@ -19,8 +21,8 @@ export function JournalsRoute() {
   const onGenerate = (journal: AutoJournal) => {
     toaster.add({
       name: `journal-generate-${journal.id}`,
-      title: 'Журнал формируется',
-      content: `${journal.tag}: данные подтягиваются из связанных разделов.`,
+      title: t('journals.generating'),
+      content: t('journals.generatingContent', { tag: t(journal.tagKey) }),
       theme: 'info',
     });
   };
@@ -45,21 +47,23 @@ export function JournalsRoute() {
           >
             <Flex gap={2}>
               <Flex direction="column" gap={2} style={{ flex: 1, minWidth: 0 }}>
-                <Text variant="subheader-2">{journal.title}</Text>
+                <Text variant="subheader-2">{t(journal.titleKey)}</Text>
                 <Flex gap={1} wrap>
                   {journal.sources.map((source) => (
                     <Label key={source} theme="unknown" size="xs">
-                      {JOURNAL_SOURCE_LABELS[source]}
+                      {t(JOURNAL_SOURCE_KEYS[source])}
                     </Label>
                   ))}
                 </Flex>
                 <Text
                   variant="body-2"
-                  color={journal.manualFields.length > 0 ? 'primary' : 'secondary'}
+                  color={journal.manualFieldKeys.length > 0 ? 'primary' : 'secondary'}
                 >
-                  {journal.manualFields.length > 0
-                    ? `Дозаполнить: ${journal.manualFields.join(', ')}`
-                    : 'Заполняется автоматически'}
+                  {journal.manualFieldKeys.length > 0
+                    ? t('journals.manual', {
+                        fields: journal.manualFieldKeys.map((key) => t(key)).join(', '),
+                      })
+                    : t('journals.auto')}
                 </Text>
               </Flex>
               <Button
@@ -69,7 +73,7 @@ export function JournalsRoute() {
                   e.stopPropagation();
                   onGenerate(journal);
                 }}
-                title="Печать"
+                title={t('journals.print')}
               >
                 <Icon data={Printer} size={16} />
               </Button>

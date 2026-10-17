@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToaster } from '@gravity-ui/uikit';
 import { useApi } from '@/shared/api/use-api';
+import { i18n } from '@/shared/i18n';
 import { toastError, toastSuccess } from './toasts';
 import type {
   CreateEmployeeRequest,
@@ -97,8 +98,8 @@ export function useCreateEmployee() {
       toastSuccess(
         toaster,
         'employee-created',
-        'Сотрудник добавлен',
-        `Приглашение отправлено на ${body.email}`
+        i18n.t('staff.created'),
+        i18n.t('staff.createdContent', { email: body.email })
       ),
     onError: (e) => toastError(toaster, 'employee-add', e),
     // Инвалидация и при ошибке: карточка могла создаться, а письмо не уйти —
@@ -116,7 +117,7 @@ export function useUpdateEmployee() {
     mutationFn: ({ id, patch }: { id: string; patch: UpdateEmployeeRequest }) =>
       api.request<UpdateEmployeeResponse>(`/v1/staff/${id}`, { method: 'PATCH', body: patch }),
     onSuccess: () => {
-      toastSuccess(toaster, 'employee-updated', 'Данные сотрудника обновлены');
+      toastSuccess(toaster, 'employee-updated', i18n.t('staff.updated'));
       return invalidate();
     },
     onError: (e) => toastError(toaster, 'employee-edit', e),
@@ -132,7 +133,7 @@ export function useDeleteEmployee() {
     mutationFn: (id: string) =>
       api.request<Record<string, never>>(`/v1/staff/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      toastSuccess(toaster, 'employee-deleted', 'Сотрудник удалён');
+      toastSuccess(toaster, 'employee-deleted', i18n.t('staff.deleted'));
       return invalidate();
     },
     onError: (e) => toastError(toaster, 'employee-delete', e),
@@ -155,7 +156,7 @@ export function useResendInvitation() {
         body: {},
       }),
     onSuccess: (data) => {
-      toastSuccess(toaster, 'employee-invited', 'Приглашение отправлено', data.employee.email);
+      toastSuccess(toaster, 'employee-invited', i18n.t('staff.invited'), data.employee.email);
       return invalidate();
     },
     onError: (e) => toastError(toaster, 'employee-invite', e),

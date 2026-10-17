@@ -13,6 +13,7 @@ import type { ExtractedCollection, ExtractedDish } from './extract-collection';
 import { useRecipeForm } from './recipe-form';
 import { useDrawerHeight } from './use-drawer-height';
 import type { Recipe } from './types';
+import { useTranslation } from '@/shared/i18n';
 import './recipe-drawer.css';
 
 /** Что принимаем — PDF и DOC/DOCX (+ TXT для простого текста). */
@@ -74,6 +75,7 @@ function dishToRecipe(dish: ExtractedDish, collectionName: string): Recipe {
  */
 export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toaster = useToaster();
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -103,8 +105,8 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
     if (accepted.length < incoming.length) {
       toaster.add({
         name: 'ttk-import-format',
-        title: 'Неподдерживаемый формат',
-        content: `Можно загружать только ${ACCEPT_LABEL}`,
+        title: t('ttk.importUnsupported'),
+        content: t('ttk.importOnlyFormats', { formats: ACCEPT_LABEL }),
         theme: 'warning',
       });
     }
@@ -140,8 +142,10 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
       if (empty.length > 0) {
         toaster.add({
           name: 'ttk-import-empty',
-          title: 'Не все файлы разобраны',
-          content: `Не нашли блюд в: ${empty.map((item) => item.fileName).join(', ')}`,
+          title: t('ttk.importSomeFailed'),
+          content: t('ttk.importEmptyFiles', {
+            files: empty.map((item) => item.fileName).join(', '),
+          }),
           theme: 'warning',
         });
       }
@@ -150,8 +154,8 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
       if (extracted.every((collection) => collection.dishes.length === 0)) {
         toaster.add({
           name: 'ttk-import-none',
-          title: 'Блюд не найдено',
-          content: 'Проверьте, что в файле есть технологические карты или названия блюд.',
+          title: t('ttk.importNone'),
+          content: t('ttk.importNoneHint'),
           theme: 'danger',
         });
         return;
@@ -165,8 +169,8 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
     } catch (error) {
       toaster.add({
         name: 'ttk-import-parse',
-        title: 'Ошибка разбора файла',
-        content: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: t('ttk.importParseError'),
+        content: error instanceof Error ? error.message : t('common.unknownError'),
         theme: 'danger',
       });
     } finally {
@@ -177,11 +181,11 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
   return (
     <>
       <Dialog open={open && !reviewOpen} onClose={closePopup} size="s">
-        <Dialog.Header caption="Импорт сборников" />
+        <Dialog.Header caption={t('ttk.importHeader')} />
         <Dialog.Divider />
         <Dialog.Body>
           <Flex direction="column" gap={3}>
-            <Text variant="body-2">Импортируйте ваши сборники</Text>
+            <Text variant="body-2">{t('ttk.importIntro')}</Text>
             <DropZone
               dragging={dragging}
               setDragging={setDragging}
@@ -215,7 +219,7 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
                   view="flat"
                   size="s"
                   onClick={() => setRenamingId(item.id)}
-                  title="Изменить имя файла"
+                  title={t('ttk.renameFile')}
                 >
                   <Icon data={Pencil} size={14} />
                 </Button>
@@ -225,7 +229,7 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
                   onClick={() =>
                     setFiles((current) => current.filter((file) => file.id !== item.id))
                   }
-                  title="Убрать файл"
+                  title={t('ttk.removeFile')}
                 >
                   <Icon data={TrashBin} size={14} />
                 </Button>
@@ -237,7 +241,7 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
         <Dialog.Footer>
           <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
             <Button view="outlined" size="l" onClick={closePopup}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button
               view="action"
@@ -247,7 +251,7 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
               loading={parsing}
             >
               <Icon data={ArrowUpFromSquare} size={16} />
-              Импортировать
+              {t('ttk.importButton')}
             </Button>
           </Flex>
         </Dialog.Footer>
@@ -276,6 +280,7 @@ function ImportReviewDrawer({
 }) {
   const height = useDrawerHeight();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -369,8 +374,8 @@ function ImportReviewDrawer({
   const submit = () => {
     toaster.add({
       name: 'ttk-import',
-      title: 'Импорт сборников пока не подключён',
-      content: 'Карты из файла не сохранены. Заведите их вручную через «Создать ТТК».',
+      title: t('ttk.importNotConnected'),
+      content: t('ttk.importNotConnectedHint'),
       theme: 'warning',
     });
   };
@@ -394,9 +399,9 @@ function ImportReviewDrawer({
         <div className="ttk-recipe-drawer__mode" hidden={editing !== null}>
           <div className="ttk-recipe-drawer__header">
             <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-2">Импорт сборников</Text>
+              <Text variant="subheader-2">{t('ttk.importHeader')}</Text>
             </div>
-            <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+            <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -420,7 +425,7 @@ function ImportReviewDrawer({
                         view="flat"
                         size="s"
                         onClick={() => toggleExpanded(collection.id)}
-                        aria-label={expanded ? 'Свернуть' : 'Показать блюда'}
+                        aria-label={expanded ? t('ttk.collapse') : t('ttk.showDishes')}
                       >
                         <Icon data={expanded ? ChevronUp : ChevronDown} size={16} />
                       </Button>
@@ -460,7 +465,7 @@ function ImportReviewDrawer({
                         view="flat"
                         size="s"
                         onClick={() => setRenamingId(collection.id)}
-                        title="Изменить название"
+                        title={t('ttk.renameCollection')}
                       >
                         <Icon data={Pencil} size={14} />
                       </Button>
@@ -473,7 +478,7 @@ function ImportReviewDrawer({
                           );
                           setExpandedIds((current) => current.filter((id) => id !== collection.id));
                         }}
-                        title="Убрать сборник"
+                        title={t('ttk.removeCollection')}
                       >
                         <Icon data={TrashBin} size={14} />
                       </Button>
@@ -494,7 +499,7 @@ function ImportReviewDrawer({
                             <Button
                               view="flat"
                               size="s"
-                              title="Открыть и изменить"
+                              title={t('ttk.openEdit')}
                               onClick={() => openDish(collection.id, dish)}
                             >
                               <Icon data={Pencil} size={14} />
@@ -502,7 +507,7 @@ function ImportReviewDrawer({
                             <Button
                               view="flat"
                               size="s"
-                              title="Убрать блюдо"
+                              title={t('ttk.removeDish')}
                               onClick={() => {
                                 if (editing?.dish.id === dish.id) setEditing(null);
                                 const next = collections
@@ -532,11 +537,11 @@ function ImportReviewDrawer({
 
           <div className="ttk-recipe-drawer__footer">
             <Button view="outlined" size="l" onClick={requestClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button view="action" size="l" onClick={submit} disabled={collections.length === 0}>
               <Icon data={ArrowUpFromSquare} size={16} />
-              Импортировать
+              {t('ttk.importButton')}
             </Button>
           </div>
         </div>
@@ -544,9 +549,14 @@ function ImportReviewDrawer({
         <div className="ttk-recipe-drawer__mode" hidden={editing === null}>
           <div className="ttk-recipe-drawer__header">
             <div className="ttk-recipe-drawer__title-row">
-              <Text variant="subheader-2">Редактировать блюдо</Text>
+              <Text variant="subheader-2">{t('ttk.editDishTitle')}</Text>
             </div>
-            <Button view="flat" size="l" onClick={() => setEditing(null)} aria-label="Закрыть">
+            <Button
+              view="flat"
+              size="l"
+              onClick={() => setEditing(null)}
+              aria-label={t('common.close')}
+            >
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -557,11 +567,11 @@ function ImportReviewDrawer({
 
           <div className="ttk-recipe-drawer__footer">
             <Button view="outlined" size="l" onClick={() => setEditing(null)}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button view="action" size="l" onClick={saveDish} disabled={!form.canSubmit}>
               <Icon data={Pencil} size={16} />
-              Сохранить
+              {t('common.save')}
             </Button>
           </div>
         </div>
@@ -581,6 +591,7 @@ function DropZone({
   inputRef: RefObject<HTMLInputElement>;
   onAdd: (files: FileList | null) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       onDragOver={(e) => {
@@ -606,12 +617,12 @@ function DropZone({
       <Flex direction="column" alignItems="center" gap={1}>
         <Button view="outlined" onClick={() => inputRef.current?.click()}>
           <Icon data={File} size={16} />
-          Выберите файл
+          {t('ttk.chooseFile')}
         </Button>
         <Text variant="body-1" color="secondary">
-          или
+          {t('ttk.or')}
         </Text>
-        <Text variant="body-2">перетащите файл сюда</Text>
+        <Text variant="body-2">{t('ttk.dropHere')}</Text>
         <Text variant="body-1" color="hint">
           {ACCEPT_LABEL}
         </Text>

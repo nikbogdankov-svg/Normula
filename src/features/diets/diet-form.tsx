@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Checkbox, Flex, Text, TextInput } from '@gravity-ui/uikit';
+import { useTranslation } from '@/shared/i18n';
 import type { FacilityType } from '@/features/objects/types';
 import { MEALS, type MealId } from '@/features/menu/types';
 import type { CreateDietRequest, Diet } from './types';
 
-const FACILITY_TYPE_OPTIONS: Array<{ value: FacilityType; label: string }> = [
-  { value: 'school', label: 'Школа' },
-  { value: 'kindergarten', label: 'Детский сад' },
-  { value: 'hospital', label: 'Больница' },
+const FACILITY_TYPE_OPTIONS: Array<{ value: FacilityType; labelKey: string }> = [
+  { value: 'school', labelKey: 'facility.school' },
+  { value: 'kindergarten', labelKey: 'facility.kindergarten' },
+  { value: 'hospital', labelKey: 'facility.hospital' },
 ];
 
 function parseDecimal(value: string): number {
@@ -27,8 +28,6 @@ function isInvalidNorm(value: string): boolean {
   return !Number.isFinite(parsed) || parsed < 0;
 }
 
-const NORM_ERROR = 'Не может быть отрицательным';
-
 type Draft = {
   name: string;
   appliesTo: FacilityType[];
@@ -42,6 +41,7 @@ type Draft = {
 
 /** Состояние и разметка формы создания/редактирования диеты. */
 export function useDietForm(initial?: Diet | null, resetKey?: string) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Draft>({
     name: '',
     appliesTo: [],
@@ -106,15 +106,15 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     <Flex direction="column" gap={3}>
       <TextInput
         size="l"
-        label="Название:"
-        placeholder="Например, Основной"
+        label={t('diets.nameLabel')}
+        placeholder={t('diets.namePlaceholder')}
         value={draft.name}
         onUpdate={patchName}
         autoFocus
       />
       <Flex direction="column" gap={1}>
         <Text variant="body-2" color="secondary">
-          Для каких учреждений доступна диета:
+          {t('diets.institutionsLabel')}
         </Text>
         {FACILITY_TYPE_OPTIONS.map((option) => (
           <Checkbox
@@ -123,14 +123,14 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             checked={draft.appliesTo.includes(option.value)}
             onUpdate={() => toggleType(option.value)}
           >
-            {option.label}
+            {t(option.labelKey)}
           </Checkbox>
         ))}
       </Flex>
 
       <Flex direction="column" gap={1}>
         <Text variant="body-2" color="secondary">
-          Для каких приёмов пищи доступна диета:
+          {t('diets.mealsLabel')}
         </Text>
         {MEALS.map((meal) => (
           <Checkbox
@@ -139,21 +139,21 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
             checked={draft.mealIds.includes(meal.id)}
             onUpdate={() => toggleMeal(meal.id)}
           >
-            {meal.label}
+            {t(meal.labelKey)}
           </Checkbox>
         ))}
       </Flex>
 
       <Flex direction="column" gap={2}>
-        <Text variant="subheader-1">Норма на день</Text>
+        <Text variant="subheader-1">{t('diets.dailyNorm')}</Text>
         <TextInput
           size="l"
           type="number"
-          label="Цена на день, ₽:"
+          label={t('diets.pricePerDayLabel')}
           placeholder="0"
           value={draft.pricePerDay}
           validationState={isInvalidNorm(draft.pricePerDay) ? 'invalid' : undefined}
-          errorMessage={NORM_ERROR}
+          errorMessage={t('diets.normError')}
           controlProps={{ min: 0, step: 1 }}
           onUpdate={(value) => patchNumber('pricePerDay', value)}
         />
@@ -161,11 +161,11 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
           <TextInput
             size="l"
             type="number"
-            label="Ккал:"
+            label={t('diets.formKcal')}
             placeholder="0"
             value={draft.kcal}
             validationState={isInvalidNorm(draft.kcal) ? 'invalid' : undefined}
-            errorMessage={NORM_ERROR}
+            errorMessage={t('diets.normError')}
             controlProps={{ min: 0, step: 1 }}
             onUpdate={(value) => patchNumber('kcal', value)}
             style={{ flex: 1 }}
@@ -173,11 +173,11 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
           <TextInput
             size="l"
             type="number"
-            label="Белки, г:"
+            label={t('diets.formProtein')}
             placeholder="0"
             value={draft.protein}
             validationState={isInvalidNorm(draft.protein) ? 'invalid' : undefined}
-            errorMessage={NORM_ERROR}
+            errorMessage={t('diets.normError')}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('protein', value)}
             style={{ flex: 1 }}
@@ -187,11 +187,11 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
           <TextInput
             size="l"
             type="number"
-            label="Жиры, г:"
+            label={t('diets.formFat')}
             placeholder="0"
             value={draft.fat}
             validationState={isInvalidNorm(draft.fat) ? 'invalid' : undefined}
-            errorMessage={NORM_ERROR}
+            errorMessage={t('diets.normError')}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('fat', value)}
             style={{ flex: 1 }}
@@ -199,11 +199,11 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
           <TextInput
             size="l"
             type="number"
-            label="Углеводы, г:"
+            label={t('diets.formCarbs')}
             placeholder="0"
             value={draft.carbs}
             validationState={isInvalidNorm(draft.carbs) ? 'invalid' : undefined}
-            errorMessage={NORM_ERROR}
+            errorMessage={t('diets.normError')}
             controlProps={{ min: 0, step: 0.1 }}
             onUpdate={(value) => patchNumber('carbs', value)}
             style={{ flex: 1 }}

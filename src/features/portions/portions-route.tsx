@@ -25,6 +25,7 @@ import {
   TriangleExclamation,
 } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { i18n, useTranslation } from '@/shared/i18n';
 import type { jsPDF } from 'jspdf';
 import {
   createPdfDoc,
@@ -73,8 +74,8 @@ const MEALS_ORDER: Record<MealId, number> = Object.fromEntries(
 ) as Record<MealId, number>;
 
 /** Название приёма пищи по его id — подпись под названием блюда. */
-const MEAL_LABELS: Record<MealId, string> = Object.fromEntries(
-  MEALS.map((meal) => [meal.id, meal.label])
+const MEAL_LABEL_KEYS: Record<MealId, string> = Object.fromEntries(
+  MEALS.map((meal) => [meal.id, meal.labelKey])
 ) as Record<MealId, string>;
 
 /** Килограммы на строку: порции × выход порции из ТТК (граммы); 0 — выход не задан. */
@@ -125,6 +126,7 @@ function portionUnits(objects: ObjectItem[]): PortionUnit[] {
  */
 export function PortionsRoute() {
   const { current } = useOrganizations();
+  const { t } = useTranslation();
   const objects = useObjects();
   // Дата живёт в адресе страницы: перезагрузка или редирект (например,
   // обновление токена Logto) не сбрасывают выбор на сегодня.
@@ -271,7 +273,7 @@ export function PortionsRoute() {
         onError: (e) =>
           toaster.add({
             name: 'portions-fill',
-            title: 'Не удалось заполнить',
+            title: t('portions.fillError'),
             content: e.message,
             theme: 'danger',
           }),
@@ -286,7 +288,7 @@ export function PortionsRoute() {
           <Button
             view="outlined"
             size="l"
-            title="Предыдущий день"
+            title={t('portions.prevDay')}
             onClick={() => setDate(shiftIso(date, -1))}
           >
             <Icon data={ChevronLeft} size={16} />
@@ -300,7 +302,7 @@ export function PortionsRoute() {
           <Button
             view="outlined"
             size="l"
-            title="Следующий день"
+            title={t('portions.nextDay')}
             onClick={() => setDate(shiftIso(date, 1))}
           >
             <Icon data={ChevronRight} size={16} />
@@ -311,8 +313,8 @@ export function PortionsRoute() {
           value={view}
           onUpdate={(value) => setView(value as PortionsView)}
         >
-          <SegmentedRadioGroup.Option value="organizations" content="По объектам" />
-          <SegmentedRadioGroup.Option value="dishes" content="По блюдам" />
+          <SegmentedRadioGroup.Option value="organizations" content={t('portions.byObjects')} />
+          <SegmentedRadioGroup.Option value="dishes" content={t('portions.byDishes')} />
         </SegmentedRadioGroup>
       </Flex>
 
@@ -327,7 +329,7 @@ export function PortionsRoute() {
           <Flex alignItems="center" gap={2}>
             <Icon data={Receipt} size={16} />
             <Text variant="subheader-2">
-              {view === 'dishes' ? 'Порционник по блюдам' : 'Порционник по объектам'}
+              {view === 'dishes' ? t('portions.titleDishes') : t('portions.titleObjects')}
             </Text>
           </Flex>
           <Flex alignItems="center" gap={2}>
@@ -335,7 +337,7 @@ export function PortionsRoute() {
               <>
                 <TextInput
                   size="m"
-                  placeholder="Поиск по объектам..."
+                  placeholder={t('portions.searchObjects')}
                   value={searchQuery}
                   onUpdate={setSearchQuery}
                   hasClear
@@ -351,8 +353,8 @@ export function PortionsRoute() {
                 <Select
                   size="m"
                   width={280}
-                  label="Объект:"
-                  title="Объект:"
+                  label={t('portions.objectLabel')}
+                  title={t('portions.objectLabel')}
                   value={[selectedId]}
                   onUpdate={(value) => {
                     const next = value[0] ?? ALL_SUBOBJECTS;
@@ -363,8 +365,8 @@ export function PortionsRoute() {
                       setObjectId(next.slice('object:'.length));
                     }
                   }}
-                  placeholder="Выберите объект или подобъект"
-                  options={[{ value: ALL_SUBOBJECTS, content: 'Все' }, ...objectOptions]}
+                  placeholder={t('portions.objectPlaceholder')}
+                  options={[{ value: ALL_SUBOBJECTS, content: t('common.all') }, ...objectOptions]}
                 />
               </>
             )}
@@ -372,7 +374,7 @@ export function PortionsRoute() {
               <>
                 <TextInput
                   size="m"
-                  placeholder="Поиск по блюдам..."
+                  placeholder={t('portions.searchDishes')}
                   value={dishSearchQuery}
                   onUpdate={setDishSearchQuery}
                   hasClear
@@ -388,8 +390,8 @@ export function PortionsRoute() {
                 <Select
                   size="m"
                   width={280}
-                  label="Объект:"
-                  title="Объект:"
+                  label={t('portions.objectLabel')}
+                  title={t('portions.objectLabel')}
                   value={activeObjectId ? [activeObjectId] : []}
                   onUpdate={(value) => {
                     const next = value[0] ?? null;
@@ -413,7 +415,7 @@ export function PortionsRoute() {
                   grand: printData.grand,
                 })
               }
-              title="Печать (PDF)"
+              title={t('portions.print')}
             >
               <Icon data={Printer} size={16} />
             </Button>
@@ -435,10 +437,10 @@ export function PortionsRoute() {
                 <Flex alignItems="center" gap={2} wrap style={{ padding: '8px 16px' }}>
                   <Icon data={TriangleExclamation} size={16} />
                   <Text variant="body-2" style={{ color: 'var(--g-color-text-secondary)' }}>
-                    Эта дата в будущем
+                    {t('portions.futureDate')}
                   </Text>
                   <Button size="s" view="normal" onClick={() => setDate(todayIso())}>
-                    Перейти на сегодня
+                    {t('portions.goToday')}
                   </Button>
                   {/* Кнопку заполнения показываем, пока день пуст; после
                       заполнения остаются только надпись и переход на сегодня. */}
@@ -451,7 +453,7 @@ export function PortionsRoute() {
                       disabled={!yesterday.data || (yesterday.data.entries?.length ?? 0) === 0}
                       onClick={fillFromYesterday}
                     >
-                      Заполнить вчерашними данными
+                      {t('portions.fillYesterday')}
                     </Button>
                   )}
                 </Flex>
@@ -461,7 +463,7 @@ export function PortionsRoute() {
                 <ErrorState error={portions.error} onRetry={() => void portions.refetch()} />
               )}
               {!portions.isPending && !portions.isError && subObjects.length === 0 && (
-                <EmptyState text="Сначала добавьте подобъекты в разделе «Объекты»" />
+                <EmptyState text={t('portions.emptyAddSubObjects')} />
               )}
               {!portions.isPending && !portions.isError && subObjects.length > 0 && (
                 <SummaryPortionsTable
@@ -496,7 +498,11 @@ export function PortionsRoute() {
 
       <Dialog open={stickerRow !== null} onClose={() => setStickerRow(null)} size="s">
         <Dialog.Header
-          caption={stickerRow ? `Наклейка: ${stickerRow.dishName}` : 'Наклейки на термос'}
+          caption={
+            stickerRow
+              ? t('portions.stickerTitle', { dish: stickerRow.dishName })
+              : t('portions.stickersTitle')
+          }
         />
         <Dialog.Divider />
         <Dialog.Body>
@@ -509,8 +515,8 @@ export function PortionsRoute() {
               </Text>
               <TextInput
                 size="l"
-                label="Срок годности:"
-                placeholder="Например «72 часа» или «до 12.10.2026»"
+                label={t('portions.expiryLabel')}
+                placeholder={t('portions.expiryPlaceholder')}
                 value={stickerExpiry}
                 onUpdate={setStickerExpiry}
                 hasClear
@@ -522,8 +528,8 @@ export function PortionsRoute() {
         <Dialog.Footer
           onClickButtonApply={downloadStickers}
           onClickButtonCancel={() => setStickerRow(null)}
-          textButtonApply="Скачать PDF"
-          textButtonCancel="Отмена"
+          textButtonApply={t('portions.downloadPdf')}
+          textButtonCancel={t('common.cancel')}
           propsButtonApply={{ disabled: stickerRecipes.isPending || stickerRows.length === 0 }}
         />
       </Dialog>
@@ -586,6 +592,7 @@ function SummaryPortionsTable({
 }) {
   const update = useUpdatePortionHeadcount();
   const toaster = useToaster();
+  const { t } = useTranslation();
 
   const commit = (
     row: { subObjectId: string; departmentId: string; tableId: string },
@@ -603,7 +610,7 @@ function SummaryPortionsTable({
         onError: (e) =>
           toaster.add({
             name: 'portions-headcount',
-            title: 'Не удалось сохранить',
+            title: t('portions.saveError'),
             content: e.message,
             theme: 'danger',
           }),
@@ -689,7 +696,7 @@ function SummaryPortionsTable({
         subObjectId: '__grand',
         departmentId: '__grand',
         tableId: '__grand',
-        subObjectName: 'Всего',
+        subObjectName: '',
         departmentName: '',
         tableName: '',
         headcount: grand,
@@ -704,7 +711,7 @@ function SummaryPortionsTable({
   }, [subObjects, headcountOf]);
 
   if (rows.length === 0) {
-    return <EmptyState text="Нет данных для сводного порционника" />;
+    return <EmptyState text={t('portions.emptySummary')} />;
   }
 
   return (
@@ -732,12 +739,12 @@ function SummaryPortionsTable({
         columns={[
           {
             id: 'subObjectName',
-            name: 'Объект',
+            name: t('portions.colObject'),
             width: '28%',
             template: (row) =>
               row.isTotal ? (
                 <Text variant="body-2" style={{ fontWeight: 600 }}>
-                  Всего
+                  {t('portions.total')}
                 </Text>
               ) : row.showSubObject ? (
                 <Flex direction="column">
@@ -746,7 +753,7 @@ function SummaryPortionsTable({
                   </Text>
                   {row.subObjectName !== parentObjectName[row.subObjectId] && (
                     <Text variant="body-1" color="secondary">
-                      подобъект {parentObjectName[row.subObjectId]}
+                      {t('portions.subObjectOf', { name: parentObjectName[row.subObjectId] })}
                     </Text>
                   )}
                 </Flex>
@@ -755,7 +762,7 @@ function SummaryPortionsTable({
           },
           {
             id: 'departmentName',
-            name: 'Отделение',
+            name: t('portions.colDepartment'),
             width: '28%',
             template: (row) =>
               row.isTotal ? null : row.showDepartment ? row.departmentName : null,
@@ -763,14 +770,14 @@ function SummaryPortionsTable({
           },
           {
             id: 'tableName',
-            name: 'Стол',
+            name: t('portions.colTable'),
             width: '24%',
             template: (row) => (row.isTotal ? null : row.tableName),
             placeholder: () => null,
           },
           {
             id: 'headcount',
-            name: 'Человек',
+            name: t('portions.colPeople'),
             width: '20%',
             align: 'end',
             template: (row) =>
@@ -792,6 +799,7 @@ function SummaryPortionsTable({
 
 /** Пустое состояние раздачи: ведёт на вкладку заполнения порционника. */
 function DishesEmptyState({ onFill }: { onFill: () => void }) {
+  const { t } = useTranslation();
   return (
     <Flex
       direction="column"
@@ -813,13 +821,13 @@ function DishesEmptyState({ onFill }: { onFill: () => void }) {
         <Icon data={TriangleExclamation} size={20} />
       </div>
       <Text variant="subheader-2" style={{ marginTop: 12 }}>
-        Нет данных
+        {t('portions.noData')}
       </Text>
       <Text variant="body-2" color="secondary" style={{ marginTop: 2 }}>
-        Заполните порционник по организациям
+        {t('portions.fillByOrg')}
       </Text>
       <Button view="action" style={{ marginTop: 12 }} onClick={onFill}>
-        Заполнить порционник
+        {t('portions.fillPortions')}
       </Button>
     </Flex>
   );
@@ -843,6 +851,7 @@ function DishesDistributionTable({
   rows: DishDistributionRow[];
   totalPortions: number;
 }) {
+  const { t } = useTranslation();
   const tableRows = useMemo(() => {
     type DistRow = DishDistributionRow & {
       id: string;
@@ -944,7 +953,7 @@ function DishesDistributionTable({
     if (result.length > 0) {
       result.push({
         id: '__grand-total',
-        dishName: 'Общее количество всех блюд',
+        dishName: t('portions.grandTotalLabel'),
         mealId: rows[0].mealId,
         yieldNet: 0,
         objectName: '',
@@ -974,7 +983,7 @@ function DishesDistributionTable({
     }
 
     return result;
-  }, [rows, totalPortions]);
+  }, [rows, totalPortions, t]);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState error={error} onRetry={onRetry} />;
@@ -1014,7 +1023,7 @@ function DishesDistributionTable({
         columns={[
           {
             id: 'dishName',
-            name: 'Блюдо',
+            name: t('portions.colDish'),
             width: '30%',
             template: (row) => {
               if (row.isGrandTotal) {
@@ -1024,7 +1033,7 @@ function DishesDistributionTable({
                   </Text>
                 );
               }
-              if (row.isDishTotal) return 'Всего';
+              if (row.isDishTotal) return t('portions.total');
               if (!row.showDish) return null;
               return (
                 <Flex direction="column">
@@ -1032,7 +1041,7 @@ function DishesDistributionTable({
                     {row.dishName}
                   </Text>
                   <Text variant="body-1" color="secondary">
-                    {MEAL_LABELS[row.mealId]}
+                    {t(MEAL_LABEL_KEYS[row.mealId])}
                   </Text>
                 </Flex>
               );
@@ -1041,7 +1050,7 @@ function DishesDistributionTable({
           },
           {
             id: 'subObjectName',
-            name: 'Объект',
+            name: t('portions.colObject'),
             width: '20%',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal ? null : row.showSubObject ? (
@@ -1051,7 +1060,7 @@ function DishesDistributionTable({
                   </Text>
                   {row.subObjectName !== row.objectName && (
                     <Text variant="body-1" color="secondary">
-                      подобъект {row.objectName}
+                      {t('portions.subObjectOf', { name: row.objectName })}
                     </Text>
                   )}
                 </Flex>
@@ -1060,7 +1069,7 @@ function DishesDistributionTable({
           },
           {
             id: 'departmentName',
-            name: 'Отделение',
+            name: t('portions.colDepartment'),
             width: '15%',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal
@@ -1072,14 +1081,14 @@ function DishesDistributionTable({
           },
           {
             id: 'tableName',
-            name: 'Рацион',
+            name: t('portions.colDiet'),
             width: '15%',
             template: (row) => (row.isDishTotal || row.isGrandTotal ? null : row.tableName),
             placeholder: () => null,
           },
           {
             id: 'portions',
-            name: 'Порций',
+            name: t('portions.colPortions'),
             width: '16%',
             align: 'end',
             template: (row) => (
@@ -1091,7 +1100,8 @@ function DishesDistributionTable({
                     color="secondary"
                     style={{ marginLeft: 6, fontWeight: 'normal' }}
                   >
-                    ({row.weightKg.toLocaleString('ru-RU', { maximumFractionDigits: 1 })} кг)
+                    ({row.weightKg.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}{' '}
+                    {t('portions.kg')})
                   </Text>
                 )}
               </Text>
@@ -1104,7 +1114,11 @@ function DishesDistributionTable({
             align: 'center',
             template: (row) =>
               row.isDishTotal || row.isGrandTotal ? null : (
-                <Button view="flat" title="Наклейка на термос" onClick={() => onSticker(row)}>
+                <Button
+                  view="flat"
+                  title={t('portions.stickerTooltip')}
+                  onClick={() => onSticker(row)}
+                >
                   <Icon data={Sticker} size={16} />
                 </Button>
               ),
@@ -1220,10 +1234,10 @@ function writePortionsPdf(
     doc.setFont('PTSans', 'bold');
     doc.setFontSize(PDF_BODY_SIZE);
     doc.setTextColor(...PDF_TEXT_COLOR);
-    drawCellLines(['Объект'], 0, top);
-    drawCellLines(['Отделение'], 1, top);
-    drawCellLines(['Стол'], 2, top);
-    drawCellLines(['Человек'], 3, top, true);
+    drawCellLines([i18n.t('portions.colObject')], 0, top);
+    drawCellLines([i18n.t('portions.colDepartment')], 1, top);
+    drawCellLines([i18n.t('portions.colTable')], 2, top);
+    drawCellLines([i18n.t('portions.colPeople')], 3, top, true);
     doc.setFont('PTSans', 'normal');
     drawGridLine(top + height);
     return top + height;
@@ -1233,7 +1247,7 @@ function writePortionsPdf(
   doc.setFont('PTSans', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(...PDF_TEXT_COLOR);
-  doc.text('Порционник', PDF_MARGIN, marginTop);
+  doc.text(i18n.t('portions.printTitle'), PDF_MARGIN, marginTop);
   doc.text(data.displayDate, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop, { align: 'right' });
 
   let y = marginTop + 10;
@@ -1288,7 +1302,7 @@ function writePortionsPdf(
   doc.setDrawColor(...PDF_TEXT_COLOR);
   doc.line(PDF_MARGIN, y, PDF_MARGIN + PDF_CONTENT_WIDTH, y);
   doc.setLineWidth(0.2);
-  drawCellLines(['Всего'], 0, y);
+  drawCellLines([i18n.t('portions.total')], 0, y);
   drawCellLines([String(data.grand)], 3, y, true);
   y += grandRowHeight;
   drawGridLine(y);
@@ -1304,7 +1318,7 @@ function writePortionsPdf(
   doc.setFont('PTSans', 'normal');
   doc.setFontSize(PDF_BODY_SIZE);
   doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
-  doc.text('Ответственный за питание: ______________________', PDF_MARGIN, y + PDF_LINE_HEIGHT);
+  doc.text(i18n.t('portions.printResponsible'), PDF_MARGIN, y + PDF_LINE_HEIGHT);
   doc.text(data.displayDate, PDF_PAGE_WIDTH - PDF_MARGIN, y + PDF_LINE_HEIGHT, { align: 'right' });
 }
 
@@ -1317,5 +1331,5 @@ async function downloadPortionsDoc(data: {
   const displayDate = data.date.split('-').reverse().join('.');
   const doc = await createPdfDoc();
   writePortionsPdf(doc, { ...data, displayDate });
-  doc.save(`Порционник_${displayDate}.pdf`);
+  doc.save(i18n.t('portions.printFileName', { date: displayDate }));
 }

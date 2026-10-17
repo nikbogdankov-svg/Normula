@@ -9,6 +9,7 @@ import {
 } from '@gravity-ui/icons';
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
+import { useTranslation, setLanguage, LANGUAGES } from '@/shared/i18n';
 import { visibleNavGroups, type NavItem } from './nav';
 import './sidebar.css';
 
@@ -43,6 +44,7 @@ export function Sidebar({
   const { theme, toggleTheme } = useAppTheme();
   const { signOut, user } = useAuth();
   const { current, scopes } = useOrganizations();
+  const { t, i18n } = useTranslation();
 
   // Пункты, которых у человека нет, не рисуем вовсе: показать и убрать
   // после загрузки скоупов было бы заметнее, чем дорисовать с задержкой.
@@ -63,18 +65,23 @@ export function Sidebar({
     >
       <div className="sidebar-header">
         <Tooltip
-          content={collapsed ? 'Развернуть меню' : 'Свернуть меню'}
+          content={collapsed ? t('sidebar.expandMenu') : t('sidebar.collapseMenu')}
           openDelay={TOOLTIP_DELAY}
           rest={0}
         >
-          <Button view="flat" size="m" onClick={onToggleCollapsed} aria-label="Свернуть меню">
+          <Button
+            view="flat"
+            size="m"
+            onClick={onToggleCollapsed}
+            aria-label={t('sidebar.collapseMenu')}
+          >
             <Icon data={LayoutSideContent} size={BUTTON_ICON_SIZE} />
           </Button>
         </Tooltip>
 
         {!collapsed && (
           <Text variant="subheader-2" color="brand" style={{ marginInlineStart: 'auto' }}>
-            ЛОГО
+            {t('sidebar.logo')}
           </Text>
         )}
       </div>
@@ -82,7 +89,7 @@ export function Sidebar({
       <nav style={{ flexGrow: 1, overflowY: 'auto', paddingBottom: 12 }}>
         {groups.map((group, index) => (
           <div key={group.title}>
-            {!collapsed && <div className="sidebar-group__title">{group.title}</div>}
+            {!collapsed && <div className="sidebar-group__title">{t(group.title)}</div>}
             {collapsed &&
               (index === 0 ? <div style={{ height: 8 }} /> : <div className="sidebar-separator" />)}
             {group.items.map((item) => (
@@ -97,18 +104,26 @@ export function Sidebar({
           size="m"
           popupProps={{ placement: collapsed ? 'right-end' : 'top-start' }}
           renderSwitcher={(props) => (
-            <Button {...props} view="flat" size="m" aria-label="Меню аккаунта">
+            <Button {...props} view="flat" size="m" aria-label={t('sidebar.accountMenu')}>
               <Icon data={EllipsisVertical} size={BUTTON_ICON_SIZE} />
             </Button>
           )}
           items={[
             {
-              text: theme === 'dark' ? 'Светлая тема' : 'Тёмная тема',
+              text: t('sidebar.language'),
+              items: LANGUAGES.map((language) => ({
+                text: language.label,
+                active: language.code === i18n.language,
+                action: () => setLanguage(language.code),
+              })),
+            },
+            {
+              text: theme === 'dark' ? t('sidebar.lightTheme') : t('sidebar.darkTheme'),
               iconStart: <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />,
               action: () => toggleTheme(),
             },
             {
-              text: 'Выйти',
+              text: t('sidebar.logout'),
               iconStart: <Icon data={ArrowRightFromSquare} size={BUTTON_ICON_SIZE} />,
               action: () => void signOut(),
             },
@@ -120,11 +135,11 @@ export function Sidebar({
           // иначе название организации и роль слипаются в одну строку.
           <Flex direction="column" style={{ overflow: 'hidden', minWidth: 0 }}>
             <Text variant="body-1" ellipsis>
-              {user?.name || user?.email || 'Пользователь'}
+              {user?.name || user?.email || t('common.user')}
             </Text>
             {current && roleCaption(scopes) && (
               <Text variant="caption-2" color="secondary" ellipsis>
-                {roleCaption(scopes)}
+                {t(roleCaption(scopes)!)}
               </Text>
             )}
           </Flex>
@@ -136,18 +151,22 @@ export function Sidebar({
 
 /**
  * Подпись под названием организации — кто человек в ней, по скоупам токена.
- * null, пока скоупы не прочитаны: лучше без подписи, чем с неверной.
+ * Возвращает ключ перевода, null — пока скоупы не прочитаны: лучше без
+ * подписи, чем с неверной.
  */
 function roleCaption(scopes: string[] | null): string | null {
   if (!scopes) return null;
-  if (scopes.includes('manage:platform')) return 'Администратор платформы';
-  if (scopes.includes('manage:organization')) return 'Администратор';
+  if (scopes.includes('manage:platform')) return 'sidebar.rolePlatformAdmin';
+  if (scopes.includes('manage:organization')) return 'sidebar.roleAdmin';
 
-  return 'Сотрудник';
+  return 'sidebar.roleEmployee';
 }
 
 /** Пункт меню. В свёрнутом виде остаётся только иконка с подсказкой. */
 function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+  const { t } = useTranslation();
+  const label = t(item.label);
+
   const link = (
     <NavLink
       to={item.to}
@@ -156,14 +175,14 @@ function SidebarLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
       <span className="sidebar-item__icon">
         <Icon data={item.icon} size={NAV_ICON_SIZE} />
       </span>
-      {!collapsed && <span>{item.label}</span>}
+      {!collapsed && <span>{label}</span>}
     </NavLink>
   );
 
   if (!collapsed) return link;
 
   return (
-    <Tooltip content={item.label} placement="right" openDelay={TOOLTIP_DELAY} rest={0}>
+    <Tooltip content={label} placement="right" openDelay={TOOLTIP_DELAY} rest={0}>
       {link}
     </Tooltip>
   );

@@ -12,6 +12,8 @@ import {
   useToaster,
 } from '@gravity-ui/uikit';
 import { Ban, Cubes3Overlap, Persons, Play, Plus, TrashBin } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
+import { i18n } from '@/shared/i18n';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
   useCreateOrganization,
@@ -29,6 +31,7 @@ export function ManagementRoute() {
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationList();
   const hasOrganization = current !== null;
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Organization | null>(null);
 
@@ -45,7 +48,7 @@ export function ManagementRoute() {
         >
           <Flex alignItems="center" gap={2}>
             <Icon data={Cubes3Overlap} size={16} />
-            <Text variant="subheader-2">Организации</Text>
+            <Text variant="subheader-2">{t('org.listTitle')}</Text>
             {data && (
               <Text variant="body-1" color="secondary">
                 {data.total}
@@ -55,7 +58,7 @@ export function ManagementRoute() {
 
           <Button view="normal" onClick={() => setCreateOpen(true)}>
             <Icon data={Plus} size={16} />
-            Добавить
+            {t('org.addButton')}
           </Button>
         </Flex>
 
@@ -80,7 +83,7 @@ export function ManagementRoute() {
           {data && data.organizations.length === 0 && (
             <div style={{ padding: 48, textAlign: 'center' }}>
               <Text variant="body-2" color="secondary">
-                Организаций пока нет
+                {t('org.empty')}
               </Text>
             </div>
           )}
@@ -105,6 +108,7 @@ function OrganizationsTable({
   onSelect: (org: Organization) => void;
   selectedId: string | null;
 }) {
+  const { t } = useTranslation();
   const setDisabled = useSetOrganizationDisabled();
   const remove = useDeleteOrganization();
   const toaster = useToaster();
@@ -116,7 +120,7 @@ function OrganizationsTable({
         onError: (e) =>
           toaster.add({
             name: 'org-disable',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -130,21 +134,26 @@ function OrganizationsTable({
     if (!org.disabled) {
       toaster.add({
         name: 'org-delete-guard',
-        title: 'Сначала отключите организацию',
-        content: 'Удаление необратимо, поэтому доступно только для отключённых организаций.',
+        title: t('org.disableFirstTitle'),
+        content: t('org.disableFirstContent'),
         theme: 'warning',
       });
 
       return;
     }
 
-    if (!window.confirm(`Удалить организацию «${org.name}» безвозвратно?`)) return;
+    if (!window.confirm(t('org.deleteConfirm', { name: org.name }))) return;
 
     remove.mutate(org.id, {
       onSuccess: () =>
-        toaster.add({ name: 'org-deleted', title: 'Организация удалена', theme: 'success' }),
+        toaster.add({ name: 'org-deleted', title: t('org.deleted'), theme: 'success' }),
       onError: (e) =>
-        toaster.add({ name: 'org-delete', title: 'Ошибка', content: e.message, theme: 'danger' }),
+        toaster.add({
+          name: 'org-delete',
+          title: t('common.error'),
+          content: e.message,
+          theme: 'danger',
+        }),
     });
   };
 
@@ -161,12 +170,12 @@ function OrganizationsTable({
         columns={[
           {
             id: 'name',
-            name: 'Название',
+            name: t('org.orgName'),
             template: (row) => <Text variant="subheader-1">{row.name}</Text>,
           },
           {
             id: 'memberCount',
-            name: 'Участников',
+            name: t('org.colMembers'),
             template: (row) => (
               <Flex alignItems="center" gap={1}>
                 <Icon data={Persons} size={14} />
@@ -176,22 +185,22 @@ function OrganizationsTable({
           },
           {
             id: 'disabled',
-            name: 'Статус',
+            name: t('org.colStatus'),
             template: (row) =>
               row.disabled ? (
-                <Label theme="warning">Отключена</Label>
+                <Label theme="warning">{t('org.disabled')}</Label>
               ) : (
-                <Label theme="success">Активна</Label>
+                <Label theme="success">{t('org.active')}</Label>
               ),
           },
           {
             id: 'createdAt',
-            name: 'Создана',
+            name: t('org.colCreated'),
             template: (row) => formatDate(row.createdAt),
           },
           {
             id: 'actions',
-            name: 'Действия',
+            name: t('org.colActions'),
             width: 0,
             align: 'end',
             className: 'admin-table__actions',
@@ -201,11 +210,16 @@ function OrganizationsTable({
                   view="flat"
                   size="s"
                   onClick={() => onToggleDisabled(row)}
-                  title={row.disabled ? 'Включить' : 'Отключить'}
+                  title={row.disabled ? t('org.enable') : t('org.disable')}
                 >
                   <Icon data={row.disabled ? Play : Ban} size={16} />
                 </Button>
-                <Button view="flat" size="s" onClick={() => onRemove(row)} title="Удалить">
+                <Button
+                  view="flat"
+                  size="s"
+                  onClick={() => onRemove(row)}
+                  title={t('common.delete')}
+                >
                   <Icon data={TrashBin} size={16} />
                 </Button>
               </Flex>
@@ -218,6 +232,7 @@ function OrganizationsTable({
 }
 
 function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const create = useCreateOrganization();
   const toaster = useToaster();
   const [name, setName] = useState('');
@@ -243,8 +258,8 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
         onSuccess: (result) => {
           toaster.add({
             name: 'org-created',
-            title: 'Организация создана',
-            content: `Приглашение отправлено на ${result.invitation.invitee}`,
+            title: t('org.created'),
+            content: t('org.createdContent', { email: result.invitation.invitee }),
             theme: 'success',
           });
           reset();
@@ -253,7 +268,7 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
         onError: (e) =>
           toaster.add({
             name: 'org-create',
-            title: 'Не удалось создать организацию',
+            title: t('org.createFailed'),
             content: e.message,
             theme: 'danger',
           }),
@@ -263,21 +278,37 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
 
   return (
     <Dialog open={open} onClose={onClose} size="s">
-      <Dialog.Header caption="Новая организация" />
+      <Dialog.Header caption={t('org.createTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
-          <TextInput label="Название" value={name} onUpdate={setName} autoFocus size="l" />
+          <TextInput
+            label={t('org.createName')}
+            value={name}
+            onUpdate={setName}
+            autoFocus
+            size="l"
+          />
           <Flex gap={3}>
-            <TextInput label="Имя" value={adminFirstName} onUpdate={setAdminFirstName} size="l" />
-            <TextInput label="Фамилия" value={adminLastName} onUpdate={setAdminLastName} size="l" />
+            <TextInput
+              label={t('org.createFirstName')}
+              value={adminFirstName}
+              onUpdate={setAdminFirstName}
+              size="l"
+            />
+            <TextInput
+              label={t('org.createLastName')}
+              value={adminLastName}
+              onUpdate={setAdminLastName}
+              size="l"
+            />
           </Flex>
           <TextInput
-            label="Почта администратора"
+            label={t('org.createAdminEmail')}
             type="email"
             value={adminEmail}
             onUpdate={setAdminEmail}
-            note="На этот адрес придёт ссылка для входа в систему"
+            note={t('org.createEmailNote')}
             size="l"
           />
         </Flex>
@@ -286,8 +317,8 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
       <Dialog.Footer
         onClickButtonCancel={onClose}
         onClickButtonApply={submit}
-        textButtonCancel="Отмена"
-        textButtonApply="Создать"
+        textButtonCancel={t('common.cancel')}
+        textButtonApply={t('common.create')}
         propsButtonApply={{
           disabled:
             !name.trim() || !adminFirstName.trim() || !adminLastName.trim() || !adminEmail.trim(),
@@ -303,5 +334,5 @@ export function formatDate(epochMillis: string): string {
   const value = Number(epochMillis);
   if (!Number.isFinite(value) || value === 0) return '—';
 
-  return new Date(value).toLocaleDateString('ru-RU');
+  return new Date(value).toLocaleDateString(i18n.language);
 }

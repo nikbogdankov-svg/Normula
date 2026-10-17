@@ -7,6 +7,7 @@ import { useReceipt } from '@/features/warehouse/api';
 import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/format';
 import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
 import type { Receipt, ReceiptItem } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import './warehouse-receipt-drawer.css';
 
 function Cell({
@@ -27,16 +28,17 @@ function Cell({
 
 /** Приёмочный контроль строки, раскрывается шевроном. */
 function ItemDetails({ item }: { item: ReceiptItem }) {
+  const { t } = useTranslation();
   const rows: [string, string][] = [
-    ['Изготовитель', item.manufacturer],
-    ['Фасовка', item.packaging],
-    ['Дата выработки', formatDate(item.productionDate)],
-    ['Тип документа', item.documentType],
-    ['Органолептика', item.organoleptic],
-    ['Условия хранения', item.storageConditions],
-    ['Цена за единицу', formatMoney(item.unitPrice)],
-    ['Сумма', formatMoney(item.total)],
-    ['Примечание', item.note],
+    [t('receipt.detailManufacturer'), item.manufacturer],
+    [t('receipt.detailPackaging'), item.packaging],
+    [t('receipt.detailProductionDate'), formatDate(item.productionDate)],
+    [t('receipt.detailDocumentType'), item.documentType],
+    [t('receipt.detailOrganoleptic'), item.organoleptic],
+    [t('receipt.detailStorageConditions'), item.storageConditions],
+    [t('receipt.detailUnitPrice'), formatMoney(item.unitPrice)],
+    [t('receipt.detailTotal'), formatMoney(item.total)],
+    [t('receipt.detailNote'), item.note],
   ];
 
   return (
@@ -60,6 +62,7 @@ function ReceiptView({
   receipt: Receipt;
   objectOptions: ObjectOption[];
 }) {
+  const { t } = useTranslation();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleItem = (id: string) => {
@@ -81,13 +84,13 @@ function ReceiptView({
           <Flex alignItems="center" gap={4}>
             <Flex alignItems="center" gap={1}>
               <Text variant="body-3" color="secondary">
-                Объект:
+                {t('receipt.objectLabel')}
               </Text>
               <Text variant="body-3">{objectName(objectOptions, receipt.objectId)}</Text>
             </Flex>
             <Flex alignItems="center" gap={1}>
               <Text variant="body-3" color="secondary">
-                Сумма:
+                {t('receipt.amountLabel')}
               </Text>
               <Text variant="body-3">{formatMoney(receipt.total)}</Text>
             </Flex>
@@ -95,12 +98,12 @@ function ReceiptView({
         </div>
         <div className="warehouse-receipt-drawer__items">
           <div className="warehouse-receipt-drawer__items-head">
-            <Text variant="body-2">Товар</Text>
-            <Text variant="body-2">Кол-во</Text>
-            <Text variant="body-2">Поставщик</Text>
-            <Text variant="body-2">Номер документа</Text>
+            <Text variant="body-2">{t('receipt.colProduct')}</Text>
+            <Text variant="body-2">{t('receipt.colQuantity')}</Text>
+            <Text variant="body-2">{t('receipt.colSupplier')}</Text>
+            <Text variant="body-2">{t('receipt.colDocumentNumber')}</Text>
             <Text variant="body-2" className="warehouse-receipt-drawer__cell-right">
-              Срок реал.
+              {t('receipt.colExpiry')}
             </Text>
             <span></span>
           </div>
@@ -130,7 +133,7 @@ function ReceiptView({
                     size="m"
                     className="warehouse-receipt-drawer__toggle"
                     onClick={() => toggleItem(item.id)}
-                    aria-label="Больше информации"
+                    aria-label={t('receipt.moreInfo')}
                   >
                     <Icon data={expanded ? ChevronUp : ChevronDown} size={16} />
                   </Button>
@@ -161,6 +164,7 @@ export function ReceiptDrawer({
   onEdit: (receipt: Receipt) => void;
 }) {
   const height = useDrawerHeight();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
   const receipt = useReceipt(viewId);
@@ -201,7 +205,9 @@ export function ReceiptDrawer({
           <div className="warehouse-receipt-drawer__header-inner">
             <Flex alignItems="center" gap={2}>
               <Text variant="subheader-3">
-                {view ? `Накладная ${view.invoiceNumber}` : 'Накладная'}
+                {view
+                  ? t('receipt.viewTitle', { number: view.invoiceNumber })
+                  : t('receipt.viewTitlePlain')}
               </Text>
               {view && (
                 <Label theme="normal" size="m">
@@ -209,7 +215,7 @@ export function ReceiptDrawer({
                 </Label>
               )}
             </Flex>
-            <Button view="flat" size="l" onClick={onClose} aria-label="Закрыть">
+            <Button view="flat" size="l" onClick={onClose} aria-label={t('receipt.close')}>
               <Icon data={Xmark} size={20} />
             </Button>
           </div>
@@ -226,10 +232,10 @@ export function ReceiptDrawer({
         <div className="warehouse-receipt-drawer__footer">
           <div className="warehouse-receipt-drawer__footer-inner">
             <Button view="outlined" size="l" onClick={onClose}>
-              Закрыть
+              {t('common.close')}
             </Button>
             <Button view="normal" size="l" disabled={!view} onClick={() => view && onEdit(view)}>
-              Редактировать
+              {t('common.edit')}
             </Button>
           </div>
         </div>

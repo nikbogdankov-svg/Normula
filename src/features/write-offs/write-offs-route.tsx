@@ -22,6 +22,7 @@ import { formatDate, formatMoney } from '@/features/warehouse/format';
 import { ObjectSelect, useObjectChoice } from '@/features/warehouse/object-select';
 import { useDebouncedValue } from '@/features/warehouse/use-debounced-value';
 import type { WriteOff, WriteOffKind, WriteOffSummary } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 import { WriteOffDrawer } from './write-off-drawer';
 import { CreateWriteOffDialog } from './create-write-off-dialog';
 import './write-offs-route.css';
@@ -39,20 +40,21 @@ function WriteOffsTable({
   onLoadMore: () => void;
   onOpen: (writeOff: WriteOffSummary) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<WriteOffSummary>[] = [
     {
       id: 'date',
-      name: 'Дата',
+      name: t('writeOff.colDate'),
       template: (row) => <Text variant="body-2">{formatDate(row.date)}</Text>,
     },
     {
       id: 'reason',
-      name: 'Причина',
+      name: t('writeOff.colReason'),
       template: (row) => <Text variant="body-2">{row.reason}</Text>,
     },
     {
       id: 'itemsCount',
-      name: 'Кол-во товаров',
+      name: t('writeOff.colItemsCount'),
       template: (row) => (
         <Text variant="body-2" color="secondary">
           {row.itemsCount}
@@ -61,7 +63,7 @@ function WriteOffsTable({
     },
     {
       id: 'total',
-      name: 'Сумма',
+      name: t('writeOff.sumCol'),
       align: 'end',
       template: (row) => <Text variant="body-2">{formatMoney(row.total)}</Text>,
     },
@@ -84,7 +86,7 @@ function WriteOffsTable({
           {hasMore && (
             <Flex justifyContent="center" style={{ padding: 8 }}>
               <Button view="flat" size="l" loading={loadingMore} onClick={onLoadMore}>
-                Загрузить ещё
+                {t('common.loadMore')}
               </Button>
             </Flex>
           )}
@@ -105,6 +107,7 @@ export function WriteOffsRoute() {
   const [openedId, setOpenedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<WriteOff | null>(null);
+  const { t } = useTranslation();
 
   const writeOffs = useWriteOffs({ objectId, search: debouncedSearch }, kind);
   const rows = writeOffs.data?.pages.flatMap((page) => page.writeOffs) ?? [];
@@ -131,7 +134,7 @@ export function WriteOffsRoute() {
           />
           <TextInput
             size="l"
-            placeholder="Поиск по причине"
+            placeholder={t('writeOff.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -147,8 +150,8 @@ export function WriteOffsRoute() {
             value={kind}
             onUpdate={(value) => setKind(value as WriteOffKind)}
           >
-            <SegmentedRadioGroup.Option value="manual" content="Исключительные" />
-            <SegmentedRadioGroup.Option value="auto" content="Автоматические" />
+            <SegmentedRadioGroup.Option value="manual" content={t('writeOff.kindManualPlural')} />
+            <SegmentedRadioGroup.Option value="auto" content={t('writeOff.kindAutoPlural')} />
           </SegmentedRadioGroup>
         </Flex>
         <Button
@@ -158,14 +161,14 @@ export function WriteOffsRoute() {
           disabled={!objectId}
         >
           <Icon data={Plus} size={16} />
-          Списание
+          {t('writeOff.viewTitle')}
         </Button>
       </Flex>
 
       {objects.isError && (
         <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
       )}
-      {noObjects && <EmptyState text="Сначала заведите объект в справочнике «Объекты»" />}
+      {noObjects && <EmptyState text={t('writeOff.noObjects')} />}
       {!noObjects && !objects.isError && (objects.isPending || writeOffs.isPending) && (
         <LoadingState />
       )}
@@ -175,7 +178,9 @@ export function WriteOffsRoute() {
       {writeOffs.isSuccess && rows.length === 0 && (
         <EmptyState
           text={
-            debouncedSearch ? `Ничего не нашли по запросу «${debouncedSearch}»` : 'Нет списаний'
+            debouncedSearch
+              ? t('writeOff.noResultsSearch', { query: debouncedSearch })
+              : t('writeOff.empty')
           }
         />
       )}
