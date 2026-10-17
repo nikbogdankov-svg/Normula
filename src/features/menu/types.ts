@@ -16,13 +16,13 @@
 
 export type MealId = 'breakfast' | 'second_breakfast' | 'lunch' | 'snack' | 'dinner';
 
-/** Приёмы пищи в порядке дня. */
-export const MEALS: { id: MealId; label: string }[] = [
-  { id: 'breakfast', label: 'Завтрак' },
-  { id: 'second_breakfast', label: '2-й завтрак' },
-  { id: 'lunch', label: 'Обед' },
-  { id: 'snack', label: 'Полдник' },
-  { id: 'dinner', label: 'Ужин' },
+/** Приёмы пищи в порядке дня; labelKey — ключ перевода из shared/i18n. */
+export const MEALS: { id: MealId; labelKey: string }[] = [
+  { id: 'breakfast', labelKey: 'meals.breakfast' },
+  { id: 'second_breakfast', labelKey: 'meals.secondBreakfast' },
+  { id: 'lunch', labelKey: 'meals.lunch' },
+  { id: 'snack', labelKey: 'meals.snack' },
+  { id: 'dinner', labelKey: 'meals.dinner' },
 ];
 
 /** Блюдо в приёме пищи — карта ТТК с полями на чтение. */

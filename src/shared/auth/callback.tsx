@@ -1,4 +1,5 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useHandleSignInCallback } from '@logto/react';
 import { Alert, Button, Flex, Text } from '@gravity-ui/uikit';
 import { config } from '@/shared/config';
@@ -9,6 +10,7 @@ import { FullPageLoader } from '@/shared/ui/full-page-loader';
  * страница /callback просто рендерит <AuthCallback/>.
  */
 export function AuthCallback() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
@@ -29,21 +31,22 @@ export function AuthCallback() {
         <Flex direction="column" gap={3} style={{ maxWidth: 640 }}>
           <Alert
             theme="danger"
-            title="Ошибка входа"
+            title={t('callback.title')}
             message={
               oidcError
-                ? `${oidcError}: ${oidcErrorDescription ?? 'без описания'}`
-                : (error?.message ?? 'неизвестная ошибка')
+                ? `${oidcError}: ${oidcErrorDescription ?? t('callback.noDescription')}`
+                : (error?.message ?? t('callback.unknownError'))
             }
           />
           <Text variant="body-1" color="secondary">
-            Ответ вернул сервер авторизации ({config.logto?.endpoint}). Обычные причины — приложению
-            не разрешены запрошенные скоупы, не заведён API resource {config.logto?.apiResource} или
-            не прописан redirect URI {window.location.origin}
-            /callback.
+            {t('callback.diagnostic', {
+              endpoint: config.logto?.endpoint,
+              apiResource: config.logto?.apiResource,
+              origin: window.location.origin,
+            })}
           </Text>
           <Link to="/">
-            <Button view="action">На главную</Button>
+            <Button view="action">{t('notFound.goHome')}</Button>
           </Link>
         </Flex>
       </Flex>

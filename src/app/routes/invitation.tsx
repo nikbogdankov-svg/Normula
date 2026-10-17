@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLogto } from '@logto/react';
 import { Alert, Button, Card, Flex, Text } from '@gravity-ui/uikit';
+import { useTranslation } from 'react-i18next';
 import { FullPageLoader } from '@/shared/ui/full-page-loader';
 
 /**
@@ -14,6 +15,7 @@ import { FullPageLoader } from '@/shared/ui/full-page-loader';
  * самостоятельной регистрации.
  */
 export function InvitationRoute() {
+  const { t } = useTranslation();
   const [params] = useSearchParams();
   const { signIn, signOut, isAuthenticated, isLoading } = useLogto();
   const started = useRef(false);
@@ -31,9 +33,9 @@ export function InvitationRoute() {
       // выделенного поля под них в SDK нет, только extraParams.
       extraParams: { one_time_token: token ?? '', login_hint: email ?? '' },
     }).catch((error: unknown) => {
-      setFailure(error instanceof Error ? error.message : 'неизвестная ошибка');
+      setFailure(error instanceof Error ? error.message : t('common.unknownError'));
     });
-  }, [signIn, token, email]);
+  }, [signIn, token, email, t]);
 
   // Переход в Logto запускаем сами, но только если войти реально можно.
   useEffect(() => {
@@ -47,11 +49,11 @@ export function InvitationRoute() {
       <InvitationCard>
         <Alert
           theme="danger"
-          title="Ссылка неполная"
-          message="В приглашении не хватает адреса или одноразового токена. Попросите администратора выслать приглашение заново."
+          title={t('invitation.missingTitle')}
+          message={t('invitation.missingMessage')}
         />
         <Button view="action" href="/">
-          На главную
+          {t('invitation.toHome')}
         </Button>
       </InvitationCard>
     );
@@ -67,15 +69,15 @@ export function InvitationRoute() {
       <InvitationCard>
         <Alert
           theme="warning"
-          title="Вы уже вошли под другим аккаунтом"
-          message={`Приглашение выписано на ${email}. Чтобы принять его, выйдите из текущего аккаунта и откройте ссылку из письма ещё раз.`}
+          title={t('invitation.alreadyTitle')}
+          message={t('invitation.alreadyMessage', { email })}
         />
         <Flex gap={2}>
           <Button view="action" onClick={() => void signOut(`${window.location.origin}/`)}>
-            Выйти
+            {t('invitation.signOut')}
           </Button>
           <Button view="outlined" href="/app">
-            Остаться в текущем аккаунте
+            {t('invitation.stay')}
           </Button>
         </Flex>
       </InvitationCard>
@@ -85,9 +87,9 @@ export function InvitationRoute() {
   if (failure) {
     return (
       <InvitationCard>
-        <Alert theme="danger" title="Не удалось начать вход" message={failure} />
+        <Alert theme="danger" title={t('invitation.failedTitle')} message={failure} />
         <Button view="action" onClick={accept}>
-          Попробовать снова
+          {t('invitation.retry')}
         </Button>
       </InvitationCard>
     );
@@ -97,12 +99,12 @@ export function InvitationRoute() {
   // его заблокировал: без неё страница выглядела бы зависшей.
   return (
     <InvitationCard>
-      <Text variant="subheader-2">Принимаем приглашение…</Text>
+      <Text variant="subheader-2">{t('invitation.accepting')}</Text>
       <Text variant="body-1" color="secondary">
-        Сейчас откроется страница входа для {email}.
+        {t('invitation.redirecting', { email })}
       </Text>
       <Button view="outlined" onClick={accept}>
-        Продолжить вручную
+        {t('invitation.continueManually')}
       </Button>
     </InvitationCard>
   );

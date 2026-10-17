@@ -22,6 +22,7 @@ import {
   type WriteOff,
   type WriteOffRequest,
 } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 
 /** Строка формы: накладная выбирается первой, товар — из её партий. */
 interface DraftRow {
@@ -100,6 +101,7 @@ export function CreateWriteOffDialog({
   const create = useCreateWriteOff();
   const update = useUpdateWriteOff();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [draftObjectId, setDraftObjectId] = useState('');
   const [date, setDate] = useState(todayPicker());
   const [reason, setReason] = useState('');
@@ -145,18 +147,24 @@ export function CreateWriteOffDialog({
     for (const batch of batches) {
       if (seen.has(batch.receiptId)) continue;
       seen.add(batch.receiptId);
-      const date = batch.receiptDate ? ` от ${formatDate(batch.receiptDate)}` : '';
+      const date = batch.receiptDate
+        ? ` ${t('writeOff.fromDate', { date: formatDate(batch.receiptDate) })}`
+        : '';
       out.push({ value: batch.receiptId, content: `${batch.invoiceNumber}${date}` });
     }
     return out;
-  }, [batches]);
+  }, [batches, t]);
 
   const batchOptionsFor = (receiptId: string) =>
     batches
       .filter((batch) => batch.receiptId === receiptId)
       .map((batch) => ({
         value: batch.id,
-        content: `${batch.productName} — остаток ${formatQuantity(batch.remaining, batch.unit)}, ${formatMoney(batch.unitPrice)}`,
+        content: t('writeOff.productRemaining', {
+          name: batch.productName,
+          remaining: formatQuantity(batch.remaining, batch.unit),
+          price: formatMoney(batch.unitPrice),
+        }),
       }));
 
   const updateRow = (index: number, patch: Partial<DraftRow>) => {
@@ -175,16 +183,18 @@ export function CreateWriteOffDialog({
   /** Проблема строки для подсветки; null — строка готова к отправке. */
   const rowProblem = (row: DraftRow, index: number): string | null => {
     const batch = batchById.get(row.batchId);
-    if (!batch) return 'Выберите накладную и товар';
+    if (!batch) return t('writeOff.errorSelectReceiptProduct');
 
     if (rows.some((other, i) => i !== index && other.batchId === row.batchId)) {
-      return 'Эта партия уже есть в другой строке';
+      return t('writeOff.errorDuplicateBatch');
     }
 
     const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS);
-    if (quantity === null || quantity <= 0) return 'Введите количество';
+    if (quantity === null || quantity <= 0) return t('writeOff.errorEnterQuantity');
     if (quantity > batch.remaining) {
-      return `Не больше ${formatQuantity(batch.remaining, batch.unit)}`;
+      return t('writeOff.errorNotMore', {
+        max: formatQuantity(batch.remaining, batch.unit),
+      });
     }
 
     return null;
@@ -218,7 +228,7 @@ export function CreateWriteOffDialog({
     const onSuccess = () => {
       toaster.add({
         name: initial ? 'write-off-updated' : 'write-off-created',
-        title: initial ? 'Списание обновлено' : 'Списание создано',
+        title: initial ? t('writeOff.toastUpdated') : t('writeOff.toastCreated'),
         theme: 'success',
       });
       onClose();
@@ -226,7 +236,7 @@ export function CreateWriteOffDialog({
     const onError = (e: Error) =>
       toaster.add({
         name: initial ? 'write-off-update' : 'write-off-create',
-        title: 'Ошибка',
+        title: t('common.error'),
         content: e.message,
         theme: 'danger',
       });
@@ -242,7 +252,7 @@ export function CreateWriteOffDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size="l">
-      <Dialog.Header caption={initial ? 'Редактировать списание' : 'Добавить списание'} />
+      <Dialog.Header caption={initial ? t('writeOff.editTitle') : t('writeOff.addTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
@@ -259,8 +269,8 @@ export function CreateWriteOffDialog({
               <DatePicker
                 size="l"
                 view="normal"
-                label="Дата:"
-                placeholder="дд/мм/гггг"
+                label={t('writeOff.dateLabel')}
+                placeholder={t('writeOff.datePlaceholder')}
                 value={date ? dateTime({ input: date, format: 'DD/MM/YYYY' }) : null}
                 onUpdate={(next) => setDate(next ? next.format('DD/MM/YYYY') : '')}
                 style={{ width: '100%' }}
@@ -270,8 +280,8 @@ export function CreateWriteOffDialog({
 
           <TextInput
             size="l"
-            label="Причина списания:"
-            placeholder="Например, просрочка продукции"
+            label={t('writeOff.reasonLabel')}
+            placeholder={t('writeOff.reasonPlaceholder')}
             value={reason}
             onUpdate={setReason}
             autoFocus
@@ -279,7 +289,7 @@ export function CreateWriteOffDialog({
 
           {noBatches && (
             <Text variant="body-2" color="secondary">
-              На этом объекте нет партий с остатком — списывать нечего.
+              {t('writeOff.noBatches')}
             </Text>
           )}
 
@@ -295,8 +305,8 @@ export function CreateWriteOffDialog({
                   <div style={{ flex: 2, minWidth: 180 }}>
                     <Select
                       size="l"
-                      label="Накладная:"
-                      placeholder="Выберите накладную"
+                      label={t('writeOff.receiptLabel')}
+                      placeholder={t('writeOff.receiptPlaceholder')}
                       value={row.receiptId ? [row.receiptId] : []}
                       onUpdate={(next) =>
                         updateRow(index, { receiptId: next[0] ?? '', batchId: '', quantity: '' })
@@ -309,8 +319,8 @@ export function CreateWriteOffDialog({
                   <div style={{ flex: 3, minWidth: 240 }}>
                     <Select
                       size="l"
-                      label="Товар:"
-                      placeholder="Выберите товар"
+                      label={t('writeOff.productLabel')}
+                      placeholder={t('writeOff.productPlaceholder')}
                       value={row.batchId ? [row.batchId] : []}
                       onUpdate={(next) => updateRow(index, { batchId: next[0] ?? '' })}
                       options={batchOptionsFor(row.receiptId)}
@@ -321,7 +331,7 @@ export function CreateWriteOffDialog({
                   <div style={{ flex: 1, minWidth: 140 }}>
                     <TextInput
                       size="l"
-                      label="Кол-во:"
+                      label={t('writeOff.quantityLabel')}
                       placeholder="0"
                       value={row.quantity}
                       onUpdate={(value) => updateRow(index, { quantity: sanitizeNumber(value) })}
@@ -348,8 +358,8 @@ export function CreateWriteOffDialog({
                     view="flat"
                     size="l"
                     onClick={() => removeRow(index)}
-                    title="Удалить"
-                    aria-label="Удалить строку"
+                    title={t('common.delete')}
+                    aria-label={t('writeOff.deleteRow')}
                     disabled={rows.length <= 1}
                   >
                     <Icon data={TrashBin} size={18} />
@@ -366,7 +376,7 @@ export function CreateWriteOffDialog({
               disabled={noBatches}
             >
               <Icon data={Plus} size={16} />
-              Добавить товар
+              {t('writeOff.addProduct')}
             </Button>
           </Flex>
         </Flex>
@@ -374,10 +384,10 @@ export function CreateWriteOffDialog({
       <Dialog.Divider />
       <Dialog.Footer>
         <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ width: '100%' }}>
-          <Text variant="subheader-2">Итого: {formatMoney(total)}</Text>
+          <Text variant="subheader-2">{t('writeOff.total', { value: formatMoney(total) })}</Text>
           <Flex gap={2}>
             <Button view="outlined" size="l" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button
               view="action"
@@ -387,7 +397,7 @@ export function CreateWriteOffDialog({
               loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={Plus} size={16} />
-              {initial ? 'Сохранить' : 'Добавить списание'}
+              {initial ? t('common.save') : t('writeOff.addTitle')}
             </Button>
           </Flex>
         </Flex>

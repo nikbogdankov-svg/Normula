@@ -11,10 +11,11 @@ import {
 } from '@gravity-ui/uikit';
 import { Printer, Xmark } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { useTranslation } from '@/shared/i18n';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { usePageObjectChoice } from '@/shared/object-selection';
 import { useObjects } from '@/features/objects/api';
-import { MEALS } from '@/features/menu/types';
+import { MEALS, type MealId } from '@/features/menu/types';
 import { formatDate } from '@/features/warehouse/format';
 import { useAccounts } from './api';
 import type { Account } from './types';
@@ -34,7 +35,7 @@ interface AccountRow {
   passed: number;
   charged: number;
   meals: {
-    name: string;
+    mealId: MealId;
     passed: number;
     charged: number;
     diets: { name: string; passed: number; charged: number }[];
@@ -49,7 +50,7 @@ function toRow(account: Account): AccountRow {
     passed: account.passed,
     charged: account.charged,
     meals: (account.meals ?? []).map((meal) => ({
-      name: MEALS.find((item) => item.id === meal.mealId)?.label ?? meal.mealId,
+      mealId: meal.mealId,
       passed: meal.passed,
       charged: meal.charged,
       diets: (meal.diets ?? []).map((diet) => ({
@@ -63,6 +64,7 @@ function toRow(account: Account): AccountRow {
 
 export function AccountsRoute() {
   const { current } = useOrganizations();
+  const { t } = useTranslation();
   const height = useDrawerHeight();
   const [selected, setSelected] = useState<AccountRow | null>(null);
   const [open, setOpen] = useState(false);
@@ -72,6 +74,11 @@ export function AccountsRoute() {
   // Фильтр живёт на клиенте: счета приходят целиком.
   const objects = useObjects();
   const accounts = useAccounts();
+
+  const mealLabel = (mealId: MealId): string => {
+    const def = MEALS.find((item) => item.id === mealId);
+    return def ? t(def.labelKey) : mealId;
+  };
 
   const objectOptions = useMemo(() => {
     const all = objects.data?.objects ?? [];
@@ -83,8 +90,8 @@ export function AccountsRoute() {
   );
 
   const objectFilterOptions = useMemo(
-    () => [{ value: ALL_OBJECTS, content: 'Все объекты' }, ...objectOptions],
-    [objectOptions]
+    () => [{ value: ALL_OBJECTS, content: t('accounts.allObjects') }, ...objectOptions],
+    [objectOptions, t]
   );
 
   const rows = useMemo(() => {
@@ -148,14 +155,16 @@ export function AccountsRoute() {
         <Select
           size="l"
           width={280}
-          label="Объект:"
+          label={t('accounts.objectLabel')}
           value={[objectId]}
           onUpdate={(value) => setObjectId(value[0] ?? ALL_OBJECTS)}
           options={objectFilterOptions}
           disabled={objects.isPending}
         />
         <Text variant="body-1" color="secondary">
-          {objectId === ALL_OBJECTS ? `Всего счетов: ${rows.length}` : `Найдено: ${rows.length}`}
+          {objectId === ALL_OBJECTS
+            ? t('accounts.totalAccounts', { count: rows.length })
+            : t('accounts.found', { count: rows.length })}
         </Text>
       </Flex>
       <div className="ac-page__scroll">
@@ -190,30 +199,41 @@ export function AccountsRoute() {
           <div className="accounts-drawer__card">
             <div className="accounts-drawer__header">
               <Text variant="subheader-2">{view.organization}</Text>
-              <Button view="flat" size="l" onClick={requestClose} aria-label="Закрыть">
+              <Button view="flat" size="l" onClick={requestClose} aria-label={t('common.close')}>
                 <Icon data={Xmark} size={20} />
               </Button>
             </div>
             <div className="accounts-drawer__body">
               {view.meals.map((meal) => (
-                <div key={meal.name} className="accounts-drawer__meal-card">
+                <div key={meal.mealId} className="accounts-drawer__meal-card">
                   <div className="accounts-drawer__meal-head">
-                    <Text variant="subheader-2">{meal.name}</Text>
+                    <Text variant="subheader-2">{mealLabel(meal.mealId)}</Text>
                     <div className="accounts-drawer__meal-totals">
-                      <Text variant="body-2">Прошли: {meal.passed} чел.</Text>
                       <Text variant="body-2">
-                        Списано: {meal.charged.toLocaleString('ru-RU')} ₽
+                        {t('accounts.passedPeople', { count: meal.passed })}
+                      </Text>
+                      <Text variant="body-2">
+                        {t('accounts.chargedRub', {
+                          amount: meal.charged.toLocaleString('ru-RU'),
+                        })}
                       </Text>
                     </div>
                   </div>
-                  <table className="admin-table accounts-drawer__diets" aria-label="Диеты">
+                  <table
+                    className="admin-table accounts-drawer__diets"
+                    aria-label={t('nav.items.diets')}
+                  >
                     <tbody>
                       {meal.diets.map((diet) => (
                         <tr key={diet.name}>
                           <td>{diet.name}</td>
-                          <td style={{ textAlign: 'right' }}>{diet.passed} чел.</td>
                           <td style={{ textAlign: 'right' }}>
-                            {diet.charged.toLocaleString('ru-RU')} ₽
+                            {t('accounts.people', { count: diet.passed })}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {t('accounts.amountRub', {
+                              amount: diet.charged.toLocaleString('ru-RU'),
+                            })}
                           </td>
                         </tr>
                       ))}
@@ -226,7 +246,7 @@ export function AccountsRoute() {
               <div className="accounts-drawer__footer-inner">
                 <Button view="normal" size="l" onClick={() => window.print()}>
                   <Icon data={Printer} size={16} />
-                  Печать
+                  {t('accounts.print')}
                 </Button>
               </div>
             </div>
@@ -245,28 +265,35 @@ function AccountsTable({
   rows: AccountRow[];
   onOpen: (row: AccountRow) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<AccountRow>[] = [
     {
       id: 'date',
-      name: 'Дата',
+      name: t('common.date'),
       template: (row) => <Text variant="body-2">{row.date}</Text>,
     },
     {
       id: 'organization',
-      name: 'Организация',
+      name: t('accounts.colOrganization'),
       template: (row) => <Text variant="body-2">{row.organization}</Text>,
     },
     {
       id: 'passed',
-      name: 'Прошли',
+      name: t('accounts.colPassed'),
       align: 'end',
-      template: (row) => <Text variant="body-2">{row.passed} чел.</Text>,
+      template: (row) => (
+        <Text variant="body-2">{t('accounts.people', { count: row.passed })}</Text>
+      ),
     },
     {
       id: 'charged',
-      name: 'Списано',
+      name: t('accounts.colCharged'),
       align: 'end',
-      template: (row) => <Text variant="body-2">{row.charged.toLocaleString('ru-RU')} ₽</Text>,
+      template: (row) => (
+        <Text variant="body-2">
+          {t('accounts.amountRub', { amount: row.charged.toLocaleString('ru-RU') })}
+        </Text>
+      ),
     },
   ];
 

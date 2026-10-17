@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dialog, Divider, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
 import { FloppyDisk, Magnifier, Plus, TrashBin } from '@gravity-ui/icons';
 import { useRecipes } from '@/features/ttk/api';
+import { useTranslation } from '@/shared/i18n';
 import { formatMetric, sumPrice } from './norms';
 import type { Dish } from './types';
 
@@ -40,6 +41,7 @@ export function DishPickerDialog({
   const [draft, setDraft] = useState<PickedDish[]>([]);
   const wasOpen = useRef(false);
   const recipes = useRecipes();
+  const { t } = useTranslation();
 
   // Синхронизируем черновик только при открытии — иначе ререндер родителя сбрасывает добавления.
   useEffect(() => {
@@ -95,7 +97,7 @@ export function DishPickerDialog({
           <Flex direction="column" gap={2}>
             {draft.length === 0 ? (
               <Text variant="body-1" color="secondary">
-                Блюд пока нет - добавьте из ТТК ниже.
+                {t('dishPicker.empty')}
               </Text>
             ) : (
               draft.map((dish) => (
@@ -105,7 +107,10 @@ export function DishPickerDialog({
                       {dish.name}
                     </Text>
                     <Text variant="body-1" color="secondary">
-                      {formatMetric(dish.kcal)} ккал · {formatMetric(dish.price)} ₽
+                      {t('dishPicker.kcalPrice', {
+                        kcal: formatMetric(dish.kcal),
+                        price: formatMetric(dish.price),
+                      })}
                     </Text>
                   </Flex>
                   <Button
@@ -124,20 +129,27 @@ export function DishPickerDialog({
               ))
             )}
             <Text variant="subheader-2" color={overLimit ? 'danger' : 'primary'}>
-              Цена дня: {formatMetric(dayPrice)} / {formatMetric(priceLimit)} ₽
               {overLimit
-                ? ` · превышение на ${formatMetric(Math.abs(remaining))} ₽`
-                : ` · осталось ${formatMetric(remaining)} ₽`}
+                ? t('dishPicker.dayPriceOver', {
+                    price: formatMetric(dayPrice),
+                    limit: formatMetric(priceLimit),
+                    over: formatMetric(Math.abs(remaining)),
+                  })
+                : t('dishPicker.dayPriceLeft', {
+                    price: formatMetric(dayPrice),
+                    limit: formatMetric(priceLimit),
+                    left: formatMetric(remaining),
+                  })}
             </Text>
           </Flex>
 
           <Divider />
 
           <Flex direction="column" gap={2}>
-            <Text variant="subheader-1">Добавить из ТТК</Text>
+            <Text variant="subheader-1">{t('dishPicker.addFromTtk')}</Text>
             <TextInput
               size="l"
-              placeholder="Поиск блюда"
+              placeholder={t('dishPicker.searchPlaceholder')}
               value={search}
               onUpdate={setSearch}
               hasClear
@@ -151,12 +163,12 @@ export function DishPickerDialog({
             />
             {recipes.isPending && (
               <Text variant="body-1" color="secondary">
-                Загрузка…
+                {t('dishPicker.loading')}
               </Text>
             )}
             {recipes.isError && (
               <Text variant="body-1" color="danger">
-                Не удалось загрузить ТТК
+                {t('dishPicker.loadError')}
               </Text>
             )}
             <Flex direction="column" gap={1} style={{ maxHeight: 260, overflow: 'auto' }}>
@@ -170,20 +182,23 @@ export function DishPickerDialog({
                         {recipe.name}
                       </Text>
                       <Text variant="body-1" color="secondary">
-                        {formatMetric(recipe.kcal)} ккал · {formatMetric(recipe.price)} ₽
-                        {wouldExceed && ' · превысит лимит'}
+                        {t('dishPicker.kcalPrice', {
+                          kcal: formatMetric(recipe.kcal),
+                          price: formatMetric(recipe.price),
+                        })}
+                        {wouldExceed && t('dishPicker.exceedsLimit')}
                       </Text>
                     </Flex>
                     <Button type="button" view="flat" size="s" onClick={() => add(recipe.id)}>
                       <Icon data={Plus} size={14} />
-                      Добавить
+                      {t('dishPicker.add')}
                     </Button>
                   </Flex>
                 );
               })}
               {recipes.data && available.length === 0 && (
                 <Text variant="body-1" color="secondary">
-                  {search ? 'Ничего не найдено' : 'Все подходящие блюда уже в ячейке'}
+                  {search ? t('dishPicker.nothingFound') : t('dishPicker.allAdded')}
                 </Text>
               )}
             </Flex>
@@ -194,7 +209,7 @@ export function DishPickerDialog({
       <Dialog.Footer>
         <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Button type="button" view="outlined" size="l" onClick={onClose}>
-            Отмена
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -204,7 +219,7 @@ export function DishPickerDialog({
             onClick={() => onSave(draft)}
           >
             <Icon data={FloppyDisk} size={16} />
-            Сохранить
+            {t('common.save')}
           </Button>
         </Flex>
       </Dialog.Footer>

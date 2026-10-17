@@ -1,6 +1,7 @@
 import { Button, Flex, Icon, Text } from '@gravity-ui/uikit';
 import { Lock } from '@gravity-ui/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '@/shared/i18n';
 
 /**
  * Раздел есть, но этому человеку он не выдан.
@@ -15,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
  */
 export function NoAccessPage({ title }: { title: string }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -27,15 +29,14 @@ export function NoAccessPage({ title }: { title: string }) {
       <Icon data={Lock} size={32} />
 
       <Flex direction="column" gap={1}>
-        <Text variant="subheader-3">Раздел «{title}» вам не открыт</Text>
+        <Text variant="subheader-3">{t('noAccess.sectionClosed', { title: t(title) })}</Text>
         <Text variant="body-1" color="secondary">
-          Доступ выдаёт администратор организации. Если раздел нужен для работы — попросите его
-          добавить.
+          {t('noAccess.body')}
         </Text>
       </Flex>
 
       <Button view="action" size="l" onClick={() => void navigate('/app')}>
-        На главную
+        {t('notFound.goHome')}
       </Button>
     </Flex>
   );

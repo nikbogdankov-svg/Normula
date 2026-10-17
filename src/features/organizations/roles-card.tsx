@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Card, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { ChevronDown, ChevronUp, ShieldCheck } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import { useOrganizationRoles } from './api';
 import { useOrganizations } from '@/shared/auth';
@@ -11,6 +12,7 @@ import { useOrganizations } from '@/shared/auth';
  */
 export function RolesCard() {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
   const { current } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationRoles();
 
@@ -24,9 +26,9 @@ export function RolesCard() {
       >
         <Flex alignItems="center" gap={2}>
           <Icon data={ShieldCheck} size={16} />
-          <Text variant="subheader-2">Роли и доступы</Text>
+          <Text variant="subheader-2">{t('org.rolesTitle')}</Text>
         </Flex>
-        <Button view="flat" size="s" aria-label={open ? 'Свернуть' : 'Развернуть'}>
+        <Button view="flat" size="s" aria-label={open ? t('org.collapse') : t('org.expand')}>
           <Icon data={open ? ChevronUp : ChevronDown} size={16} />
         </Button>
       </Flex>
@@ -49,7 +51,7 @@ export function RolesCard() {
                   <Flex gap={1} wrap>
                     {role.scopes.length === 0 && (
                       <Text variant="body-1" color="hint">
-                        без разрешений
+                        {t('org.noPermissions')}
                       </Text>
                     )}
                     {role.scopes.map((scope) => (

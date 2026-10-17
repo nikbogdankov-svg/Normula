@@ -7,108 +7,110 @@ export type JournalSource = 'menu' | 'ttk' | 'portions' | 'invoices' | 'warehous
 /** Описание автоматического журнала [ЖУРН]. */
 export interface AutoJournal {
   id: string;
-  tag: string;
-  title: string;
-  description: string;
+  tagKey: string;
+  titleKey: string;
+  descriptionKey: string;
   priority: JournalPriority;
   sources: JournalSource[];
-  autoFields: string[];
-  manualFields: string[];
+  autoFieldKeys: string[];
+  manualFieldKeys: string[];
 }
 
-export const JOURNAL_SOURCE_LABELS: Record<JournalSource, string> = {
-  menu: 'Меню',
-  ttk: 'ТТК',
-  portions: 'Порционник',
-  invoices: 'Накладные',
-  warehouse: 'Склад',
+export const JOURNAL_SOURCE_KEYS: Record<JournalSource, string> = {
+  menu: 'journals.source.menu',
+  ttk: 'journals.source.ttk',
+  portions: 'journals.source.portions',
+  invoices: 'journals.source.invoices',
+  warehouse: 'journals.source.warehouse',
 };
 
-export const JOURNAL_PRIORITY_LABELS: Record<JournalPriority, string> = {
-  required: 'Обязательно',
-  optional: 'Желательно',
+export const JOURNAL_PRIORITY_KEYS: Record<JournalPriority, string> = {
+  required: 'journals.priority.required',
+  optional: 'journals.priority.optional',
 };
+
+const field = (key: string) => `journals.field.${key}`;
 
 /** Каталог автоматических журналов по разделу 4 ТЗ. */
 export const AUTO_JOURNALS: AutoJournal[] = [
   {
     id: 'journ-01',
-    tag: 'ЖУРН-01',
-    title: 'Накопительная ведомость диетического контроля',
-    description: 'Норма–факт за 10–14 дней по питанию.',
+    tagKey: 'journals.items.journ-01.tag',
+    titleKey: 'journals.items.journ-01.title',
+    descriptionKey: 'journals.items.journ-01.description',
     priority: 'required',
     sources: ['menu', 'ttk', 'portions'],
-    autoFields: ['Дата', 'Приём пищи', 'Блюда', 'Норма', 'Факт', 'Отклонение'],
-    manualFields: [],
+    autoFieldKeys: ['date', 'meal', 'dishes', 'norm', 'fact', 'deviation'].map(field),
+    manualFieldKeys: [],
   },
   {
     id: 'journ-02',
-    tag: 'ЖУРН-02',
-    title: 'Бракеражный журнал готовой продукции',
-    description: 'Контроль качества готовых блюд перед выдачей.',
+    tagKey: 'journals.items.journ-02.tag',
+    titleKey: 'journals.items.journ-02.title',
+    descriptionKey: 'journals.items.journ-02.description',
     priority: 'required',
     sources: ['menu', 'ttk', 'portions'],
-    autoFields: ['Дата', 'Приём пищи', 'Блюда', 'Выход', 'Время'],
-    manualFields: ['Оценка', 'Разрешение на выдачу'],
+    autoFieldKeys: ['date', 'meal', 'dishes', 'output', 'time'].map(field),
+    manualFieldKeys: ['quality', 'issuePermission'].map(field),
   },
   {
     id: 'journ-03',
-    tag: 'ЖУРН-03',
-    title: 'Журнал контроля поступления сырья',
-    description: 'Бракераж скоропортящейся продукции при приёмке.',
+    tagKey: 'journals.items.journ-03.tag',
+    titleKey: 'journals.items.journ-03.title',
+    descriptionKey: 'journals.items.journ-03.description',
     priority: 'required',
     sources: ['invoices'],
-    autoFields: ['Дата', 'Продукт', 'Поставщик', 'Количество', 'Срок годности'],
-    manualFields: ['Оценка состояния'],
+    autoFieldKeys: ['date', 'product', 'supplier', 'quantity', 'shelfLife'].map(field),
+    manualFieldKeys: ['condition'].map(field),
   },
   {
     id: 'journ-04',
-    tag: 'ЖУРН-04',
-    title: 'Ведомость обогащения третьих и сладких блюд',
-    description: 'Витаминизация блюд по типам и объёму питания.',
+    tagKey: 'journals.items.journ-04.tag',
+    titleKey: 'journals.items.journ-04.title',
+    descriptionKey: 'journals.items.journ-04.description',
     priority: 'required',
     sources: ['menu', 'portions'],
-    autoFields: ['Дата', 'Тип блюда', 'Блюдо', 'Число питающихся', 'Доза витаминов'],
-    manualFields: [],
+    autoFieldKeys: ['date', 'dishType', 'dish', 'diners', 'vitaminDose'].map(field),
+    manualFieldKeys: [],
   },
   {
     id: 'journ-05',
-    tag: 'ЖУРН-05',
-    title: 'Ведомость выдачи продуктов со склада',
-    description: 'Меню-требование на продукты для приготовления.',
+    tagKey: 'journals.items.journ-05.tag',
+    titleKey: 'journals.items.journ-05.title',
+    descriptionKey: 'journals.items.journ-05.description',
     priority: 'required',
     sources: ['menu', 'ttk', 'warehouse'],
-    autoFields: ['Дата', 'Продукт', 'Единица', 'Количество по меню', 'К выдаче'],
-    manualFields: ['Подпись кладовщика'],
+    autoFieldKeys: ['date', 'product', 'unit', 'menuQuantity', 'toIssue'].map(field),
+    manualFieldKeys: ['storekeeperSign'].map(field),
   },
   {
     id: 'journ-06',
-    tag: 'ЖУРН-06',
-    title: 'Товарный отчёт по складу',
-    description: 'Расход продуктов за выбранный период.',
+    tagKey: 'journals.items.journ-06.tag',
+    titleKey: 'journals.items.journ-06.title',
+    descriptionKey: 'journals.items.journ-06.description',
     priority: 'required',
     sources: ['warehouse', 'invoices'],
-    autoFields: ['Период', 'Продукт', 'Остаток на начало', 'Приход', 'Расход', 'Остаток на конец'],
-    manualFields: [],
+    autoFieldKeys: ['period', 'product', 'opening', 'income', 'expense', 'closing'].map(field),
+    manualFieldKeys: [],
   },
   {
     id: 'journ-07',
-    tag: 'ЖУРН-07',
-    title: 'Заявка поставщику',
-    description: 'Потребность в продуктах на неделю.',
+    tagKey: 'journals.items.journ-07.tag',
+    titleKey: 'journals.items.journ-07.title',
+    descriptionKey: 'journals.items.journ-07.description',
     priority: 'optional',
     sources: ['menu', 'ttk', 'warehouse'],
-    autoFields: ['Период', 'Продукт', 'Единица', 'Потребность', 'Остаток', 'К заказу'],
-    manualFields: ['Подпись'],
+    autoFieldKeys: ['period', 'product', 'unit', 'need', 'stockBalance', 'toOrder'].map(field),
+    manualFieldKeys: ['sign'].map(field),
   },
   {
     id: 'journ-08',
-    tag: 'ЖУРН-08',
-    title: 'Журнал ежедневного отбора проб',
-    description: 'Учёт проб готовых блюд для хранения.',
+    tagKey: 'journals.items.journ-08.tag',
+    titleKey: 'journals.items.journ-08.title',
+    descriptionKey: 'journals.items.journ-08.description',
     priority: 'optional',
     sources: ['menu', 'ttk', 'portions'],
-    autoFields: ['Дата', 'Блюдо', 'Выход'],
-    manualFields: ['Хранение проб'],
+    autoFieldKeys: ['date', 'dish', 'output'].map(field),
+    manualFieldKeys: ['sampleStorage'].map(field),
   },
 ];

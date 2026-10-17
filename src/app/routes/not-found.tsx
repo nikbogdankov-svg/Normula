@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Button, Flex, Text } from '@gravity-ui/uikit';
+import { useTranslation } from '@/shared/i18n';
 
 export function NotFoundRoute() {
+  const { t } = useTranslation();
   return (
     <Flex
       direction="column"
@@ -12,7 +14,7 @@ export function NotFoundRoute() {
     >
       <Text variant="display-1">404</Text>
       <Link to="/app">
-        <Button view="action">На главную</Button>
+        <Button view="action">{t('notFound.goHome')}</Button>
       </Link>
     </Flex>
   );

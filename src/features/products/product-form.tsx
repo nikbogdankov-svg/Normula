@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Flex, Select, TextInput, type SelectOption } from '@gravity-ui/uikit';
+import { useTranslation } from 'react-i18next';
 import type { CreateProductRequest, Product } from './types';
 
 type Draft = {
@@ -13,6 +14,7 @@ const UNIT_OPTIONS = ['кг', 'г', 'л', 'мл', 'шт', 'уп', 'кор', 'я�
 
 /** Состояние и разметка минимальной формы создания продукта (имя + единица). */
 export function useProductForm(initial?: Product | null, resetKey?: string) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<Draft>(emptyDraft);
 
   useEffect(() => {
@@ -46,16 +48,16 @@ export function useProductForm(initial?: Product | null, resetKey?: string) {
     <Flex direction="column" gap={2}>
       <TextInput
         size="l"
-        label="Название продукта:"
-        placeholder="Например, Тофу соевый"
+        label={t('products.nameLabel')}
+        placeholder={t('products.namePlaceholder')}
         value={draft.name}
         onUpdate={(value) => patch('name', value)}
         autoFocus
       />
       <Select
         size="l"
-        label="Единица закупки:"
-        placeholder="кг, л, шт"
+        label={t('products.unitLabel')}
+        placeholder={t('products.unitPlaceholder')}
         value={draft.unit ? [draft.unit] : []}
         onUpdate={(value) => patch('unit', value[0] ?? '')}
         filterable

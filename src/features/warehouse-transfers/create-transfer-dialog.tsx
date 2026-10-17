@@ -20,6 +20,7 @@ import {
   type Transfer,
   type TransferRequest,
 } from '@/features/warehouse/types';
+import { useTranslation } from '@/shared/i18n';
 
 /** Строка формы: накладная выбирается первой, товар — из её партий. */
 interface DraftRow {
@@ -89,6 +90,7 @@ export function CreateTransferDialog({
   const create = useCreateTransfer();
   const update = useUpdateTransfer();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const [fromObjectId, setFromObjectId] = useState('');
   const [toObjectId, setToObjectId] = useState('');
   const [date, setDate] = useState(todayPicker());
@@ -133,18 +135,23 @@ export function CreateTransferDialog({
     for (const batch of batches) {
       if (seen.has(batch.receiptId)) continue;
       seen.add(batch.receiptId);
-      const date = batch.receiptDate ? ` от ${formatDate(batch.receiptDate)}` : '';
+      const date = batch.receiptDate
+        ? ` ${t('transfer.fromDate', { date: formatDate(batch.receiptDate) })}`
+        : '';
       out.push({ value: batch.receiptId, content: `${batch.invoiceNumber}${date}` });
     }
     return out;
-  }, [batches]);
+  }, [batches, t]);
 
   const batchOptionsFor = (receiptId: string) =>
     batches
       .filter((batch) => batch.receiptId === receiptId)
       .map((batch) => ({
         value: batch.id,
-        content: `${batch.productName} — остаток ${formatQuantity(batch.remaining, batch.unit)}`,
+        content: t('transfer.productRemaining', {
+          name: batch.productName,
+          remaining: formatQuantity(batch.remaining, batch.unit),
+        }),
       }));
 
   // Склады не должны совпадать: каждый селект скрывает выбранный в другом.
@@ -174,16 +181,18 @@ export function CreateTransferDialog({
   /** Проблема строки для подсветки; null — строка готова к отправке. */
   const rowProblem = (row: DraftRow, index: number): string | null => {
     const batch = batchById.get(row.batchId);
-    if (!batch) return 'Выберите накладную и товар';
+    if (!batch) return t('transfer.errorSelectReceiptProduct');
 
     if (rows.some((other, i) => i !== index && other.batchId === row.batchId)) {
-      return 'Эта партия уже есть в другой строке';
+      return t('transfer.errorDuplicateBatch');
     }
 
     const quantity = parseDecimal(row.quantity, QUANTITY_DECIMALS);
-    if (quantity === null || quantity <= 0) return 'Введите количество';
+    if (quantity === null || quantity <= 0) return t('transfer.errorEnterQuantity');
     if (quantity > batch.remaining) {
-      return `Не больше ${formatQuantity(batch.remaining, batch.unit)}`;
+      return t('transfer.errorNotMore', {
+        max: formatQuantity(batch.remaining, batch.unit),
+      });
     }
 
     return null;
@@ -212,7 +221,7 @@ export function CreateTransferDialog({
     const onSuccess = () => {
       toaster.add({
         name: initial ? 'transfer-updated' : 'transfer-created',
-        title: initial ? 'Перемещение обновлено' : 'Перемещение создано',
+        title: initial ? t('transfer.toastUpdated') : t('transfer.toastCreated'),
         theme: 'success',
       });
       onClose();
@@ -220,7 +229,7 @@ export function CreateTransferDialog({
     const onError = (e: Error) =>
       toaster.add({
         name: initial ? 'transfer-update' : 'transfer-create',
-        title: 'Ошибка',
+        title: t('common.error'),
         content: e.message,
         theme: 'danger',
       });
@@ -236,7 +245,7 @@ export function CreateTransferDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size="l">
-      <Dialog.Header caption={initial ? 'Редактировать перемещение' : 'Добавить перемещение'} />
+      <Dialog.Header caption={initial ? t('transfer.editTitle') : t('transfer.addTitle')} />
       <Dialog.Divider />
       <Dialog.Body>
         <Flex direction="column" gap={3}>
@@ -246,7 +255,7 @@ export function CreateTransferDialog({
                 value={fromObjectId}
                 onUpdate={changeFromObject}
                 options={fromOptions}
-                label="Со склада:"
+                label={t('transfer.fromLabel')}
                 width="max"
               />
             </div>
@@ -255,7 +264,7 @@ export function CreateTransferDialog({
                 value={toObjectId}
                 onUpdate={setToObjectId}
                 options={toOptions}
-                label="На склад:"
+                label={t('transfer.toLabel')}
                 width="max"
               />
             </div>
@@ -263,7 +272,7 @@ export function CreateTransferDialog({
 
           {fromObjectId !== '' && toObjectId === fromObjectId && (
             <Text variant="body-2" color="danger">
-              Склад-отправитель и склад-получатель должны различаться.
+              {t('transfer.sameObjectError')}
             </Text>
           )}
 
@@ -272,8 +281,8 @@ export function CreateTransferDialog({
               <DatePicker
                 size="l"
                 view="normal"
-                label="Дата:"
-                placeholder="дд/мм/гггг"
+                label={t('transfer.dateLabel')}
+                placeholder={t('transfer.datePlaceholder')}
                 value={date ? dateTime({ input: date, format: 'DD/MM/YYYY' }) : null}
                 onUpdate={(next) => setDate(next ? next.format('DD/MM/YYYY') : '')}
                 style={{ width: '100%' }}
@@ -283,7 +292,7 @@ export function CreateTransferDialog({
 
           {noBatches && (
             <Text variant="body-2" color="secondary">
-              На этом складе нет партий с остатком — переносить нечего.
+              {t('transfer.noBatches')}
             </Text>
           )}
 
@@ -299,8 +308,8 @@ export function CreateTransferDialog({
                   <div style={{ flex: 2, minWidth: 180 }}>
                     <Select
                       size="l"
-                      label="Накладная:"
-                      placeholder="Выберите накладную"
+                      label={t('transfer.receiptLabel')}
+                      placeholder={t('transfer.receiptPlaceholder')}
                       value={row.receiptId ? [row.receiptId] : []}
                       onUpdate={(next) =>
                         updateRow(index, { receiptId: next[0] ?? '', batchId: '', quantity: '' })
@@ -313,8 +322,8 @@ export function CreateTransferDialog({
                   <div style={{ flex: 3, minWidth: 240 }}>
                     <Select
                       size="l"
-                      label="Товар:"
-                      placeholder="Выберите товар"
+                      label={t('transfer.productLabel')}
+                      placeholder={t('transfer.productPlaceholder')}
                       value={row.batchId ? [row.batchId] : []}
                       onUpdate={(next) => updateRow(index, { batchId: next[0] ?? '' })}
                       options={batchOptionsFor(row.receiptId)}
@@ -325,7 +334,7 @@ export function CreateTransferDialog({
                   <div style={{ flex: 1, minWidth: 140 }}>
                     <TextInput
                       size="l"
-                      label="Кол-во:"
+                      label={t('transfer.quantityLabel')}
                       placeholder="0"
                       value={row.quantity}
                       onUpdate={(value) => updateRow(index, { quantity: value })}
@@ -351,8 +360,8 @@ export function CreateTransferDialog({
                     view="flat"
                     size="l"
                     onClick={() => removeRow(index)}
-                    title="Удалить"
-                    aria-label="Удалить строку"
+                    title={t('common.delete')}
+                    aria-label={t('transfer.deleteRow')}
                     disabled={rows.length <= 1}
                   >
                     <Icon data={TrashBin} size={18} />
@@ -369,7 +378,7 @@ export function CreateTransferDialog({
               disabled={noBatches}
             >
               <Icon data={Plus} size={16} />
-              Добавить товар
+              {t('transfer.addProduct')}
             </Button>
           </Flex>
         </Flex>
@@ -379,7 +388,7 @@ export function CreateTransferDialog({
         <Flex alignItems="center" justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
           <Flex gap={2}>
             <Button view="outlined" size="l" onClick={onClose}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             <Button
               view="action"
@@ -389,7 +398,7 @@ export function CreateTransferDialog({
               loading={initial ? update.isPending : create.isPending}
             >
               <Icon data={ArrowRightArrowLeft} size={16} />
-              {initial ? 'Сохранить' : 'Переместить'}
+              {initial ? t('common.save') : t('transfer.submit')}
             </Button>
           </Flex>
         </Flex>

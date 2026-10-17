@@ -26,6 +26,7 @@ import {
 } from '@/shared/ui/states';
 import { HighlightText } from '@/shared/ui/highlight-text';
 import { formatMoney } from '@/features/warehouse/format';
+import { useTranslation } from '@/shared/i18n';
 import { useRecipes } from './api';
 import type { RecipeSummary } from './types';
 import { RecipeDialog } from './recipe-dialog';
@@ -71,6 +72,7 @@ function filterRecipes(
 /** Раздел ТТК: панель фильтров закреплена, скроллится таблица. */
 export function TtkRoute() {
   const { current } = useOrganizations();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [collection, setCollection] = useState(ALL_COLLECTIONS);
   const [sort, setSort] = useState<RecipeSort>('name');
@@ -90,11 +92,11 @@ export function TtkRoute() {
     const hasEmpty = all.some((recipe) => recipe.collectionName === '');
 
     return [
-      { value: ALL_COLLECTIONS, content: 'Все' },
-      ...(hasEmpty ? [{ value: NO_COLLECTION, content: 'Без сборника' }] : []),
+      { value: ALL_COLLECTIONS, content: t('ttk.allCollections') },
+      ...(hasEmpty ? [{ value: NO_COLLECTION, content: t('ttk.noCollection') }] : []),
       ...names.map((name) => ({ value: name, content: name })),
     ];
-  }, [all]);
+  }, [all, t]);
 
   const recipes = useMemo(
     () => filterRecipes(all, search, collection, sort, ascending),
@@ -118,7 +120,7 @@ export function TtkRoute() {
           <Select
             size="l"
             width={280}
-            label="Сборник:"
+            label={t('ttk.collectionLabel')}
             value={[collection]}
             onUpdate={(value) => setCollection(value[0] ?? ALL_COLLECTIONS)}
             options={collectionOptions}
@@ -127,18 +129,18 @@ export function TtkRoute() {
           <Flex alignItems="center" gap={2}>
             <Button size="l" view="normal-contrast" onClick={() => setImportOpen(true)}>
               <Icon data={ArrowUpFromSquare} size={16} />
-              Импорт сборника
+              {t('ttk.importCollection')}
             </Button>
             <Button size="l" view="normal-contrast" onClick={() => setCreateOpen(true)}>
               <Icon data={Plus} size={16} />
-              Создать ТТК
+              {t('ttk.createTitle')}
             </Button>
           </Flex>
         </Flex>
         <Flex direction="column" gap={2}>
           <TextInput
             size="xl"
-            placeholder="Поиск по названию блюда или карты"
+            placeholder={t('ttk.searchPlaceholder')}
             value={search}
             onUpdate={setSearch}
             hasClear
@@ -151,7 +153,9 @@ export function TtkRoute() {
           />
           {data && (
             <Text variant="body-1" color="secondary">
-              {hasFilters ? `Найдено: ${recipes.length} ТТК` : `Всего ТТК: ${all.length}`}
+              {hasFilters
+                ? t('ttk.foundCount', { count: recipes.length })
+                : t('ttk.totalCount', { count: all.length })}
             </Text>
           )}
         </Flex>
@@ -163,9 +167,7 @@ export function TtkRoute() {
           {current !== null && isPending && <LoadingState />}
           {isError && <ErrorState error={error} onRetry={() => void refetch()} />}
           {data && recipes.length === 0 && (
-            <EmptyState
-              text={hasFilters ? 'Ничего не нашли по заданным фильтрам' : 'Карт ТТК пока нет'}
-            />
+            <EmptyState text={hasFilters ? t('ttk.nothingFound') : t('ttk.empty')} />
           )}
 
           {data && recipes.length > 0 && (
@@ -207,12 +209,13 @@ function RecipesTable({
   onSort: (column: RecipeSort) => void;
   onOpen: (recipe: RecipeSummary) => void;
 }) {
+  const { t } = useTranslation();
   const columns: TableColumnConfig<RecipeSummary>[] = [
     {
       id: 'name',
       name: () => (
         <SortableHeader
-          label="Название"
+          label={t('ttk.colTitle')}
           column="name"
           sort={sort}
           ascending={ascending}
@@ -229,7 +232,7 @@ function RecipesTable({
     },
     {
       id: 'collection',
-      name: 'Сборник',
+      name: t('ttk.colCollection'),
       template: (row) => (
         <Text variant="body-2" color="secondary">
           {row.collectionName || '—'}
@@ -240,7 +243,7 @@ function RecipesTable({
       id: 'price',
       name: () => (
         <SortableHeader
-          label="Цена"
+          label={t('ttk.colPrice')}
           column="price"
           sort={sort}
           ascending={ascending}
@@ -256,7 +259,7 @@ function RecipesTable({
       name: () => (
         <Flex alignItems="center" justifyContent="flex-end" style={{ width: '100%' }}>
           <Text variant="body-2" color="secondary">
-            Ккал
+            {t('ttk.colKcal')}
           </Text>
         </Flex>
       ),
@@ -300,6 +303,7 @@ function SortableHeader({
 }) {
   const active = sort === column;
   const icon = active ? (ascending ? ArrowUp : ArrowDown) : ArrowUpArrowDown;
+  const { t } = useTranslation();
 
   return (
     <Flex
@@ -309,11 +313,7 @@ function SortableHeader({
       style={{ cursor: 'pointer', userSelect: 'none' }}
       onClick={() => onSort(column)}
       title={
-        active
-          ? ascending
-            ? 'По возрастанию — нажмите для убывания'
-            : 'По убыванию — нажмите для возрастания'
-          : `Сортировать по: ${label}`
+        active ? (ascending ? t('ttk.sortAsc') : t('ttk.sortDesc')) : t('ttk.sortBy', { label })
       }
     >
       {label}

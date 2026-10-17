@@ -58,6 +58,7 @@ import {
 } from './norms';
 import { MEALS, type Dish, type MealId, type Violation, type ViolationMetric } from './types';
 import { buildMenuPrintRows, downloadMenuDoc } from './menu-print';
+import { useTranslation } from '@/shared/i18n';
 import './menu-route.css';
 
 const EMPTY_DISHES: Dish[] = [];
@@ -65,13 +66,13 @@ const EMPTY_DISHES: Dish[] = [];
 /** Окно сетки: бэкенд работает с любым отрезком дат, 14 дней — выбор экрана. */
 const CYCLE_DAYS = 14;
 
-/** Подписи метрик нарушения в попапе «Нарушения за день». */
-const METRIC_LABELS: Record<ViolationMetric, { label: string; unit: string }> = {
-  kcal: { label: 'Калорийность', unit: 'ккал' },
-  protein: { label: 'Белки', unit: 'г' },
-  fat: { label: 'Жиры', unit: 'г' },
-  carbs: { label: 'Углеводы', unit: 'г' },
-  price: { label: 'Цена', unit: '₽' },
+/** Ключи метрик нарушения в попапе «Нарушения за день». */
+const METRIC_LABELS: Record<ViolationMetric, { labelKey: string; unitKey: string }> = {
+  kcal: { labelKey: 'metrics.kcal', unitKey: 'menu.kcalUnit' },
+  protein: { labelKey: 'metrics.protein', unitKey: 'units.gram' },
+  fat: { labelKey: 'metrics.fat', unitKey: 'units.gram' },
+  carbs: { labelKey: 'metrics.carbs', unitKey: 'units.gram' },
+  price: { labelKey: 'metrics.price', unitKey: 'units.ruble' },
 };
 
 /** Объекты планирования: у складов нет ни численности, ни меню. */
@@ -128,6 +129,7 @@ function MenuByDates() {
   const fillSchedule = useFillSchedule();
   const createMenu = useCreateMenu();
   const toaster = useToaster();
+  const { t } = useTranslation();
   const {
     objectId: savedObjectId,
     setObjectId: saveObjectId,
@@ -264,12 +266,9 @@ function MenuByDates() {
     return (dayTotals.get(picker.day)?.price ?? 0) - sumDishes(pickerDishes).price;
   }, [picker, dayTotals, pickerDishes]);
 
+  const pickerMeal = picker ? MEALS.find((meal) => meal.id === picker.mealId) : undefined;
   const pickerTitle = picker
-    ? formatSlotTitle(
-        startDate,
-        picker.day,
-        MEALS.find((meal) => meal.id === picker.mealId)?.label ?? ''
-      )
+    ? formatSlotTitle(startDate, picker.day, pickerMeal ? t(pickerMeal.labelKey) : '')
     : '';
 
   const fillMenuOptions = useMemo(() => menus.data?.menus ?? [], [menus.data]);
@@ -327,7 +326,7 @@ function MenuByDates() {
     ],
   }));
   /** Имя меню по умолчанию — по окну, которое сохраняем. */
-  const defaultMenuName = `Меню ${formatDateRange(startDate, CYCLE_DAYS)}`;
+  const defaultMenuName = t('menu.defaultName', { range: formatDateRange(startDate, CYCLE_DAYS) });
 
   const fillFromSourceMenu = async (sourceMenuId: string) => {
     const sourceMenu = fillMenuOptions.find((candidate) => candidate.id === sourceMenuId);
@@ -349,15 +348,15 @@ function MenuByDates() {
       setFillMenuSourceId(null);
       toaster.add({
         name: 'menu-filled-from-source',
-        title: 'Меню заполнено',
-        content: `Скопировано из меню «${sourceMenu.name}».`,
+        title: t('menu.filledToast'),
+        content: t('menu.filledContent', { name: sourceMenu.name }),
         theme: 'success',
       });
     } catch (error) {
       toaster.add({
         name: 'menu-fill-error',
-        title: 'Не удалось заполнить меню',
-        content: error instanceof Error ? error.message : 'Попробуйте ещё раз.',
+        title: t('menu.fillError'),
+        content: error instanceof Error ? error.message : t('menu.tryAgain'),
         theme: 'danger',
       });
     } finally {
@@ -377,15 +376,15 @@ function MenuByDates() {
 
       toaster.add({
         name: 'menu-created-and-filled',
-        title: 'Новое меню создано',
-        content: `Меню «${name}» сохранено из текущего периода.`,
+        title: t('menu.createdToast'),
+        content: t('menu.createdContent', { name }),
         theme: 'success',
       });
     } catch (error) {
       toaster.add({
         name: 'menu-create-error',
-        title: 'Не удалось создать меню',
-        content: error instanceof Error ? error.message : 'Попробуйте ещё раз.',
+        title: t('menu.createError'),
+        content: error instanceof Error ? error.message : t('menu.tryAgain'),
         theme: 'danger',
       });
     } finally {
@@ -405,8 +404,10 @@ function MenuByDates() {
   };
 
   const printMenu = () => {
-    const mealLabelOf = (mealId: MealId) =>
-      MEALS.find((meal) => meal.id === mealId)?.label ?? mealId;
+    const mealLabelOf = (mealId: MealId) => {
+      const meal = MEALS.find((item) => item.id === mealId);
+      return meal ? t(meal.labelKey) : mealId;
+    };
     void downloadMenuDoc({
       startDate,
       cycleDays: CYCLE_DAYS,
@@ -434,8 +435,8 @@ function MenuByDates() {
         onSuccess: () => {
           toaster.add({
             name: 'menu-violation-allowed',
-            title: 'Нарушение разрешено',
-            content: `День ${day} сохранён с нарушением нормы.`,
+            title: t('menu.violationAllowedToast'),
+            content: t('menu.violationAllowedContent', { day }),
             theme: 'warning',
           });
           setViolationDay(null);
@@ -443,7 +444,7 @@ function MenuByDates() {
         onError: (e) =>
           toaster.add({
             name: 'menu-violation-error',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -468,14 +469,17 @@ function MenuByDates() {
           if (dayPrice > priceLimit) {
             toaster.add({
               name: 'menu-price-warning',
-              title: 'Ячейка сохранена с превышением цены',
-              content: `Цена дня ${Math.round(dayPrice)} ₽ выше лимита ${priceLimit} ₽.`,
+              title: t('menu.priceExceededToast'),
+              content: t('menu.priceExceededContent', {
+                price: Math.round(dayPrice),
+                limit: priceLimit,
+              }),
               theme: 'warning',
             });
           } else {
             toaster.add({
               name: 'menu-slot-saved',
-              title: 'Ячейка сохранена',
+              title: t('menu.slotSaved'),
               theme: 'success',
             });
           }
@@ -484,7 +488,7 @@ function MenuByDates() {
         onError: (e) =>
           toaster.add({
             name: 'menu-slot-error',
-            title: 'Ошибка',
+            title: t('common.error'),
             content: e.message,
             theme: 'danger',
           }),
@@ -498,10 +502,10 @@ function MenuByDates() {
         <Flex alignItems="center" gap={2}>
           <Select
             size="l"
-            label="Объект:"
+            label={t('menu.objectLabel')}
             width={280}
             value={objectId ? [objectId] : []}
-            placeholder="Выберите объект"
+            placeholder={t('menu.objectPlaceholder')}
             onUpdate={(values) => {
               const next = values[0] ?? null;
               setObjectId(next);
@@ -514,10 +518,10 @@ function MenuByDates() {
           />
           <Select
             size="l"
-            label="Рацион:"
+            label={t('menu.dietLabel')}
             width={200}
             value={dietId ? [dietId] : []}
-            placeholder="Выберите рацион"
+            placeholder={t('menu.dietPlaceholder')}
             onUpdate={(values) => setDietId(values[0] ?? null)}
             options={dietOptions.map((option) => ({ value: option.id, content: option.name }))}
             disabled={dietOptions.length === 0}
@@ -528,7 +532,7 @@ function MenuByDates() {
           <Button
             view="outlined"
             size="l"
-            title="Предыдущий период"
+            title={t('menu.prevPeriod')}
             disabled={weekLoading}
             onClick={() => shiftPeriod(-1)}
           >
@@ -543,7 +547,7 @@ function MenuByDates() {
               <Button
                 view="normal"
                 size="s"
-                title="Вернуться к текущей неделе"
+                title={t('menu.currentWeek')}
                 disabled={weekLoading}
                 onClick={() => goToWeek(startOfWeekMonday())}
               >
@@ -554,7 +558,7 @@ function MenuByDates() {
           <Button
             view="outlined"
             size="l"
-            title="Следующий период"
+            title={t('menu.nextPeriod')}
             disabled={weekLoading}
             onClick={() => shiftPeriod(1)}
           >
@@ -567,7 +571,7 @@ function MenuByDates() {
             onClick={() => setFillMenuOpen(true)}
             disabled={weekLoading || !periodSynced}
           >
-            Заполнение меню
+            {t('menu.fillMenu')}
           </Button>
           <Button
             type="button"
@@ -575,7 +579,7 @@ function MenuByDates() {
             size="l"
             onClick={printMenu}
             disabled={weekLoading || !periodSynced}
-            title="Печать (PDF)"
+            title={t('menu.print')}
           >
             <Icon data={Printer} size={16} />
           </Button>
@@ -608,7 +612,7 @@ function MenuByDates() {
                     {header.date}
                     {isToday && (
                       <Label className="menu-grid__today-label" theme="success" size="xs">
-                        Сегодня
+                        {t('menu.today')}
                       </Label>
                     )}
                   </div>
@@ -617,7 +621,8 @@ function MenuByDates() {
             })}
 
             {activeMeals.map((mealId, mealIndex) => {
-              const label = MEALS.find((meal) => meal.id === mealId)?.label ?? mealId;
+              const meal = MEALS.find((item) => item.id === mealId);
+              const label = meal ? t(meal.labelKey) : mealId;
               const beforeTotal =
                 mealIndex === activeMeals.length - 1 ? ' menu-grid__cell_before-total' : '';
 
@@ -644,7 +649,7 @@ function MenuByDates() {
                           }}
                         >
                           {dishes.length === 0 ? (
-                            <span className="menu-grid__empty">+ блюдо</span>
+                            <span className="menu-grid__empty">{t('menu.addDish')}</span>
                           ) : (
                             <>
                               <Text
@@ -656,11 +661,13 @@ function MenuByDates() {
                               </Text>
                               <div className="menu-grid__slot-meta">
                                 <span>
-                                  {formatMetric(totals.kcal)} ккал | {formatMetric(totals.price)} ₽
+                                  {formatMetric(totals.kcal)} {t('menu.kcalUnit')} |{' '}
+                                  {formatMetric(totals.price)} ₽
                                 </span>
                                 <span>
-                                  Б {formatMetric(totals.protein)} | Ж {formatMetric(totals.fat)} |
-                                  У {formatMetric(totals.carbs)}
+                                  {t('menu.macroProtein')} {formatMetric(totals.protein)} |{' '}
+                                  {t('menu.macroFat')} {formatMetric(totals.fat)} |{' '}
+                                  {t('menu.macroCarbs')} {formatMetric(totals.carbs)}
                                 </span>
                               </div>
                             </>
@@ -673,7 +680,7 @@ function MenuByDates() {
               );
             })}
 
-            <div className="menu-grid__cell menu-grid__total-label">Итог на день</div>
+            <div className="menu-grid__cell menu-grid__total-label">{t('menu.dayTotal')}</div>
             {days.map((day, dayIndex) => {
               const totals = dayTotals.get(day) ?? sumDishes([]);
               const end = dayIndex === days.length - 1 ? ' menu-grid__cell_end' : '';
@@ -712,20 +719,25 @@ function MenuByDates() {
       >
         {createMenuOpen ? (
           <Flex alignItems="center" gap={1} style={{ padding: '16px 20px 12px' }}>
-            <Button view="flat" size="s" title="Назад" onClick={() => setCreateMenuOpen(false)}>
+            <Button
+              view="flat"
+              size="s"
+              title={t('common.back')}
+              onClick={() => setCreateMenuOpen(false)}
+            >
               <Icon data={ArrowLeft} size={16} />
             </Button>
-            <Text variant="subheader-2">Создание нового меню</Text>
+            <Text variant="subheader-2">{t('menu.createMenuTitle')}</Text>
           </Flex>
         ) : (
-          <Dialog.Header caption="Заполнить меню" />
+          <Dialog.Header caption={t('menu.fillMenuTitle')} />
         )}
         <Dialog.Divider />
         <Dialog.Body>
           {createMenuOpen ? (
             <TextInput
               size="l"
-              label="Название меню:"
+              label={t('menu.nameLabel')}
               placeholder={defaultMenuName}
               value={createMenuName}
               onUpdate={setCreateMenuName}
@@ -736,8 +748,8 @@ function MenuByDates() {
               {fillMenuOptions.length > 0 && (
                 <Select
                   size="l"
-                  label="Выбор меню:"
-                  placeholder="Выберите меню"
+                  label={t('menu.chooseLabel')}
+                  placeholder={t('menu.choosePlaceholder')}
                   value={fillMenuSourceId ? [fillMenuSourceId] : []}
                   onUpdate={(value) => setFillMenuSourceId(value[0] ?? null)}
                   options={fillMenuOptions.map((candidate) => ({
@@ -755,12 +767,12 @@ function MenuByDates() {
                   onClick={() => setCreateMenuOpen(true)}
                   disabled={fillMenuSubmitting}
                 >
-                  Создать новое из текущего
+                  {t('menu.createFromCurrent')}
                 </Button>
               )}
               {fillMenuSourceId && (
                 <Text variant="body-2" color="secondary">
-                  При выборе другого меню изменения будут применены только со следующего дня.
+                  {t('menu.nextDayNote')}
                 </Text>
               )}
             </Flex>
@@ -777,7 +789,7 @@ function MenuByDates() {
                   size="l"
                   onClick={() => setCreateMenuOpen(false)}
                 >
-                  Назад
+                  {t('common.back')}
                 </Button>
                 <Button
                   type="button"
@@ -787,7 +799,7 @@ function MenuByDates() {
                   onClick={() => void createAndFillNewMenu()}
                   disabled={fillMenuSubmitting}
                 >
-                  Создать новое меню
+                  {t('menu.createNewMenu')}
                 </Button>
               </>
             ) : (
@@ -798,7 +810,7 @@ function MenuByDates() {
                   size="l"
                   onClick={() => setFillMenuOpen(false)}
                 >
-                  Отмена
+                  {t('common.cancel')}
                 </Button>
                 {fillMenuOptions.length > 0 && fillMenuSourceId && (
                   <Button
@@ -809,7 +821,7 @@ function MenuByDates() {
                     onClick={() => void fillFromSourceMenu(fillMenuSourceId)}
                     disabled={fillMenuSubmitting}
                   >
-                    Выбрать
+                    {t('menu.choose')}
                   </Button>
                 )}
               </>
@@ -819,20 +831,24 @@ function MenuByDates() {
       </Dialog>
 
       <Dialog open={violationDay !== null} onClose={() => setViolationDay(null)} size="s">
-        <Dialog.Header caption="Нарушения за день" />
+        <Dialog.Header caption={t('menu.violationsTitle')} />
         <Dialog.Divider />
         <Dialog.Body>
           {violationDay !== null && (
             <Flex direction="column" gap={3}>
               {(dayViolations.get(violationDay) ?? []).map((item) => (
                 <Text key={item.metric} variant="body-2">
-                  {METRIC_LABELS[item.metric].label}: {formatMetric(item.actual)} /{' '}
-                  {formatMetric(item.norm)} {METRIC_LABELS[item.metric].unit} -{' '}
-                  {item.status === 'low' ? 'ниже' : 'выше'} нормы
+                  {t('menu.violationLine', {
+                    label: t(METRIC_LABELS[item.metric].labelKey),
+                    actual: formatMetric(item.actual),
+                    norm: formatMetric(item.norm),
+                    unit: t(METRIC_LABELS[item.metric].unitKey),
+                    direction: t(item.status === 'low' ? 'menu.below' : 'menu.above'),
+                  })}
                 </Text>
               ))}
               <Text variant="body-2" color="secondary">
-                Вы можете разрешить нарушение или изменить состав блюд в приёмах.
+                {t('menu.violationHint')}
               </Text>
             </Flex>
           )}
@@ -841,7 +857,7 @@ function MenuByDates() {
         <Dialog.Footer>
           <Flex justifyContent="flex-end" gap={2} style={{ width: '100%' }}>
             <Button type="button" view="outlined" size="l" onClick={() => setViolationDay(null)}>
-              Отмена
+              {t('common.cancel')}
             </Button>
             {violationDay !== null && !allowedViolationDays.has(violationDay) && (
               <Button
@@ -851,7 +867,7 @@ function MenuByDates() {
                 loading={allowViolation.isPending}
                 onClick={() => allowDayViolation(violationDay)}
               >
-                Разрешить нарушение
+                {t('menu.allowViolation')}
               </Button>
             )}
           </Flex>
@@ -888,6 +904,7 @@ function DayTotalCell({
   /** Нарушение дня было разрешено — кнопка-глаз в обычном стиле. */
   allowed?: boolean;
 }) {
+  const { t } = useTranslation();
   const anyViolation = violations.length > 0;
 
   return (
@@ -897,7 +914,7 @@ function DayTotalCell({
           actual={totals.kcal}
           norm={norm.kcal}
           digits={0}
-          unit=" ккал"
+          unit={` ${t('menu.kcalUnit')}`}
           status={statusOf(violations, 'kcal')}
         />
       </div>
@@ -906,21 +923,21 @@ function DayTotalCell({
           actual={totals.protein}
           norm={norm.protein}
           digits={0}
-          prefix="Б "
+          prefix={`${t('menu.macroProtein')} `}
           status={statusOf(violations, 'protein')}
         />
         <NormValue
           actual={totals.fat}
           norm={norm.fat}
           digits={0}
-          prefix="Ж "
+          prefix={`${t('menu.macroFat')} `}
           status={statusOf(violations, 'fat')}
         />
         <NormValue
           actual={totals.carbs}
           norm={norm.carbs}
           digits={0}
-          prefix="У "
+          prefix={`${t('menu.macroCarbs')} `}
           status={statusOf(violations, 'carbs')}
         />
       </div>
@@ -939,7 +956,7 @@ function DayTotalCell({
           view={allowed ? 'flat' : 'action'}
           size="s"
           className="menu-grid__violation-btn"
-          title="Посмотреть нарушения"
+          title={t('menu.viewViolations')}
           onClick={() => onInspect(day)}
         >
           <Icon data={Eye} size={16} />

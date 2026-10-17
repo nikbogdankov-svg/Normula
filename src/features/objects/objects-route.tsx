@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Card, Flex, Icon, Select, Table, Text } from '@gravity-ui/uikit';
 import { House, Layers, Pencil, Plus } from '@gravity-ui/icons';
+import { useTranslation } from 'react-i18next';
 import { useOrganizations } from '@/shared/auth';
 import {
   EmptyState,
@@ -11,15 +12,8 @@ import {
 } from '@/shared/ui/states';
 import { useObjects } from './api';
 import { ObjectDrawer, SubObjectDrawer } from './objects-dialog';
-import { type FacilityType, type ObjectItem } from './types';
+import { type ObjectItem } from './types';
 import './objects-route.css';
-
-const FACILITY_TYPE_LABELS: Record<FacilityType, string> = {
-  school: 'Школа',
-  kindergarten: 'Детский сад',
-  hospital: 'Больница',
-  warehouse: 'Склад',
-};
 
 function groupRowClassNames(row: {
   isLastInDepartment: boolean;
@@ -141,6 +135,7 @@ export function ObjectsRoute() {
 
 /** Секция одного подобъекта: шапка (название + тип) и таблица отделений. */
 function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit: () => void }) {
+  const { t } = useTranslation();
   const rows = useMemo(() => groupRows(subObject), [subObject]);
 
   return (
@@ -154,16 +149,16 @@ function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit
         <Flex alignItems="center" gap={2}>
           <Icon data={Layers} size={16} />
           <Text variant="body-1" color="secondary">
-            Подобъект:
+            {t('objects.subObjectLabel')}
           </Text>
           <Text variant="subheader-2">{subObject.name}</Text>
           <Text variant="body-1" color="secondary">
-            {FACILITY_TYPE_LABELS[subObject.type]}
+            {t(`facility.${subObject.type}`)}
           </Text>
         </Flex>
         <Button view="normal" size="m" onClick={onEdit}>
           <Icon data={Pencil} size={16} />
-          Редактировать
+          {t('common.edit')}
         </Button>
       </Flex>
       <div
@@ -174,7 +169,7 @@ function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit
         }}
       >
         {rows.length === 0 ? (
-          <EmptyState text="В подобъекте нет групп/классов" />
+          <EmptyState text={t('objects.emptySubObjectGroups')} />
         ) : (
           <div className="admin-table-wrap">
             <Table
@@ -191,14 +186,14 @@ function SubObjectSection({ subObject, onEdit }: { subObject: ObjectItem; onEdit
               columns={[
                 {
                   id: 'departmentName',
-                  name: 'Группа / класс',
+                  name: t('objects.colGroup'),
                   width: '60%',
                   template: (row) => (row.showDepartment ? row.departmentName : null),
                   placeholder: () => null,
                 },
                 {
                   id: 'tableName',
-                  name: 'Рацион',
+                  name: t('objects.colDiet'),
                   width: '40%',
                 },
               ]}
@@ -225,6 +220,7 @@ function SubObjectsCard({
   const [creating, setCreating] = useState(false);
   const [addingSubObject, setAddingSubObject] = useState(false);
   const [editingSubObjectId, setEditingSubObjectId] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? objects[0] ?? null;
   const editingSubObject = subObjects.find((s) => s.id === editingSubObjectId) ?? null;
@@ -241,10 +237,10 @@ function SubObjectsCard({
           <Select
             size="l"
             width={280}
-            label="Объект:"
+            label={t('objects.objectSelectLabel')}
             value={selectedObjectId ? [selectedObjectId] : []}
             onUpdate={(value) => onSelectObject(value[0] ?? null)}
-            placeholder="Все объекты"
+            placeholder={t('objects.objectSelectAll')}
             options={objects.map((obj) => ({
               value: obj.id,
               content: obj.name,
@@ -253,7 +249,7 @@ function SubObjectsCard({
         )}
         <Button view="normal-contrast" size="l" onClick={() => setCreating(true)}>
           <Icon data={Plus} size={16} />
-          Добавить объект
+          {t('objects.addObject')}
         </Button>
       </Flex>
 
@@ -266,10 +262,12 @@ function SubObjectsCard({
         >
           <Flex alignItems="center" gap={2}>
             <Icon data={House} size={16} />
-            <Text variant="subheader-2">{selectedObject ? selectedObject.name : 'Объект'}</Text>
+            <Text variant="subheader-2">
+              {selectedObject ? selectedObject.name : t('objects.headerFallback')}
+            </Text>
             {selectedObject && (
               <Text variant="body-1" color="secondary">
-                {FACILITY_TYPE_LABELS[selectedObject.type]}
+                {t(`facility.${selectedObject.type}`)}
               </Text>
             )}
           </Flex>
@@ -281,7 +279,7 @@ function SubObjectsCard({
               onClick={() => setEditing(true)}
             >
               <Icon data={Pencil} size={16} />
-              Редактировать
+              {t('common.edit')}
             </Button>
           )}
         </Flex>
@@ -295,7 +293,7 @@ function SubObjectsCard({
             }}
           >
             {objectRows.length === 0 ? (
-              <EmptyState text="У объекта пока нет групп/классов" />
+              <EmptyState text={t('objects.emptyObjectGroups')} />
             ) : (
               <div className="admin-table-wrap">
                 <Table
@@ -314,14 +312,14 @@ function SubObjectsCard({
                   columns={[
                     {
                       id: 'departmentName',
-                      name: 'Группа / класс',
+                      name: t('objects.colGroup'),
                       width: '60%',
                       template: (row) => (row.showDepartment ? row.departmentName : null),
                       placeholder: () => null,
                     },
                     {
                       id: 'tableName',
-                      name: 'Рацион',
+                      name: t('objects.colDiet'),
                       width: '40%',
                     },
                   ]}
@@ -342,7 +340,7 @@ function SubObjectsCard({
             style={{ alignSelf: 'flex-start' }}
           >
             <Icon data={Plus} size={16} />
-            Добавить подобъект
+            {t('objects.subCreateTitle')}
           </Button>
 
           {subObjects.length === 0

@@ -1,4 +1,5 @@
 import type { useToaster } from '@gravity-ui/uikit';
+import { i18n } from '@/shared/i18n';
 
 type Toaster = ReturnType<typeof useToaster>;
 
@@ -9,28 +10,20 @@ type Toaster = ReturnType<typeof useToaster>;
  * совпадение ищется по подстроке, а не по равенству. Неопознанное сообщение
  * показывается как есть: спрятать его значило бы оставить человека гадать.
  */
-const ERROR_TEXTS: [match: RegExp, title: string, hint?: string][] = [
-  [/СНИЛС checksum/, 'СНИЛС неверный', 'Не сошлось контрольное число — проверьте цифры'],
-  [/ИНН checksum/, 'ИНН неверный', 'Не сошлись контрольные разряды — проверьте цифры'],
-  [/СНИЛС must contain/, 'СНИЛС неверный', 'В СНИЛС должно быть 11 цифр'],
-  [/ИНН must contain/, 'ИНН неверный', 'В ИНН должно быть 12 цифр'],
-  [/серия паспорта must contain/, 'Серия паспорта неверна', 'В серии должно быть 4 цифры'],
-  [/номер паспорта must contain/, 'Номер паспорта неверен', 'В номере должно быть 6 цифр'],
-  [
-    /contains a non-digit/,
-    'Недопустимые символы',
-    'В номерах документов допустимы только цифры, пробелы, точки и дефисы',
-  ],
-  [/email .*is invalid|email is empty/, 'Почта указана с ошибкой', 'Проверьте адрес'],
-  [/first name is empty/, 'Не заполнено имя'],
-  [/last name is empty/, 'Не заполнена фамилия'],
-  [/already registered/, 'Сотрудник уже зарегистрирован', 'Повторное приглашение не требуется'],
-  [/already exists/, 'Такой сотрудник уже есть', 'Эта почта занята другой карточкой'],
-  [
-    /email was not sent/,
-    'Письмо не отправилось',
-    'Карточка сохранена — вышлите приглашение заново из списка',
-  ],
+const ERROR_TEXTS: [match: RegExp, titleKey: string, hintKey?: string][] = [
+  [/СНИЛС checksum/, 'staff.errSnilsInvalid', 'staff.errSnilsInvalidHint'],
+  [/ИНН checksum/, 'staff.errInnInvalid', 'staff.errInnInvalidHint'],
+  [/СНИЛС must contain/, 'staff.errSnilsLength', 'staff.errSnilsLengthHint'],
+  [/ИНН must contain/, 'staff.errInnLength', 'staff.errInnLengthHint'],
+  [/серия паспорта must contain/, 'staff.errPassportSeries', 'staff.errPassportSeriesHint'],
+  [/номер паспорта must contain/, 'staff.errPassportNumber', 'staff.errPassportNumberHint'],
+  [/contains a non-digit/, 'staff.errNonDigit', 'staff.errNonDigitHint'],
+  [/email .*is invalid|email is empty/, 'staff.errEmail', 'staff.errEmailHint'],
+  [/first name is empty/, 'staff.errFirstName'],
+  [/last name is empty/, 'staff.errLastName'],
+  [/already registered/, 'staff.errAlreadyRegistered', 'staff.errAlreadyRegisteredHint'],
+  [/already exists/, 'staff.errAlreadyExists', 'staff.errAlreadyExistsHint'],
+  [/email was not sent/, 'staff.errEmailNotSent', 'staff.errEmailNotSentHint'],
 ];
 
 export function toastError(toaster: Toaster, name: string, error: unknown): void {
@@ -39,8 +32,12 @@ export function toastError(toaster: Toaster, name: string, error: unknown): void
 
   toaster.add({
     name,
-    title: known ? known[1] : 'Ошибка',
-    content: known ? known[2] : message || 'Неизвестная ошибка',
+    title: known ? i18n.t(known[1]) : i18n.t('common.error'),
+    content: known
+      ? known[2]
+        ? i18n.t(known[2])
+        : undefined
+      : message || i18n.t('common.unknownError'),
     theme: 'danger',
   });
 }
