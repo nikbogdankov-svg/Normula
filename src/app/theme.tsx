@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { ThemeProvider } from '@gravity-ui/uikit';
 import { useTranslation } from '@/shared/i18n';
 
-type AppTheme = 'light' | 'dark';
+type AppTheme = 'light';
 const STORAGE_KEY = 'onemore.theme';
 
 interface ThemeContextValue {
@@ -13,25 +13,16 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/** Тема Gravity UI с сохранением выбора. Дефолт — системная. */
+/** Тема Gravity UI. Только светлая тема. */
 export function AppThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<AppTheme>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'light' || saved === 'dark') return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const [theme] = useState<AppTheme>('light');
 
   const setTheme = useCallback((next: AppTheme) => {
     localStorage.setItem(STORAGE_KEY, next);
-    setThemeState(next);
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setThemeState((t) => {
-      const next = t === 'dark' ? 'light' : 'dark';
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
+    localStorage.setItem(STORAGE_KEY, 'light');
   }, []);
 
   const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, setTheme, toggleTheme]);

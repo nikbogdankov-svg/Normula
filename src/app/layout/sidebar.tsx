@@ -1,12 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { Button, DropdownMenu, Flex, Icon, Text, Tooltip } from '@gravity-ui/uikit';
-import {
-  ArrowRightFromSquare,
-  EllipsisVertical,
-  LayoutSideContent,
-  Moon,
-  Sun,
-} from '@gravity-ui/icons';
+import { ArrowRightFromSquare, EllipsisVertical, LayoutSideContent } from '@gravity-ui/icons';
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
 import { useTranslation, setLanguage, LANGUAGES } from '@/shared/i18n';
@@ -40,7 +34,7 @@ export function Sidebar({
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
-  const { theme, toggleTheme } = useAppTheme();
+  useAppTheme(); // тема только светлая, переключатель временно убран
   const { signOut, user } = useAuth();
   const { current, scopes } = useOrganizations();
   const { t, i18n } = useTranslation();
@@ -116,11 +110,12 @@ export function Sidebar({
                 action: () => setLanguage(language.code),
               })),
             },
-            {
-              text: theme === 'dark' ? t('sidebar.lightTheme') : t('sidebar.darkTheme'),
-              iconStart: <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />,
-              action: () => toggleTheme(),
-            },
+            // Тёмная тема временно отключена
+            // {
+            //   text: theme === 'dark' ? t('sidebar.lightTheme') : t('sidebar.darkTheme'),
+            //   iconStart: <Icon data={theme === 'dark' ? Sun : Moon} size={BUTTON_ICON_SIZE} />,
+            //   action: () => toggleTheme(),
+            // },
             {
               text: t('sidebar.logout'),
               iconStart: <Icon data={ArrowRightFromSquare} size={BUTTON_ICON_SIZE} />,

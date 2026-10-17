@@ -94,14 +94,10 @@ function PreferencesCard() {
           <Select
             width="max"
             value={[theme]}
-            onUpdate={(value) => {
-              const next = value[0];
-              if (next === 'light' || next === 'dark') setTheme(next);
+            onUpdate={() => {
+              setTheme('light');
             }}
-            options={[
-              { value: 'light', content: t('profile.themeLight') },
-              { value: 'dark', content: t('profile.themeDark') },
-            ]}
+            options={[{ value: 'light', content: t('profile.themeLight') }]}
           />
         </Field>
         <Field label={t('profile.languageLabel')}>
