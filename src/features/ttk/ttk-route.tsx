@@ -65,7 +65,7 @@ function filterRecipes(
   return found.sort((a, b) => {
     if (sort === 'price') return (a.price - b.price) * direction;
 
-    return a.name.localeCompare(b.name, 'ru') * direction;
+    return a.name.localeCompare(b.name, 'cs') * direction;
   });
 }
 
@@ -87,7 +87,7 @@ export function TtkRoute() {
 
   const collectionOptions = useMemo(() => {
     const names = [...new Set(all.map((recipe) => recipe.collectionName).filter(Boolean))].sort(
-      (a, b) => a.localeCompare(b, 'ru')
+      (a, b) => a.localeCompare(b, 'cs')
     );
     const hasEmpty = all.some((recipe) => recipe.collectionName === '');
 

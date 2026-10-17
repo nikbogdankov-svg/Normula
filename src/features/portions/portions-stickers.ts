@@ -42,7 +42,7 @@ function compositionOf(recipe: Recipe | null): string {
   return recipe ? recipe.ingredients.map((ingredient) => ingredient.productName).join(', ') : '';
 }
 
-/** Форматирует число по-русски без дробной части, лишние нули убирает. */
+/** Форматирует число без лишних нулей, с запятой как десятичным разделителем. */
 function formatValue(value: number): string {
   const rounded = Math.round(value * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');

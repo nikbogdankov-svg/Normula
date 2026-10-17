@@ -2,7 +2,7 @@ import { PRICE_DECIMALS, QUANTITY_DECIMALS } from './types';
 
 /** Сумма в рублях: «1 234,56 ₽». */
 export function formatMoney(value: number): string {
-  return `${value.toLocaleString('ru-RU', {
+  return `${value.toLocaleString('cs-CZ', {
     minimumFractionDigits: PRICE_DECIMALS,
     maximumFractionDigits: PRICE_DECIMALS,
   })} ₽`;
@@ -10,7 +10,7 @@ export function formatMoney(value: number): string {
 
 /** Количество без лишних нулей: «10,5», «0,987», «12». */
 export function formatQuantity(value: number, unit?: string): string {
-  const text = value.toLocaleString('ru-RU', { maximumFractionDigits: QUANTITY_DECIMALS });
+  const text = value.toLocaleString('cs-CZ', { maximumFractionDigits: QUANTITY_DECIMALS });
 
   return unit ? `${text} ${unit}` : text;
 }

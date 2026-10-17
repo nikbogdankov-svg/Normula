@@ -214,7 +214,7 @@ export function AccountsRoute() {
                       </Text>
                       <Text variant="body-2">
                         {t('accounts.chargedRub', {
-                          amount: meal.charged.toLocaleString('ru-RU'),
+                          amount: meal.charged.toLocaleString('cs-CZ'),
                         })}
                       </Text>
                     </div>
@@ -232,7 +232,7 @@ export function AccountsRoute() {
                           </td>
                           <td style={{ textAlign: 'right' }}>
                             {t('accounts.amountRub', {
-                              amount: diet.charged.toLocaleString('ru-RU'),
+                              amount: diet.charged.toLocaleString('cs-CZ'),
                             })}
                           </td>
                         </tr>
@@ -291,7 +291,7 @@ function AccountsTable({
       align: 'end',
       template: (row) => (
         <Text variant="body-2">
-          {t('accounts.amountRub', { amount: row.charged.toLocaleString('ru-RU') })}
+          {t('accounts.amountRub', { amount: row.charged.toLocaleString('cs-CZ') })}
         </Text>
       ),
     },

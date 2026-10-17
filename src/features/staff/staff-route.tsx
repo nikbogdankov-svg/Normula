@@ -98,7 +98,7 @@ function StaffCard({
       if (sort === 'name') {
         const left = `${a.lastName} ${a.firstName}`.trim();
         const right = `${b.lastName} ${b.firstName}`.trim();
-        return left.localeCompare(right, 'ru') * dir;
+        return left.localeCompare(right, 'cs') * dir;
       }
 
       // Числами, а не строками: epoch-миллисекунды приходят строкой (int64

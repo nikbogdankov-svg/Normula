@@ -59,7 +59,7 @@ function shiftIso(date: string, days: number): string {
 }
 
 function formatQuantity(quantity: number, unit: string): string {
-  return `${quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${unit}`;
+  return `${quantity.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} ${unit}`;
 }
 
 /** ISO-дата в виде «ДД.ММ.ГГГГ» для печатного документа. */

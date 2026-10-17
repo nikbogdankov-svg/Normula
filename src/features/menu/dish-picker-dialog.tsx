@@ -71,7 +71,7 @@ export function DishPickerDialog({
     return (recipes.data?.recipes ?? [])
       .filter((recipe) => !query || recipe.name.toLowerCase().includes(query))
       .filter((recipe) => !draft.some((dish) => dish.recipeId === recipe.id))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+      .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
   }, [recipes.data?.recipes, draft, search]);
 
   const add = (recipeId: string) => {

@@ -11,7 +11,7 @@ import { router } from './app/router';
 
 async function bootstrap() {
   try {
-    await settings.loadLocale('ru');
+    await settings.loadLocale('cs');
   } catch {
     // If locale load fails, app still renders with default locale.
   }

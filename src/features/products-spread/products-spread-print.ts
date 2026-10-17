@@ -53,7 +53,7 @@ export function buildProductSpreadPrint(items: ProductSpreadItem[]): {
 
 /** Форматирует количество с единицей: «12,5 кг». */
 function formatQuantity(quantity: number, unit: string): string {
-  return `${quantity.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ${unit}`;
+  return `${quantity.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} ${unit}`;
 }
 
 const COLUMN_WIDTHS = [34, 116, 36];

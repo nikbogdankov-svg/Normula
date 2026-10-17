@@ -874,7 +874,7 @@ function DishesDistributionTable({
     // в «По объектам»): группировка ниже склеивает только соседние строки.
     // Сортировка стабильная — исходный порядок внутри блюда сохраняется.
     const grouped = (rows as { dishName: string; mealId: MealId }[]).slice().sort((a, b) => {
-      const byDish = a.dishName.localeCompare(b.dishName, 'ru');
+      const byDish = a.dishName.localeCompare(b.dishName, 'cs');
       return byDish !== 0 ? byDish : MEALS_ORDER[a.mealId] - MEALS_ORDER[b.mealId];
     }) as DishDistributionRow[];
 
@@ -1101,7 +1101,7 @@ function DishesDistributionTable({
                     color="secondary"
                     style={{ marginLeft: 6, fontWeight: 'normal' }}
                   >
-                    ({row.weightKg.toLocaleString('ru-RU', { maximumFractionDigits: 1 })}{' '}
+                    ({row.weightKg.toLocaleString('cs-CZ', { maximumFractionDigits: 1 })}{' '}
                     {t('portions.kg')})
                   </Text>
                 )}

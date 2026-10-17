@@ -63,7 +63,7 @@ function buildCards(batches: Batch[], search: string): ProductCard[] {
     card.avgPrice = card.totalRemaining > 0 ? weighted / card.totalRemaining : 0;
   }
 
-  return cards.sort((a, b) => a.productName.localeCompare(b.productName, 'ru'));
+  return cards.sort((a, b) => a.productName.localeCompare(b.productName, 'cs'));
 }
 
 /** Раздел «Склад → Остатки»: открытые партии объекта в разрезе продуктов. */
