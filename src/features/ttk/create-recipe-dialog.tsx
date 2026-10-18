@@ -6,6 +6,7 @@ import { useRecipeForm } from './recipe-form';
 import { useDrawerHeight } from './use-drawer-height';
 import { useTranslation } from '@/shared/i18n';
 import './recipe-drawer.css';
+import { errorText } from '@/shared/api/error-text';
 
 /**
  * Создание ТТК в нижнем drawer.
@@ -59,7 +60,7 @@ export function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: 
         toaster.add({
           name: 'ttk-create',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });

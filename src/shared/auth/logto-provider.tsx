@@ -3,12 +3,14 @@ import {
   LogtoClientError,
   LogtoProvider,
   LogtoRequestError,
+  Prompt,
   ReservedScope,
   useLogto,
   UserScope,
   type LogtoConfig,
 } from '@logto/react';
 import { config } from '@/shared/config';
+import { i18n } from '@/shared/i18n';
 import {
   AuthContext,
   type AuthContextValue,
@@ -239,6 +241,17 @@ function LogtoAuthBridge({ children }: { children: ReactNode }) {
       user,
       signIn: () => signIn(signInRedirectUri),
       signOut: () => signOut(postSignOutRedirectUri),
+      // prompt=login обязателен: при живой сессии Logto иначе пропустит
+      // экраны и сразу вернёт человека обратно, не показав сброс пароля.
+      changePassword: () =>
+        signIn({
+          redirectUri: signInRedirectUri,
+          firstScreen: 'reset_password',
+          prompt: Prompt.Login,
+          loginHint: user?.email,
+          // Экран сброса и письмо с кодом — на языке интерфейса.
+          extraParams: { ui_locales: i18n.language },
+        }),
       getApiToken,
       getOrganizationToken: getOrgToken,
       getOrganizationScopes,

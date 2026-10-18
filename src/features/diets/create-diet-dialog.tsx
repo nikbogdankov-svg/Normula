@@ -5,6 +5,7 @@ import { useTranslation } from '@/shared/i18n';
 import { useCreateDiet } from './api';
 import { useDietForm } from './diet-form';
 import './diets-route.css';
+import { errorText } from '@/shared/api/error-text';
 
 /** Создание диеты в модалке (popup size s). */
 export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -29,7 +30,7 @@ export function CreateDietDialog({ open, onClose }: { open: boolean; onClose: ()
         toaster.add({
           name: 'diet-create',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });

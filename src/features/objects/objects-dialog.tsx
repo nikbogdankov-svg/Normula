@@ -22,6 +22,7 @@ import {
 } from './types';
 import { useDrawerHeight } from '@/features/ttk/use-drawer-height';
 import './kitchen-drawer.css';
+import { errorText } from '@/shared/api/error-text';
 
 type DepartmentForm = {
   /** Ключ для React: id группы или временный для новой. */
@@ -561,7 +562,7 @@ export function ObjectDrawer({
           toaster.add({
             name: 'object-create',
             title: t('objects.createFailed'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       });
@@ -585,7 +586,7 @@ export function ObjectDrawer({
           toaster.add({
             name: 'object-edit',
             title: t('objects.saveFailed'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -612,7 +613,7 @@ export function ObjectDrawer({
           toaster.add({
             name: 'object-delete',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -861,7 +862,7 @@ export function SubObjectDrawer({
           toaster.add({
             name: 'subobject-create',
             title: t('objects.subCreateFailed'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -889,7 +890,7 @@ export function SubObjectDrawer({
           toaster.add({
             name: 'subobject-edit',
             title: t('objects.saveFailed'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -915,7 +916,7 @@ export function SubObjectDrawer({
           toaster.add({
             name: 'subobject-delete',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

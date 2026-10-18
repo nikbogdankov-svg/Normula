@@ -35,6 +35,7 @@ import {
 } from '@/features/warehouse/types';
 import { useTranslation } from '@/shared/i18n';
 import './create-receipt-drawer.css';
+import { errorText } from '@/shared/api/error-text';
 
 /**
  * Значения селектов приёмочного контроля. Бэкенд хранит их как текст и
@@ -420,7 +421,7 @@ export function CreateReceiptDrawer({
       toaster.add({
         name: initial ? 'receipt-update' : 'receipt-create',
         title: t('common.error'),
-        content: e.message,
+        content: errorText(e),
         theme: 'danger',
       });
 

@@ -8,11 +8,14 @@ import { RECIPE_DECIMALS, type Recipe, type RecipeRequest } from './types';
 import './recipe-drawer.css';
 
 /** Код проблемы строки ингредиента; текст берётся из словаря по этому коду. */
-type IngredientProblem = 'selectProduct' | 'grossPositive' | 'netRange' | 'duplicate';
+type IngredientProblem =
+  'selectProduct' | 'grossDecimals' | 'grossPositive' | 'netDecimals' | 'netRange' | 'duplicate';
 
 const INGREDIENT_PROBLEM_KEYS: Record<IngredientProblem, string> = {
   selectProduct: 'ttk.errorSelectProduct',
+  grossDecimals: 'ttk.errorGrossDecimals',
   grossPositive: 'ttk.errorGrossPositive',
+  netDecimals: 'ttk.errorNetDecimals',
   netRange: 'ttk.errorNetRange',
   duplicate: 'ttk.errorDuplicateProduct',
 };
@@ -89,6 +92,13 @@ function parseOptionalDecimal(value: string): number | null {
   if (value.trim() === '') return 0;
 
   return parseDecimal(value, RECIPE_DECIMALS);
+}
+
+/** Знаков после запятой больше, чем примет бэкенд. */
+function hasExtraDecimals(value: string): boolean {
+  const fraction = value.trim().replace(',', '.').split('.')[1];
+
+  return fraction !== undefined && fraction.length > RECIPE_DECIMALS;
 }
 
 /** Разрешаем только цифры и десятичный разделитель: минус и буквы не вводятся. */
@@ -183,8 +193,14 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
   const ingredientProblem = (row: IngredientDraft): IngredientProblem | null => {
     if (!row.productId) return 'selectProduct';
 
+    // Лишние знаки после запятой — отдельная ошибка: иначе число вроде
+    // 3.0032 выглядело бы как «не больше нуля».
+    if (hasExtraDecimals(row.gross)) return 'grossDecimals';
+
     const gross = parseDecimal(row.gross, RECIPE_DECIMALS);
     if (gross === null || gross <= 0) return 'grossPositive';
+
+    if (hasExtraDecimals(row.net)) return 'netDecimals';
 
     const net = parseOptionalDecimal(row.net);
     if (net === null || net > gross) return 'netRange';
@@ -404,6 +420,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
                     valueLabel={row.productName}
                     placeholder={t('ttk.productNamePlaceholder')}
                     size="l"
+                    withWater
                     onChange={(product) =>
                       updateIngredient(index, {
                         productId: product?.id ?? '',
@@ -418,7 +435,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
                   placeholder="000"
                   value={row.gross}
                   onUpdate={(value) => updateIngredient(index, { gross: value })}
-                  invalid={active && problem === 'grossPositive'}
+                  invalid={active && (problem === 'grossPositive' || problem === 'grossDecimals')}
                   endContent={unitHint(row.unit)}
                 />
                 <NumberInput
@@ -426,7 +443,7 @@ export function useRecipeForm(initial?: Recipe | null, resetKey?: string) {
                   placeholder="000"
                   value={row.net}
                   onUpdate={(value) => updateIngredient(index, { net: value })}
-                  invalid={active && problem === 'netRange'}
+                  invalid={active && (problem === 'netRange' || problem === 'netDecimals')}
                   endContent={unitHint(row.unit)}
                 />
                 <Button

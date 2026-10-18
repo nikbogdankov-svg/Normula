@@ -60,6 +60,7 @@ import { MEALS, type Dish, type MealId, type Violation, type ViolationMetric } f
 import { buildMenuPrintRows, downloadMenuDoc } from './menu-print';
 import { useTranslation } from '@/shared/i18n';
 import './menu-route.css';
+import { errorText } from '@/shared/api/error-text';
 
 const EMPTY_DISHES: Dish[] = [];
 
@@ -356,7 +357,7 @@ function MenuByDates() {
       toaster.add({
         name: 'menu-fill-error',
         title: t('menu.fillError'),
-        content: error instanceof Error ? error.message : t('menu.tryAgain'),
+        content: errorText(error),
         theme: 'danger',
       });
     } finally {
@@ -384,7 +385,7 @@ function MenuByDates() {
       toaster.add({
         name: 'menu-create-error',
         title: t('menu.createError'),
-        content: error instanceof Error ? error.message : t('menu.tryAgain'),
+        content: errorText(error),
         theme: 'danger',
       });
     } finally {
@@ -445,7 +446,7 @@ function MenuByDates() {
           toaster.add({
             name: 'menu-violation-error',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -489,7 +490,7 @@ function MenuByDates() {
           toaster.add({
             name: 'menu-slot-error',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

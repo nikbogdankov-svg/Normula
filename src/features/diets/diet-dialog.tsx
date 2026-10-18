@@ -8,6 +8,7 @@ import { useDietForm } from './diet-form';
 import { MEALS } from '@/features/menu/types';
 import type { Diet } from './types';
 import './diets-route.css';
+import { errorText } from '@/shared/api/error-text';
 
 const FACILITY_TYPE_LABEL_KEYS: Record<string, string> = {
   school: 'facility.school',
@@ -111,7 +112,7 @@ export function DietDialog({
           toaster.add({
             name: 'diet-update',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -141,7 +142,7 @@ export function DietDialog({
           toaster.add({
             name: 'diet-delete',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
