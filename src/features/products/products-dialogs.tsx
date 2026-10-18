@@ -5,6 +5,7 @@ import { useDeleteProduct, useUpdateProduct } from './api';
 import { useProductForm } from './product-form';
 import type { Product } from './types';
 import './product-dialog.css';
+import { errorText } from '@/shared/api/error-text';
 
 /** Редактирование продукта: форма уже предзаполнена, меняются имя и/или единица. */
 export function EditProductDialog({
@@ -33,7 +34,7 @@ export function EditProductDialog({
           toaster.add({
             name: 'product-update',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -95,7 +96,7 @@ export function DeleteProductDialog({
           toaster.add({
             name: 'product-delete',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

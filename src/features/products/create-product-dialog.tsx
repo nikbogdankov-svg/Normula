@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useCreateProduct } from './api';
 import { useProductForm } from './product-form';
 import './product-dialog.css';
+import { errorText } from '@/shared/api/error-text';
 
 /**
  * Минимальный диалог создания продукта (имя + единица), вызываемый inline
@@ -45,7 +46,7 @@ export function CreateProductDialog({
         toaster.add({
           name: 'product-create',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });

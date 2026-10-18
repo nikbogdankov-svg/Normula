@@ -25,6 +25,7 @@ import type { Organization } from './types';
 import { useOrganizations } from '@/shared/auth';
 import { OrganizationDetails } from './organization-details';
 import { RolesCard } from './roles-card';
+import { errorText } from '@/shared/api/error-text';
 
 /** «Управление» — организации в том же карточном стиле, что и «Персонал». */
 export function ManagementRoute() {
@@ -121,7 +122,7 @@ function OrganizationsTable({
           toaster.add({
             name: 'org-disable',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -151,7 +152,7 @@ function OrganizationsTable({
         toaster.add({
           name: 'org-delete',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });
@@ -251,7 +252,8 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
     create.mutate(
       {
         name: name.trim(),
-        description: `${adminFirstName.trim()} ${adminLastName.trim()}`.trim(),
+        adminFirstName: adminFirstName.trim(),
+        adminLastName: adminLastName.trim(),
         adminEmail: adminEmail.trim(),
       },
       {
@@ -269,7 +271,7 @@ function CreateOrganizationDialog({ open, onClose }: { open: boolean; onClose: (
           toaster.add({
             name: 'org-create',
             title: t('org.createFailed'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

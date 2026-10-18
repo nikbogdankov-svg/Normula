@@ -23,6 +23,12 @@ export interface AuthContextValue {
 
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Смена пароля: вход Logto сразу на экране сброса пароля — код на почту
+   * и новый пароль. После него человек возвращается в приложение уже
+   * вошедшим.
+   */
+  changePassword: () => Promise<void>;
 
   /** Access token для API-ресурса (aud = apiResource). */
   getApiToken: () => Promise<string>;

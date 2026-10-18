@@ -24,6 +24,7 @@ import {
 } from './api';
 import type { Invitation, InvitationStatus, Organization } from './types';
 import { formatDate } from './management-route';
+import { errorText } from '@/shared/api/error-text';
 
 const STATUS_LABEL: Record<
   InvitationStatus,
@@ -88,7 +89,7 @@ function MembersSection({ organizationId }: { organizationId: string }) {
         toaster.add({
           name: 'member-remove',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });
@@ -181,7 +182,7 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
           toaster.add({
             name: 'invite',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -194,7 +195,7 @@ function InvitationsSection({ organizationId }: { organizationId: string }) {
         toaster.add({
           name: 'revoke',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });

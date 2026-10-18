@@ -1,5 +1,6 @@
 import { Alert, Flex, Loader, Text } from '@gravity-ui/uikit';
 import { useTranslation } from '@/shared/i18n';
+import { errorText } from '@/shared/api/error-text';
 
 /** Стандартные состояния данных — чтобы фичи не изобретали свои. */
 
@@ -13,7 +14,7 @@ export function LoadingState() {
 
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const { t } = useTranslation();
-  const message = error instanceof Error ? error.message : t('common.unknownError');
+  const message = errorText(error);
   return (
     <Alert
       theme="danger"
