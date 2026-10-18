@@ -19,6 +19,7 @@ import type { Ingredient, Recipe } from './types';
 import { useDrawerHeight } from './use-drawer-height';
 import { useTranslation } from '@/shared/i18n';
 import './recipe-drawer.css';
+import { errorText } from '@/shared/api/error-text';
 
 /** Пара «подпись — значение» в шапке карты. */
 function MetaRow({ title, children }: { title: string; children: React.ReactNode }) {
@@ -187,7 +188,7 @@ export function RecipeDialog({
           toaster.add({
             name: 'ttk-delete',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -210,7 +211,7 @@ export function RecipeDialog({
           toaster.add({
             name: 'ttk-update',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -233,7 +234,7 @@ export function RecipeDialog({
         toaster.add({
           name: 'ttk-create',
           title: t('common.error'),
-          content: e.message,
+          content: errorText(e),
           theme: 'danger',
         }),
     });

@@ -63,6 +63,7 @@ import { downloadStickersDoc, type StickerRow } from './portions-stickers';
 import { MEALS, type MealId } from '@/features/menu/types';
 import { todayIso, shiftIso, type DishDistributionRow, type PortionsView } from './types';
 import './portions-route.css';
+import { errorText } from '@/shared/api/error-text';
 
 const ALL_SUBOBJECTS = '__all';
 
@@ -274,7 +275,7 @@ export function PortionsRoute() {
           toaster.add({
             name: 'portions-fill',
             title: t('portions.fillError'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }
@@ -611,7 +612,7 @@ function SummaryPortionsTable({
           toaster.add({
             name: 'portions-headcount',
             title: t('portions.saveError'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

@@ -35,8 +35,16 @@ export function ProductsRoute() {
 
   const { data, isPending, isError, error, refetch } = useProducts();
 
-  // Справочник приходит целиком, поиск — по нему на клиенте.
-  const products = useMemo(() => filterProducts(data?.products ?? [], search), [data, search]);
+  // Справочник приходит целиком, поиск — по нему на клиенте. Воду в разделе
+  // не показываем: она системная, её выбирают только в составе ТТК.
+  const products = useMemo(
+    () =>
+      filterProducts(
+        (data?.products ?? []).filter((product) => !product.water),
+        search
+      ),
+    [data, search]
+  );
   const hasQuery = search.trim() !== '';
 
   return (

@@ -23,6 +23,7 @@ import {
   type WriteOffRequest,
 } from '@/features/warehouse/types';
 import { useTranslation } from '@/shared/i18n';
+import { errorText } from '@/shared/api/error-text';
 
 /** Строка формы: накладная выбирается первой, товар — из её партий. */
 interface DraftRow {
@@ -237,7 +238,7 @@ export function CreateWriteOffDialog({
       toaster.add({
         name: initial ? 'write-off-update' : 'write-off-create',
         title: t('common.error'),
-        content: e.message,
+        content: errorText(e),
         theme: 'danger',
       });
 

@@ -61,7 +61,9 @@ export interface ListOrganizationsResponse {
 
 export interface CreateOrganizationRequest {
   name: string;
-  description: string;
+  /** Имя и фамилия первого администратора — сохраняются в его карточке. */
+  adminFirstName: string;
+  adminLastName: string;
   adminEmail: string;
   adminRoleIds?: string[];
 }

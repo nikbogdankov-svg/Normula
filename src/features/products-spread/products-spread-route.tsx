@@ -32,6 +32,7 @@ import { useConfirmProductSpread, useProductSpread } from './api';
 import { MEALS, type ProductSpreadItem } from './types';
 import { buildProductSpreadPrint, downloadProductSpreadDoc } from './products-spread-print';
 import './products-spread-route.css';
+import { errorText } from '@/shared/api/error-text';
 
 const ALL_OBJECTS = '__all';
 
@@ -125,7 +126,7 @@ export function ProductsSpreadRoute() {
           toaster.add({
             name: 'products-spread-confirm',
             title: t('common.error'),
-            content: e.message,
+            content: errorText(e),
             theme: 'danger',
           }),
       }

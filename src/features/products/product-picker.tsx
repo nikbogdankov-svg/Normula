@@ -25,6 +25,7 @@ export function ProductPicker({
   disabled,
   selectedHint,
   showUnitInValue = true,
+  withWater = false,
   onChange,
 }: {
   /** id выбранного продукта (пусто — ничего не выбрано). */
@@ -45,6 +46,8 @@ export function ProductPicker({
   selectedHint?: ReactNode;
   /** Показывать единицу измерения рядом с названием в контроле (по умолчанию да). */
   showUnitInValue?: boolean;
+  /** Предлагать воду из справочника — только в составе ТТК, на складе её нет. */
+  withWater?: boolean;
   onChange: (product: (Product & { unit?: string }) | null) => void;
 }) {
   const { t } = useTranslation();
@@ -52,7 +55,10 @@ export function ProductPicker({
   const [filter, setFilter] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
-  const allProducts = useMemo(() => products ?? data?.products ?? [], [products, data]);
+  const allProducts = useMemo(
+    () => products ?? (data?.products ?? []).filter((product) => withWater || !product.water),
+    [products, data, withWater]
+  );
 
   const filtered = useMemo(() => filterProducts(allProducts, filter), [allProducts, filter]);
 

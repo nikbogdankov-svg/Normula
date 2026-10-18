@@ -21,6 +21,7 @@ import {
   type TransferRequest,
 } from '@/features/warehouse/types';
 import { useTranslation } from '@/shared/i18n';
+import { errorText } from '@/shared/api/error-text';
 
 /** Строка формы: накладная выбирается первой, товар — из её партий. */
 interface DraftRow {
@@ -230,7 +231,7 @@ export function CreateTransferDialog({
       toaster.add({
         name: initial ? 'transfer-update' : 'transfer-create',
         title: t('common.error'),
-        content: e.message,
+        content: errorText(e),
         theme: 'danger',
       });
 
