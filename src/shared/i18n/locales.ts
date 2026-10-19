@@ -575,6 +575,13 @@ const ru = {
       warehouse: 'Склад',
     },
     priority: { required: 'Обязательно', optional: 'Желательно' },
+    objectLabel: 'Объект',
+    dietLabel: 'Рацион',
+    prevPeriod: 'Предыдущий период',
+    nextPeriod: 'Следующий период',
+    currentPeriod: 'Текущая неделя',
+    printResponsible: 'Ответственный',
+    printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Дата',
       meal: 'Приём пищи',
@@ -609,6 +616,20 @@ const ru = {
       sign: 'Подпись',
       quality: 'Оценка',
       issuePermission: 'Разрешение на выдачу',
+      arrivalDateTime: 'Дата и час поступления пищевой продукции',
+      productName: 'Наименование',
+      packaging: 'Фасовка',
+      productionDate: 'Дата выработки',
+      manufacturer: 'Изготовитель',
+      arrivalQuantity: 'Количество поступившего продукта (в кг, литрах, шт)',
+      safetyDocument:
+        'Номер документа, подтверждающего безопасность принятого пищевого продукта (декларация о соответствии, свидетельство о государственной регистрации, документы по результатам ветеринарно-санитарной экспертизы)',
+      organoleptic:
+        'Результаты органолептической оценки поступившего продовольственного сырья и пищевых продуктов',
+      storageConditions: 'Условия хранения, конечный срок реализации',
+      actualSaleDateTime: 'Дата и час фактической реализации',
+      responsibleSign: 'Подпись ответственного лица',
+      note: 'Примечание',
     },
     items: {
       'journ-01': {
@@ -1538,6 +1559,13 @@ const en = {
       warehouse: 'Warehouse',
     },
     priority: { required: 'Required', optional: 'Optional' },
+    objectLabel: 'Object',
+    dietLabel: 'Diet',
+    prevPeriod: 'Previous period',
+    nextPeriod: 'Next period',
+    currentPeriod: 'Current week',
+    printResponsible: 'Responsible',
+    printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Date',
       meal: 'Meal',
@@ -1572,6 +1600,20 @@ const en = {
       sign: 'Signature',
       quality: 'Rating',
       issuePermission: 'Issue permission',
+      arrivalDateTime: 'Date and time of receipt of food products',
+      productName: 'Name',
+      packaging: 'Packaging',
+      productionDate: 'Production date',
+      manufacturer: 'Manufacturer',
+      arrivalQuantity: 'Quantity of the received product (in kg, litres, pcs)',
+      safetyDocument:
+        'Number of the document confirming the safety of the accepted food product (declaration of conformity, state registration certificate, veterinary and sanitary examination documents)',
+      organoleptic:
+        'Results of the organoleptic assessment of the received food raw materials and food products',
+      storageConditions: 'Storage conditions, final sale deadline',
+      actualSaleDateTime: 'Date and time of actual sale',
+      responsibleSign: 'Signature of the responsible person',
+      note: 'Note',
     },
     items: {
       'journ-01': {
@@ -2502,6 +2544,13 @@ const cs = {
       warehouse: 'Sklad',
     },
     priority: { required: 'Povinné', optional: 'Volitelné' },
+    objectLabel: 'Objekt',
+    dietLabel: 'Dieta',
+    prevPeriod: 'Předchozí období',
+    nextPeriod: 'Následující období',
+    currentPeriod: 'Aktuální týden',
+    printResponsible: 'Odpovědná osoba',
+    printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Datum',
       meal: 'Jídlo',
@@ -2536,6 +2585,20 @@ const cs = {
       sign: 'Podpis',
       quality: 'Hodnocení',
       issuePermission: 'Povolení k vydání',
+      arrivalDateTime: 'Datum a čas příjmu potravinářské produkce',
+      productName: 'Název',
+      packaging: 'Balení',
+      productionDate: 'Datum výroby',
+      manufacturer: 'Výrobce',
+      arrivalQuantity: 'Množství přijatého produktu (v kg, litrech, ks)',
+      safetyDocument:
+        'Číslo dokladu potvrzujícího bezpečnost přijatého potravinářského produktu (prohlášení o shodě, osvědčení o státní registraci, doklady z veterinárně-sanitární expertizy)',
+      organoleptic:
+        'Výsledky organoleptického hodnocení přijatých potravinářských surovin a výrobků',
+      storageConditions: 'Podmínky skladování, konečná lhůta realizace',
+      actualSaleDateTime: 'Datum a čas skutečné realizace',
+      responsibleSign: 'Podpis odpovědné osoby',
+      note: 'Poznámka',
     },
     items: {
       'journ-01': {
