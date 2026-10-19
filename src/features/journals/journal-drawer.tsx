@@ -1,5 +1,6 @@
 import { Button, Drawer, Flex, Icon, Label, Text } from '@gravity-ui/uikit';
 import { Printer, Xmark } from '@gravity-ui/icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { JOURNAL_SOURCE_KEYS, type AutoJournal } from './types';
 
@@ -32,12 +33,27 @@ function FieldList({
 export function JournalDrawer({
   journal,
   onClose,
+  onPrint,
+  printDisabled = false,
 }: {
   journal: AutoJournal | null;
   onClose: () => void;
+  onPrint: (journal: AutoJournal) => Promise<void>;
+  printDisabled?: boolean;
 }) {
   const { t } = useTranslation();
+  const [printing, setPrinting] = useState(false);
   const requestClose = () => onClose();
+
+  const handlePrint = async () => {
+    if (!journal || printing) return;
+    setPrinting(true);
+    try {
+      await onPrint(journal);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <Drawer
@@ -94,7 +110,13 @@ export function JournalDrawer({
           </Flex>
 
           <Flex className="journal-drawer__footer" gap={2}>
-            <Button view="action" size="l" onClick={() => window.print()}>
+            <Button
+              view="normal"
+              size="l"
+              loading={printing}
+              disabled={printing || printDisabled}
+              onClick={() => void handlePrint()}
+            >
               <Icon data={Printer} size={16} />
               {t('journals.print')}
             </Button>

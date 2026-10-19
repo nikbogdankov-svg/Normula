@@ -89,10 +89,7 @@ export const router = createBrowserRouter([
       {
         path: '/app',
         element: <AppLayout />,
-        children: [
-          { index: true, element: <Navigate to="/app/management" replace /> },
-          ...appChildren,
-        ],
+        children: [{ index: true, element: <Navigate to="/app/menu" replace /> }, ...appChildren],
       },
     ],
   },
