@@ -44,10 +44,12 @@ function loadPtSansFonts(): Promise<{ regular: string; bold: string }> {
   return ptSansFontsPromise;
 }
 
-/** Документ A4 со встроенными шрифтами PT Sans для проверки кириллицы. */
-export async function createPdfDoc(): Promise<jsPDF> {
+/** A4-документ со встроенными шрифтами PT Sans для проверки кириллицы. */
+export async function createPdfDoc(
+  orientation: 'portrait' | 'landscape' = 'portrait'
+): Promise<jsPDF> {
   const fonts = await loadPtSansFonts();
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation });
   doc.addFileToVFS('PTSans-Regular.ttf', fonts.regular);
   doc.addFont('PTSans-Regular.ttf', 'PTSans', 'normal');
   doc.addFileToVFS('PTSans-Bold.ttf', fonts.bold);

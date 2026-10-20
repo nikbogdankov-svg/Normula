@@ -49,9 +49,9 @@ export const AUTO_JOURNALS: AutoJournal[] = [
     titleKey: 'journals.items.journ-02.title',
     descriptionKey: 'journals.items.journ-02.description',
     priority: 'required',
-    sources: ['menu', 'ttk', 'portions'],
-    autoFieldKeys: [],
-    manualFieldKeys: [
+    sources: ['invoices', 'warehouse'],
+    // Всё о партии берётся из строк накладной; дата реализации и подпись — под руку.
+    autoFieldKeys: [
       'arrivalDateTime',
       'productName',
       'packaging',
@@ -62,10 +62,9 @@ export const AUTO_JOURNALS: AutoJournal[] = [
       'safetyDocument',
       'organoleptic',
       'storageConditions',
-      'actualSaleDateTime',
-      'responsibleSign',
       'note',
     ].map(field),
+    manualFieldKeys: ['actualSaleDateTime', 'responsibleSign'].map(field),
   },
   {
     id: 'journ-03',

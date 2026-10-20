@@ -4,13 +4,10 @@ import {
   drawTextCell,
   PDF_BODY_SIZE,
   PDF_CELL_PADDING,
-  PDF_CONTENT_WIDTH,
   PDF_GRID_COLOR,
   PDF_HEADER_FILL,
   PDF_LINE_HEIGHT,
   PDF_MARGIN,
-  PDF_PAGE_HEIGHT,
-  PDF_PAGE_WIDTH,
   PDF_TEXT_COLOR,
   PDF_TEXT_COLOR_MUTED,
   wrapText,
@@ -57,15 +54,19 @@ function columnWeight(key: string): number {
   return 1.2;
 }
 
-/** Рисует форму журнала в переданный jsPDF (A4, миллиметры). */
+/** Рисует форму журнала в переданный jsPDF: A4, альбомная ориентация, миллиметры. */
 export function writeJournalPdf(doc: jsPDF, data: JournalPrintData): void {
   const marginTop = 18;
   const marginBottom = 20;
-  const bodyMaxY = PDF_PAGE_HEIGHT - marginBottom;
+  // Лист может быть и альбомным, и книжным — размеры берём у него самого.
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - PDF_MARGIN * 2;
+  const bodyMaxY = pageHeight - marginBottom;
 
   const weights = data.columns.map((column) => columnWeight(column.key));
   const weightSum = weights.reduce((sum, weight) => sum + weight, 0) || 1;
-  const columnWidths = weights.map((weight) => (weight / weightSum) * PDF_CONTENT_WIDTH);
+  const columnWidths = weights.map((weight) => (weight / weightSum) * contentWidth);
   const columnX: number[] = (() => {
     const xs = [PDF_MARGIN];
     for (const width of columnWidths) xs.push(xs[xs.length - 1] + width);
@@ -85,7 +86,7 @@ export function writeJournalPdf(doc: jsPDF, data: JournalPrintData): void {
 
   const drawGridLine = (y: number) => {
     doc.setDrawColor(...PDF_GRID_COLOR);
-    doc.line(PDF_MARGIN, y, PDF_MARGIN + PDF_CONTENT_WIDTH, y);
+    doc.line(PDF_MARGIN, y, PDF_MARGIN + contentWidth, y);
   };
 
   const drawVerticalLines = (top: number, bottom: number) => {
@@ -104,7 +105,7 @@ export function writeJournalPdf(doc: jsPDF, data: JournalPrintData): void {
     );
     const height = linesMax * PDF_LINE_HEIGHT + PDF_CELL_PADDING * 2;
     doc.setFillColor(...PDF_HEADER_FILL);
-    doc.rect(PDF_MARGIN, top, PDF_CONTENT_WIDTH, height, 'F');
+    doc.rect(PDF_MARGIN, top, contentWidth, height, 'F');
     doc.setFont('PTSans', 'bold');
     doc.setFontSize(PDF_BODY_SIZE);
     doc.setTextColor(...PDF_TEXT_COLOR);
@@ -125,12 +126,12 @@ export function writeJournalPdf(doc: jsPDF, data: JournalPrintData): void {
   doc.setFontSize(14);
   doc.setTextColor(...PDF_TEXT_COLOR);
   doc.text(data.title, PDF_MARGIN, marginTop);
-  doc.text(data.tag, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop, { align: 'right' });
+  doc.text(data.tag, pageWidth - PDF_MARGIN, marginTop, { align: 'right' });
   doc.setFont('PTSans', 'normal');
   doc.setFontSize(PDF_BODY_SIZE);
   doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
   doc.text(data.subtitle, PDF_MARGIN, marginTop + 4.5);
-  doc.text(data.period, PDF_PAGE_WIDTH - PDF_MARGIN, marginTop + 4.5, { align: 'right' });
+  doc.text(data.period, pageWidth - PDF_MARGIN, marginTop + 4.5, { align: 'right' });
 
   let y = marginTop + 10;
   let tableTop = y;
@@ -171,12 +172,12 @@ export function writeJournalPdf(doc: jsPDF, data: JournalPrintData): void {
   doc.setFontSize(PDF_BODY_SIZE);
   doc.setTextColor(...PDF_TEXT_COLOR_MUTED);
   doc.text(i18n.t('journals.printResponsible'), PDF_MARGIN, y + PDF_LINE_HEIGHT);
-  doc.text(data.period, PDF_PAGE_WIDTH - PDF_MARGIN, y + PDF_LINE_HEIGHT, { align: 'right' });
+  doc.text(data.period, pageWidth - PDF_MARGIN, y + PDF_LINE_HEIGHT, { align: 'right' });
 }
 
-/** Скачивает форму журнала как PDF. */
+/** Скачивает форму журнала как PDF: A4 в альбомной ориентации — колонкам нужно место. */
 export async function downloadJournalDoc(data: JournalPrintData): Promise<void> {
-  const doc = await createPdfDoc();
+  const doc = await createPdfDoc('landscape');
   writeJournalPdf(doc, data);
   const fileName = i18n.t('journals.printFileName', {
     tag: data.tag,

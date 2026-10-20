@@ -584,6 +584,9 @@ const ru = {
     printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Дата',
+      printEmptyTitle: 'Печатаем пустой бланк',
+      printEmptyContent:
+        'У объекта нет накладных за выбранный период — остаются пустые строки для заполнения от руки.',
       meal: 'Приём пищи',
       dishes: 'Блюда',
       norm: 'Норма',
@@ -1696,6 +1699,9 @@ const en = {
     printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Date',
+      printEmptyTitle: 'Printing a blank form',
+      printEmptyContent:
+        'The facility has no receipts for the selected period — blank rows are left for handwriting.',
       meal: 'Meal',
       dishes: 'Dishes',
       norm: 'Norm',
@@ -2816,6 +2822,9 @@ const cs = {
     printFileName: '{{tag}} {{range}}',
     field: {
       date: 'Datum',
+      printEmptyTitle: 'Tisk prázdného formuláře',
+      printEmptyContent:
+        'Za vybrané období nejsou žádné příjmy — zůstávají prázdné řádky pro ruční doplnění.',
       meal: 'Jídlo',
       dishes: 'Jídla',
       norm: 'Norma',
