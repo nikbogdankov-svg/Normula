@@ -5,7 +5,7 @@ import { NoAccessPage } from '@/shared/ui/no-access';
 import { useOrganizations } from '@/shared/auth';
 import { AppLayout } from './layout/app-layout';
 import { NAV_ITEMS, isNavItemVisible, type NavItem } from './layout/nav';
-import { LandingRoute } from './routes/landing';
+// import { LandingRoute } from './routes/landing'; // landing route removed, redirect to /app/menu
 import { CallbackRoute } from './routes/callback';
 import { NotFoundRoute } from './routes/not-found';
 import { InvitationRoute } from './routes/invitation';
@@ -79,7 +79,7 @@ const appChildren = NAV_ITEMS.map((item) => {
 });
 
 export const router = createBrowserRouter([
-  { path: '/', element: <LandingRoute /> },
+  { path: '/', element: <Navigate to="/app/menu" replace /> },
   { path: '/callback', element: <CallbackRoute /> },
   // Приём приглашения из письма — до авторизации, её как раз и запускает.
   { path: '/invitation/join', element: <InvitationRoute /> },
