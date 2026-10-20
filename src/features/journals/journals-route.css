@@ -12,6 +12,31 @@
   gap: 12px;
 }
 
+.journals-toolbar {
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.journals-week-field {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+/* Иконка-кнопка в поле дат: правый отступ как у текста слева (12px). */
+.journals-week-field.g-text-input_size_l .g-text-input__additional-content_placement_end {
+  padding-inline-end: 12px;
+}
+
+.journals-week-field .g-text-input__control {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .journals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .journals-card {
   padding: 16px;
 }

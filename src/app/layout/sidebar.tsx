@@ -10,6 +10,7 @@ import {
 import { useAuth, useOrganizations } from '@/shared/auth';
 import { useAppTheme } from '@/app/theme';
 import { useTranslation, setLanguage, LANGUAGES } from '@/shared/i18n';
+import { Logo } from './logo';
 import { visibleNavGroups, type NavItem } from './nav';
 import './sidebar.css';
 
@@ -31,8 +32,6 @@ const TOOLTIP_DELAY = 120;
 /**
  * Боковое меню по макету: лого, сворачивание, сгруппированная навигация,
  * меню пользователя (тема / выход) в трёх точках.
- *
- * Лого — временная текстовая заглушка «ЛОГО» вместо картинки.
  */
 export function Sidebar({
   collapsed,
@@ -80,9 +79,9 @@ export function Sidebar({
         </Tooltip>
 
         {!collapsed && (
-          <Text variant="subheader-2" color="brand" style={{ marginInlineStart: 'auto' }}>
-            {t('sidebar.logo')}
-          </Text>
+          <div style={{ marginInlineStart: 'auto', display: 'flex', alignItems: 'center' }}>
+            <Logo label={t('sidebar.logo')} />
+          </div>
         )}
       </div>
 
