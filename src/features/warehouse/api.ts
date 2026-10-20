@@ -10,7 +10,9 @@ import {
   type ListReceiptsResponse,
   type ListTransfersResponse,
   type ListWriteOffsResponse,
+  type Receipt,
   type ReceiptRequest,
+  type ReceiptSummary,
   type TransferRequest,
   type WriteOffKind,
   type WriteOffRequest,
@@ -55,6 +57,35 @@ export function useReceipt(id: string | null) {
     queryFn: () => api.request<GetReceiptResponse>(`/v1/warehouse/receipts/${id}`),
     enabled: api.organizationId !== null && id !== null,
   });
+}
+
+/** Запрос, на котором держатся пакетные функции склада. */
+export type WarehouseApi = ReturnType<typeof useApi>;
+
+/**
+ * Все накладные объекта одним запросом: журнал печатает период целиком, а не
+ * страницу из пятидесяти. Потолок бэкенда на pageSize — 10000, дальше только
+ * курсор; таких объёмов за период журнала не бывает.
+ */
+export async function fetchAllReceipts(
+  api: WarehouseApi,
+  objectId: string
+): Promise<ReceiptSummary[]> {
+  const query = new URLSearchParams({ objectId, pageSize: String(10000) });
+  const page = await api.request<ListReceiptsResponse>(
+    `/v1/warehouse/receipts?${query.toString()}`
+  );
+
+  return page.receipts;
+}
+
+/** Накладные целиком по списку id: у списка нет ни строк, ни партий. */
+export async function fetchReceiptsByIds(api: WarehouseApi, ids: string[]): Promise<Receipt[]> {
+  const pages = await Promise.all(
+    ids.map((id) => api.request<GetReceiptResponse>(`/v1/warehouse/receipts/${id}`))
+  );
+
+  return pages.map((page) => page.receipt);
 }
 
 /** Страницы списаний объекта одного типа: свежие сверху, следующая — по курсору. */
