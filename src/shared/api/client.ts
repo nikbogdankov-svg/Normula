@@ -1,4 +1,4 @@
-import { config } from '@/shared/config';
+import { mockApiFetch } from './mock/handlers';
 import { i18n } from '@/shared/i18n';
 
 /** Детали ошибки бэкенда: код для пользователя и параметры текста. */
@@ -28,21 +28,6 @@ export class ApiError extends Error {
   }
 }
 
-/** Тело ошибки grpc-gateway: статус gRPC с деталями. */
-interface ErrorBody {
-  code?: number;
-  message?: string;
-  details?: Array<{ '@type'?: string; reason?: string; metadata?: Record<string, string> }>;
-}
-
-/** Достаёт из деталей google.rpc.ErrorInfo — код ошибки для пользователя. */
-function reasonOf(body: ErrorBody): ApiErrorReason | undefined {
-  const info = body.details?.find((detail) => detail['@type']?.endsWith('google.rpc.ErrorInfo'));
-  if (!info?.reason) return undefined;
-
-  return { reason: info.reason, params: info.metadata ?? {} };
-}
-
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -52,35 +37,11 @@ export interface RequestOptions {
 }
 
 /**
- * Единая точка HTTP-общения с бэкендом. Функция чистая: токен приходит
- * аргументом, base URL — из runtime-конфига.
+ * Единая точка HTTP-общения с бэкендом. В мок-режиме все запросы
+ * обрабатываются локальным диспетчером без сетевых вызовов.
  */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  // Язык интерфейса, а не браузера: на нём бэкенд отправляет письма,
-  // которые вызывает запрос (приглашения сотрудникам и администраторам).
-  const headers: Record<string, string> = { 'Accept-Language': i18n.language };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (options.token) headers.Authorization = `Bearer ${options.token}`;
-
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    signal: options.signal,
-  });
-
-  if (!response.ok) {
-    let message = response.statusText;
-    let body: ErrorBody = {};
-    try {
-      body = (await response.json()) as ErrorBody;
-      if (body.message) message = body.message;
-    } catch {
-      // тело не JSON — оставляем statusText
-    }
-    throw new ApiError(response.status, message, body.code, reasonOf(body));
-  }
-
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  // Язык интерфейса прокидываем в мок-слой для совместимости.
+  void i18n.language;
+  return mockApiFetch<T>(path, options);
 }
