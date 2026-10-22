@@ -18,7 +18,7 @@ export interface Diet {
   appliesTo: FacilityType[];
   /** Приёмы пищи, для которых доступна диета (пусто — все). */
   mealIds: MealId[];
-  /** Норма цены на день на человека, ₽. */
+  /** Норма цены на день на человека, Kč. */
   pricePerDay: number;
   /** Норма калорийности на день, ккал. */
   kcal: number;

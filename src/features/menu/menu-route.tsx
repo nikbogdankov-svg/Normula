@@ -663,7 +663,7 @@ function MenuByDates() {
                               <div className="menu-grid__slot-meta">
                                 <span>
                                   {formatMetric(totals.kcal)} {t('menu.kcalUnit')} |{' '}
-                                  {formatMetric(totals.price)} ₽
+                                  {formatMetric(totals.price)} Kč
                                 </span>
                                 <span>
                                   {t('menu.macroProtein')} {formatMetric(totals.protein)} |{' '}
@@ -948,7 +948,7 @@ function DayTotalCell({
           norm={norm.price}
           digits={0}
           unit=""
-          normUnit=" ₽"
+          normUnit=" Kč"
           status={statusOf(violations, 'price')}
         />
       </div>

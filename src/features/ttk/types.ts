@@ -21,7 +21,7 @@ export interface RecipeSummary {
   yieldNet: number;
   yieldLoss: number;
   kcal: number;
-  /** Цена порции, ₽. */
+  /** Цена порции, Kč. */
   price: number;
 }
 
@@ -34,9 +34,9 @@ export interface Ingredient {
   unit: string;
   gross: number;
   net: number;
-  /** Средняя цена единицы продукта по складу, ₽; 0 без остатков. */
+  /** Средняя цена единицы продукта по складу, Kč; 0 без остатков. */
   unitPrice: number;
-  /** Сумма строки, ₽. */
+  /** Сумма строки, Kč. */
   total: number;
 }
 

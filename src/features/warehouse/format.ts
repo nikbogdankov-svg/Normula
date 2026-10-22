@@ -1,11 +1,11 @@
 import { PRICE_DECIMALS, QUANTITY_DECIMALS } from './types';
 
-/** Сумма в рублях: «1 234,56 ₽». */
+/** Сумма в чешских кронах: «1 234,56 Kč». */
 export function formatMoney(value: number): string {
   return `${value.toLocaleString('cs-CZ', {
     minimumFractionDigits: PRICE_DECIMALS,
     maximumFractionDigits: PRICE_DECIMALS,
-  })} ₽`;
+  })} Kč`;
 }
 
 /** Количество без лишних нулей: «10,5», «0,987», «12». */

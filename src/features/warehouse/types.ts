@@ -19,7 +19,7 @@ export interface ReceiptSummary {
   date: string;
   invoiceNumber: string;
   itemsCount: number;
-  /** Сумма накладной, ₽. */
+  /** Сумма накладной, Kč. */
   total: number;
 }
 

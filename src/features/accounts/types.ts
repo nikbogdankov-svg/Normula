@@ -13,7 +13,7 @@ export interface AccountDiet {
   dietId: string;
   dietName: string;
   passed: number;
-  /** Списано, ₽. */
+  /** Списано, Kč. */
   charged: number;
 }
 
@@ -33,7 +33,7 @@ export interface Account {
   date: string;
   /** Человек за день по всем диетам. */
   passed: number;
-  /** Списано за день, ₽: сумма автосписания. */
+  /** Списано за день, Kč: сумма автосписания. */
   charged: number;
   writeOffId: string;
   meals: AccountMeal[];

@@ -29,7 +29,7 @@ export function DishPickerDialog({
   open: boolean;
   title: string;
   dishes: Dish[];
-  /** Суточный лимит цены, ₽. */
+  /** Суточный лимит цены, Kč. */
   priceLimit: number;
   /** Сумма цен по другим приёмам этого дня (без текущей ячейки). */
   dayPriceWithoutSlot: number;

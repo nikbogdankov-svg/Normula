@@ -37,7 +37,7 @@ export interface Dish {
   protein: number;
   fat: number;
   carbs: number;
-  /** Цена порции, ₽, по средним ценам склада. */
+  /** Цена порции, Kč, по средним ценам склада. */
   price: number;
 }
 
