@@ -1,6 +1,6 @@
-/** Утилиты дат для меню (локальный календарь, без UTC-сдвига). */
+/** Pomocné funkce pro kalendář jídelníčku (lokální datum, bez UTC posunu). */
 
-const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'] as const;
+const WEEKDAYS = ['ne', 'po', 'út', 'st', 'čt', 'pá', 'so'] as const;
 
 export function todayIsoDate(): string {
   return toIsoDate(new Date());
@@ -18,10 +18,10 @@ export function parseIsoDate(iso: string): Date {
   return new Date(year, (month || 1) - 1, day || 1);
 }
 
-/** Понедельник недели, в которую входит дата (неделя пн–вс). */
+/** Pondělí týdne, ve kterém datum leží (týden po–ne). */
 export function startOfWeekMonday(iso: string = todayIsoDate()): string {
   const date = parseIsoDate(iso);
-  const weekday = date.getDay(); // 0 = вс … 6 = сб
+  const weekday = date.getDay(); // 0 = ne … 6 = so
   const delta = weekday === 0 ? -6 : 1 - weekday;
   date.setDate(date.getDate() + delta);
   return toIsoDate(date);
