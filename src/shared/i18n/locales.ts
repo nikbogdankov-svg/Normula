@@ -1246,7 +1246,7 @@ const cs = {
       'Odpověď vrátil autorizační server ({{endpoint}}). Běžné příčiny: aplikaci nejsou povoleny požadované scopes, není zaregistrován API resource {{apiResource}} nebo není nastaven redirect URI {{origin}}/callback.',
   },
   states: {
-    loadFailed: 'Nepodařilo se načíst data',
+    loadFailed: 'Načtení dat se nezdařilo',
     noOrgTitle: 'Žádné dostupné organizace',
     noOrgMessage:
       'Účet nepatří do žádné organizace — oddíly s organizačními daty nebudou fungovat.',
@@ -2124,7 +2124,7 @@ const cs = {
   apiErrors: {
     fallback: {
       network: 'Nelze se spojit se serverem. Zkontrolujte připojení k internetu a zkuste to znovu',
-      unknown: 'Něco se pokazilo. Zkuste to prosím znovu',
+      unknown: 'Nastala chyba. Zkuste to prosím znovu',
       invalidArgument: 'Zkontrolujte zadané údaje',
       notFound: 'Nenalezeno — záznam už mohl být smazán. Obnovte stránku',
       alreadyExists: 'Takový záznam už existuje',
