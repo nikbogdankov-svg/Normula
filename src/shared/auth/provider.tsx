@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: MOCK_USER,
       signIn,
       signOut,
+      changePassword: async () => {},
       getApiToken,
       getOrganizationToken,
       getOrganizationScopes,

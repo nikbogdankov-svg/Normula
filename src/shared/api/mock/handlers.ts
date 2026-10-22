@@ -781,7 +781,7 @@ function adminResource(method: string, rest: string[], body: unknown): unknown {
       const organization: Organization = {
         id: genId('org'),
         name: input.name,
-        description: input.description,
+        description: '',
         memberCount: 1,
         disabled: false,
         createdAt: String(Date.now()),
