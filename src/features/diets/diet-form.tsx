@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Checkbox, Flex, Text, TextInput } from '@gravity-ui/uikit';
 import { useTranslation } from '@/shared/i18n';
-import type { FacilityType } from '@/features/objects/types';
 import { MEALS, type MealId } from '@/features/menu/types';
-import type { CreateDietRequest, Diet } from './types';
+import type { CreateDietRequest, Diet, FacilityType } from './types';
 
 const FACILITY_TYPE_OPTIONS: Array<{ value: FacilityType; labelKey: string }> = [
   { value: 'school', labelKey: 'facility.school' },
@@ -75,13 +74,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     value: string
   ) => setDraft((current) => ({ ...current, [field]: sanitizeNumber(value) }));
 
-  const toggleType = (type: FacilityType) =>
-    setDraft((current) => ({
-      ...current,
-      appliesTo: current.appliesTo.includes(type)
-        ? current.appliesTo.filter((item) => item !== type)
-        : [...current.appliesTo, type],
-    }));
+  const toggleType = (_: FacilityType) => {};
 
   const toggleMeal = (meal: MealId) =>
     setDraft((current) => ({
@@ -93,7 +86,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
 
   const getBody = (): CreateDietRequest => ({
     name: draft.name.trim(),
-    appliesTo: draft.appliesTo,
+    appliesTo: [],
     mealIds: draft.mealIds,
     pricePerDay: parseDecimal(draft.pricePerDay),
     kcal: parseDecimal(draft.kcal),
@@ -112,21 +105,7 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
         onUpdate={patchName}
         autoFocus
       />
-      <Flex direction="column" gap={1}>
-        <Text variant="body-2" color="secondary">
-          {t('diets.institutionsLabel')}
-        </Text>
-        {FACILITY_TYPE_OPTIONS.map((option) => (
-          <Checkbox
-            key={option.value}
-            size="l"
-            checked={draft.appliesTo.includes(option.value)}
-            onUpdate={() => toggleType(option.value)}
-          >
-            {t(option.labelKey)}
-          </Checkbox>
-        ))}
-      </Flex>
+      {/* institutions removed */}
 
       <Flex direction="column" gap={1}>
         <Text variant="body-2" color="secondary">
@@ -218,7 +197,6 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     getBody,
     canSubmit:
       Boolean(draft.name.trim()) &&
-      draft.appliesTo.length > 0 &&
       draft.pricePerDay.trim() !== '' &&
       [draft.pricePerDay, draft.kcal, draft.protein, draft.fat, draft.carbs].every(
         (value) => !isInvalidNorm(value)

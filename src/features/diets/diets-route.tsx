@@ -51,13 +51,6 @@ function DietCard({
       <Flex alignItems="center" justifyContent="space-between" gap={2} style={{ width: '100%' }}>
         <Flex alignItems="center" gap={2} wrap>
           <Text variant="subheader-2">{diet.name}</Text>
-          <div className="diets-card__tags">
-            {diet.appliesTo.map((type) => (
-              <Label key={type} theme={FACILITY_THEME[type]}>
-                {t(FACILITY_TYPE_LABEL_KEYS[type] ?? type)}
-              </Label>
-            ))}
-          </div>
         </Flex>
         <Flex gap={1}>
           <Button

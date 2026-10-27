@@ -825,6 +825,12 @@ function adminResource(method: string, rest: string[], body: unknown): unknown {
     return { organization };
   }
 
+  if (sub === 'features' && method === 'PATCH') {
+    const input = body as { warehouseEnabled: boolean; financeEnabled: boolean };
+    organization.features = { warehouseEnabled: input.warehouseEnabled, financeEnabled: input.financeEnabled };
+    return { organization };
+  }
+
   if (sub === 'members') {
     const members = organizationMembers.get(id) ?? [];
     if (rest.length === 3) {

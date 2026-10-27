@@ -20,7 +20,6 @@ import {
   Printer,
 } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
-import { useObjectSelection } from '@/shared/object-selection';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
   useAllowViolation,
@@ -30,8 +29,6 @@ import {
   useSchedule,
   useUpdateSlot,
 } from './api';
-import { useObjects } from '@/features/objects/api';
-import type { GroupDiet, ObjectItem } from '@/features/objects/types';
 import { useDiets } from '@/features/diets/api';
 import type { Diet } from '@/features/diets/types';
 import {
@@ -76,23 +73,9 @@ const METRIC_LABELS: Record<ViolationMetric, { labelKey: string; unitKey: string
   price: { labelKey: 'metrics.price', unitKey: 'units.ruble' },
 };
 
-/** Объекты планирования: у складов нет ни численности, ни меню. */
-function planningObjects(objects: ObjectItem[] | undefined): ObjectItem[] {
-  return (objects ?? []).filter((object) => object.type !== 'warehouse');
-}
-
 /** Диеты групп объекта или подобъекта, без повторов, в порядке групп. */
-function objectDiets(object: ObjectItem | undefined): GroupDiet[] {
-  const seen = new Set<string>();
-  const out: GroupDiet[] = [];
-  for (const group of object?.groups ?? []) {
-    for (const diet of group.diets ?? []) {
-      if (seen.has(diet.id)) continue;
-      seen.add(diet.id);
-      out.push(diet);
-    }
-  }
-  return out;
+function objectDiets(): never[] {
+  return [];
 }
 
 /** Приёмы пищи сетки — из диеты; пустой mealIds у диеты — все приёмы. */
@@ -122,7 +105,6 @@ export function MenuRoute() {
 }
 
 function MenuByDates() {
-  const objects = useObjects();
   const diets = useDiets();
   const menus = useMenus();
   const updateSlot = useUpdateSlot();
@@ -131,13 +113,7 @@ function MenuByDates() {
   const createMenu = useCreateMenu();
   const toaster = useToaster();
   const { t } = useTranslation();
-  const {
-    objectId: savedObjectId,
-    setObjectId: saveObjectId,
-    clearObjectId,
-  } = useObjectSelection();
   const [picker, setPicker] = useState<{ day: number; mealId: MealId } | null>(null);
-  const [objectId, setObjectId] = useState<string | null>(null);
   const [dietId, setDietId] = useState<string | null>(null);
   const [fillMenuOpen, setFillMenuOpen] = useState(false);
   const [fillMenuSourceId, setFillMenuSourceId] = useState<string | null>(null);
@@ -150,20 +126,11 @@ function MenuByDates() {
   const [startDate, setStartDate] = useState(() => startOfWeekMonday());
   const endDate = shiftIsoDate(startDate, CYCLE_DAYS - 1);
 
-  const objectsList = useMemo(() => planningObjects(objects.data?.objects), [objects.data]);
-  const topLevelObjects = objectsList.filter((object) => !object.parentObjectId);
-  const selectedObject = objectsList.find((object) => object.id === objectId);
+  const selectedObject = undefined;
 
   useEffect(() => {
-    if (topLevelObjects.length === 0) return;
-    setObjectId(
-      (current) =>
-        current ??
-        (savedObjectId && topLevelObjects.some((object) => object.id === savedObjectId)
-          ? savedObjectId
-          : topLevelObjects[0].id)
-    );
-  }, [topLevelObjects, savedObjectId]);
+    // objects removed
+  }, []);
 
   /** Диеты, которые справочник ещё знает: группы объекта могут ссылаться на удалённые. */
   const knownDietIds = useMemo(
@@ -171,12 +138,8 @@ function MenuByDates() {
     [diets.data]
   );
 
-  /** Рационы селекта — живые диеты групп выбранного объекта; без них — весь справочник. */
-  const groupDiets = objectDiets(selectedObject).filter((diet) => knownDietIds.has(diet.id));
-  const dietOptions: GroupDiet[] =
-    groupDiets.length > 0
-      ? groupDiets
-      : (diets.data?.diets ?? []).map((diet) => ({ id: diet.id, name: diet.name }));
+  /** Рационы селекта — весь справочник. */
+  const dietOptions: GroupDiet[] = (diets.data?.diets ?? []).map((diet) => ({ id: diet.id, name: diet.name }));
 
   useEffect(() => {
     if (dietOptions.length === 0) {
@@ -195,8 +158,8 @@ function MenuByDates() {
   const priceLimit = norm.price;
 
   const scheduleParams = useMemo(
-    () => (objectId && dietId ? { objectId, dietId, from: startDate, to: endDate } : null),
-    [objectId, dietId, startDate, endDate]
+    () => (dietId ? { objectId: 'default', dietId, from: startDate, to: endDate } : null),
+    [dietId, startDate, endDate]
   );
   const schedule = useSchedule(scheduleParams);
   /** Пока в данных предыдущее окно — слоты ещё от другого периода. */
@@ -281,7 +244,7 @@ function MenuByDates() {
     );
   }, [fillMenuOpen, fillMenuOptions]);
 
-  if (objects.isPending || diets.isPending) {
+  if (diets.isPending) {
     return (
       <div className="menu-page">
         <LoadingState />
@@ -289,10 +252,10 @@ function MenuByDates() {
     );
   }
 
-  if (objects.isError) {
+  if (diets.isError) {
     return (
       <div className="menu-page">
-        <ErrorState error={objects.error} onRetry={() => void objects.refetch()} />
+        <ErrorState error={diets.error} onRetry={() => void diets.refetch()} />
       </div>
     );
   }
@@ -317,15 +280,7 @@ function MenuByDates() {
   const isEmptyWeek = days.every((day) =>
     activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
   );
-  const objectOptions = topLevelObjects.map((object) => ({
-    label: object.name,
-    options: [
-      { value: object.id, content: object.name },
-      ...objectsList
-        .filter((candidate) => candidate.parentObjectId === object.id)
-        .map((subObject) => ({ value: subObject.id, content: subObject.name })),
-    ],
-  }));
+  const objectOptions: any[] = [];
   /** Имя меню по умолчанию — по окну, которое сохраняем. */
   const defaultMenuName = t('menu.defaultName', { range: formatDateRange(startDate, CYCLE_DAYS) });
 
@@ -338,7 +293,7 @@ function MenuByDates() {
       // Уже прошедшие дни и сегодняшний не перезаписываются — меню
       // применяется со следующего дня.
       await fillSchedule.mutateAsync({
-        objectId,
+        objectId: 'default',
         dietId,
         menuId: sourceMenu.id,
         from: startDate,
@@ -370,7 +325,7 @@ function MenuByDates() {
     const name = createMenuName.trim() || defaultMenuName;
     setFillMenuSubmitting(true);
     try {
-      await createMenu.mutateAsync({ name, objectId, dietId, from: startDate, to: endDate });
+      await createMenu.mutateAsync({ name, objectId: 'default', dietId, from: startDate, to: endDate });
       setFillMenuOpen(false);
       setCreateMenuOpen(false);
       setCreateMenuName('');
@@ -429,9 +384,9 @@ function MenuByDates() {
   };
 
   const allowDayViolation = (day: number) => {
-    if (!objectId || !dietId) return;
+    if (!dietId) return;
     allowViolation.mutate(
-      { objectId, dietId, date: toIsoDate(dateForCycleDay(startDate, day)) },
+      { objectId: 'default', dietId, date: toIsoDate(dateForCycleDay(startDate, day)) },
       {
         onSuccess: () => {
           toaster.add({
@@ -454,12 +409,12 @@ function MenuByDates() {
   };
 
   const saveSlot = (picked: PickedDish[]) => {
-    if (!picker || !objectId || !dietId) return;
+    if (!picker || !dietId) return;
     const dayPrice =
       (dayTotals.get(picker.day)?.price ?? 0) - sumDishes(pickerDishes).price + sumPrice(picked);
     updateSlot.mutate(
       {
-        objectId,
+        objectId: 'default',
         dietId,
         date: toIsoDate(dateForCycleDay(startDate, picker.day)),
         mealId: picker.mealId,
@@ -501,22 +456,6 @@ function MenuByDates() {
     <div className="menu-page">
       <Flex className="menu-toolbar" alignItems="center" justifyContent="space-between" gap={3}>
         <Flex alignItems="center" gap={2}>
-          <Select
-            size="l"
-            label={t('menu.objectLabel')}
-            width={280}
-            value={objectId ? [objectId] : []}
-            placeholder={t('menu.objectPlaceholder')}
-            onUpdate={(values) => {
-              const next = values[0] ?? null;
-              setObjectId(next);
-              if (next) saveObjectId(next);
-              else clearObjectId();
-            }}
-            options={objectOptions}
-            disabled={objectsList.length === 0}
-            popupClassName="menu-object-select-popup"
-          />
           <Select
             size="l"
             label={t('menu.dietLabel')}

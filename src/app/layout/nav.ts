@@ -65,7 +65,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/app/warehouse-receipts', label: 'nav.items.receipts', icon: ArrowRightToLine },
       { to: '/app/warehouse-balances', label: 'nav.items.balances', icon: Archive },
       { to: '/app/write-offs', label: 'nav.items.writeOffs', icon: ArrowLeftFromLine },
-      { to: '/app/warehouse-transfers', label: 'nav.items.transfers', icon: ArrowRightArrowLeft },
     ],
   },
   {
@@ -79,7 +78,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'nav.groups.references',
     items: [
-      { to: '/app/objects', label: 'nav.items.objects', icon: Layers3Diagonal },
       { to: '/app/products', label: 'nav.items.products', icon: Box },
       { to: '/app/diets', label: 'nav.items.diets', icon: Heart },
     ],
