@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Flex, Icon, Label, Text, TextInput } from '@gravity-ui/uikit';
+import { Button, Flex, Icon, Text, TextInput } from '@gravity-ui/uikit';
 import { Magnifier, Pencil, Plus, TrashBin } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
 import { useTranslation } from '@/shared/i18n';
@@ -15,21 +15,6 @@ import { DietDialog } from './diet-dialog';
 import { CreateDietDialog } from './create-diet-dialog';
 import { MEALS } from '@/features/menu/types';
 import './diets-route.css';
-
-const FACILITY_TYPE_LABEL_KEYS: Record<string, string> = {
-  school: 'facility.school',
-  kindergarten: 'facility.kindergarten',
-  hospital: 'facility.hospital',
-  warehouse: 'facility.warehouse',
-};
-
-/** Цвет тэга заведения: дружелюбный к виду организации. */
-const FACILITY_THEME: Record<string, 'info' | 'success' | 'danger' | 'warning' | 'utility'> = {
-  school: 'info',
-  kindergarten: 'success',
-  hospital: 'danger',
-  warehouse: 'utility',
-};
 
 /** Карточка диеты: заведения, приёмы пищи, нормы на день и действия. */
 function DietCard({

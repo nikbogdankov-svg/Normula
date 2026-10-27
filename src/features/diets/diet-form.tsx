@@ -4,12 +4,6 @@ import { useTranslation } from '@/shared/i18n';
 import { MEALS, type MealId } from '@/features/menu/types';
 import type { CreateDietRequest, Diet, FacilityType } from './types';
 
-const FACILITY_TYPE_OPTIONS: Array<{ value: FacilityType; labelKey: string }> = [
-  { value: 'school', labelKey: 'facility.school' },
-  { value: 'kindergarten', labelKey: 'facility.kindergarten' },
-  { value: 'hospital', labelKey: 'facility.hospital' },
-];
-
 function parseDecimal(value: string): number {
   const parsed = Number(value.replace(',', '.'));
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
@@ -73,8 +67,6 @@ export function useDietForm(initial?: Diet | null, resetKey?: string) {
     field: keyof Pick<Draft, 'pricePerDay' | 'kcal' | 'protein' | 'fat' | 'carbs'>,
     value: string
   ) => setDraft((current) => ({ ...current, [field]: sanitizeNumber(value) }));
-
-  const toggleType = (_: FacilityType) => {};
 
   const toggleMeal = (meal: MealId) =>
     setDraft((current) => ({
