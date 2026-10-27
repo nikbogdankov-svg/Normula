@@ -26,6 +26,11 @@ export interface OrganizationRole {
   scopes: OrganizationScope[];
 }
 
+export interface OrganizationFeatures {
+  warehouseEnabled: boolean;
+  financeEnabled: boolean;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -33,6 +38,7 @@ export interface Organization {
   /** grpc-gateway отдаёт int32 числом. */
   memberCount: number;
   disabled: boolean;
+  features?: OrganizationFeatures;
   /** epoch в миллисекундах; int64 приходит строкой. */
   createdAt: string;
 }

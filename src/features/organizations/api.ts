@@ -9,6 +9,7 @@ import type {
   ListOrganizationsResponse,
   ListRolesResponse,
   Organization,
+  OrganizationFeaturesUpdate,
   UpdateOrganizationFeaturesRequest,
 } from './types';
 
@@ -160,7 +161,7 @@ export function useUpdateOrganizationFeatures(organizationId: string) {
   const invalidate = useInvalidate();
 
   return useMutation({
-    mutationFn: (body: UpdateOrganizationFeaturesRequest) =>
+    mutationFn: (body: OrganizationFeaturesUpdate) =>
       api.request<{ organization: Organization }>(
         `/v1/admin/organizations/${organizationId}/features`,
         { method: 'PATCH', body }
