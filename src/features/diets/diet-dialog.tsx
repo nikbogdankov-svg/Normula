@@ -10,13 +10,6 @@ import type { Diet } from './types';
 import './diets-route.css';
 import { errorText } from '@/shared/api/error-text';
 
-const FACILITY_TYPE_LABEL_KEYS: Record<string, string> = {
-  school: 'facility.school',
-  kindergarten: 'facility.kindergarten',
-  hospital: 'facility.hospital',
-  warehouse: 'facility.warehouse',
-};
-
 /** Строка «подпись — значение» в блоке нормы на день. */
 function NutritionRow({ label, value, suffix }: { label: string; value: number; suffix: string }) {
   return (
