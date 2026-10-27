@@ -1714,6 +1714,12 @@ export const organizations: Organization[] = ORGANIZATION_SEEDS.map((seed, index
   memberCount: seed.memberCount,
   disabled: seed.disabled,
   createdAt: String(Date.now() - (index + 1) * 86400000 * 60),
+  /** Модули по умолчанию: у StyleU включены оба, у остальных — выкл. */
+  features: {
+    warehouseEnabled: seed.id === 'org-styleu',
+    financeEnabled: seed.id === 'org-styleu',
+    objectsEnabled: false,
+  },
 }));
 
 function buildMember(

@@ -9,6 +9,7 @@ import type {
   ListOrganizationsResponse,
   ListRolesResponse,
   Organization,
+  UpdateOrganizationFeaturesRequest,
 } from './types';
 
 /**
@@ -149,6 +150,20 @@ export function useRemoveMember(organizationId: string) {
       api.request<Record<string, never>>(
         `/v1/admin/organizations/${organizationId}/members/${userId}`,
         { method: 'DELETE' }
+      ),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateOrganizationFeatures(organizationId: string) {
+  const api = useApi();
+  const invalidate = useInvalidate();
+
+  return useMutation({
+    mutationFn: (body: UpdateOrganizationFeaturesRequest) =>
+      api.request<{ organization: Organization }>(
+        `/v1/admin/organizations/${organizationId}/features`,
+        { method: 'PATCH', body }
       ),
     onSuccess: invalidate,
   });

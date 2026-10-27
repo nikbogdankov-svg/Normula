@@ -1,5 +1,6 @@
 import type { MealId } from '@/features/menu/types';
-import type { FacilityType } from '@/features/objects/types';
+
+export type FacilityType = 'school' | 'kindergarten' | 'hospital';
 
 /**
  * Контракт раздела «Диеты» — справочник рационов питания организации.

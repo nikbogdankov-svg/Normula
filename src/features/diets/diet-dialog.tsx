@@ -171,15 +171,7 @@ export function DietDialog({
                 {t('diets.availableFor')}
               </Text>
               <div className="diet-dialog__tags">
-                {view.appliesTo.length === 0 ? (
-                  <Text variant="body-2">—</Text>
-                ) : (
-                  view.appliesTo.map((type) => (
-                    <span key={type} className="diet-dialog__tag">
-                      {t(FACILITY_TYPE_LABEL_KEYS[type] ?? type)}
-                    </span>
-                  ))
-                )}
+                <Text variant="body-2">—</Text>
               </div>
             </div>
           </div>

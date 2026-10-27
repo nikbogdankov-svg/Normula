@@ -132,6 +132,7 @@ export function JournalsRoute() {
 
 function JournalsCatalog() {
   const { t } = useTranslation();
+  const { organizationFeatures } = useOrganizations();
   const toaster = useToaster();
   const api = useApi();
   const objects = useObjects();
@@ -350,20 +351,22 @@ function JournalsCatalog() {
     <div className="journals-page">
       <Flex className="journals-toolbar" alignItems="center" justifyContent="space-between" gap={3}>
         <Flex alignItems="center" gap={2}>
-          <Select
-            size="l"
-            label={t('journals.objectLabel')}
-            width={280}
-            value={objectId ? [objectId] : []}
-            placeholder={t('journals.objectLabel')}
-            onUpdate={(values) => {
-              const next = values[0] ?? null;
-              setObjectId(next);
-              if (next) saveObjectId(next);
-            }}
-            options={objectOptions}
-            disabled={objectsList.length === 0}
-          />
+          {organizationFeatures?.objectsEnabled === true && (
+            <Select
+              size="l"
+              label={t('journals.objectLabel')}
+              width={280}
+              value={objectId ? [objectId] : []}
+              placeholder={t('journals.objectLabel')}
+              onUpdate={(values) => {
+                const next = values[0] ?? null;
+                setObjectId(next);
+                if (next) saveObjectId(next);
+              }}
+              options={objectOptions}
+              disabled={objectsList.length === 0}
+            />
+          )}
           <Select
             size="l"
             label={t('journals.dietLabel')}

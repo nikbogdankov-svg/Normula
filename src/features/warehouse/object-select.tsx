@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Select } from '@gravity-ui/uikit';
 import { useObjects } from '@/features/objects/api';
+import { useOrganizations } from '@/shared/auth';
 import { useObjectSelection } from '@/shared/object-selection';
 import { useTranslation } from '@/shared/i18n';
 import type { ObjectItem } from '@/features/objects/types';
@@ -65,7 +66,16 @@ export function ObjectSelect({
   width?: number | 'max';
   disabled?: boolean;
 }) {
+  const { organizationFeatures } = useOrganizations();
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (organizationFeatures?.objectsEnabled !== false || options.length === 0) return;
+    if (value !== options[0].value) onUpdate(options[0].value);
+  }, [organizationFeatures?.objectsEnabled, options, value, onUpdate]);
+
+  if (organizationFeatures?.objectsEnabled !== true) return null;
+
   return (
     <Select
       size="l"

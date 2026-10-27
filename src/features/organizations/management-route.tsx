@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Button,
   Card,
@@ -29,12 +29,21 @@ import { errorText } from '@/shared/api/error-text';
 
 /** «Управление» — организации в том же карточном стиле, что и «Персонал». */
 export function ManagementRoute() {
-  const { current } = useOrganizations();
+  const { current, setOrganizationFeatures } = useOrganizations();
   const { data, isPending, isError, error, refetch } = useOrganizationList();
   const hasOrganization = current !== null;
   const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<Organization | null>(null);
+  const handleOrganizationUpdated = useCallback(
+    (organization: Organization) => {
+      setSelected(organization);
+      if (organization.features) {
+        setOrganizationFeatures(organization.id, organization.features);
+      }
+    },
+    [setOrganizationFeatures]
+  );
 
   return (
     <Flex direction="column" gap={3} style={{ padding: 16 }}>
@@ -92,7 +101,11 @@ export function ManagementRoute() {
       </Card>
 
       {selected && (
-        <OrganizationDetails organization={selected} onClose={() => setSelected(null)} />
+        <OrganizationDetails
+          organization={selected}
+          onClose={() => setSelected(null)}
+          onOrganizationUpdated={handleOrganizationUpdated}
+        />
       )}
 
       <CreateOrganizationDialog open={createOpen} onClose={() => setCreateOpen(false)} />

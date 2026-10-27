@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
 import type {
   AllowViolationRequest,
@@ -22,10 +28,12 @@ const KEY = 'menu';
  * остаётся предыдущий (isPlaceholderData) — страница по этому флагу
  * показывает загрузку, не теряя сетку.
  */
-export function useSchedule(params: ScheduleParams | null) {
+export function useSchedule(
+  params: ScheduleParams | null
+): UseQueryResult<GetScheduleResponse, Error> {
   const api = useApi();
 
-  return useQuery({
+  return useQuery<GetScheduleResponse, Error>({
     queryKey: [KEY, api.organizationId, 'schedule', params],
     queryFn: () => {
       const query = new URLSearchParams({

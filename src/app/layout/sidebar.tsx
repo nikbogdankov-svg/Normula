@@ -36,12 +36,12 @@ export function Sidebar({
 }) {
   useAppTheme(); // тема только светлая, переключатель временно убран
   const { signOut, user } = useAuth();
-  const { current, scopes } = useOrganizations();
+  const { current, scopes, organizationFeatures } = useOrganizations();
   const { t, i18n } = useTranslation();
 
   // Пункты, которых у человека нет, не рисуем вовсе: показать и убрать
   // после загрузки скоупов было бы заметнее, чем дорисовать с задержкой.
-  const groups = visibleNavGroups(scopes);
+  const groups = visibleNavGroups(scopes, organizationFeatures);
 
   return (
     <aside

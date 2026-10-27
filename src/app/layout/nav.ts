@@ -1,7 +1,6 @@
 import {
   Archive,
   ArrowLeftFromLine,
-  ArrowRightArrowLeft,
   ArrowRightToLine,
   Box,
   Cubes3Overlap,
@@ -35,6 +34,8 @@ export interface NavItem {
    * который всё равно ответит отказом.
    */
   scope?: string;
+  /** Возможность организации, без которой пункт недоступен. */
+  feature?: 'warehouseEnabled' | 'financeEnabled' | 'objectsEnabled';
 }
 
 /** Группа пунктов с заголовком, как в макете. */
@@ -62,15 +63,48 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'nav.groups.warehouse',
     items: [
-      { to: '/app/warehouse-receipts', label: 'nav.items.receipts', icon: ArrowRightToLine },
-      { to: '/app/warehouse-balances', label: 'nav.items.balances', icon: Archive },
-      { to: '/app/write-offs', label: 'nav.items.writeOffs', icon: ArrowLeftFromLine },
-      { to: '/app/warehouse-transfers', label: 'nav.items.transfers', icon: ArrowRightArrowLeft },
+      {
+        to: '/app/warehouse-receipts',
+        label: 'nav.items.receipts',
+        icon: ArrowRightToLine,
+        feature: 'warehouseEnabled',
+      },
+      {
+        to: '/app/warehouse-balances',
+        label: 'nav.items.balances',
+        icon: Archive,
+        feature: 'warehouseEnabled',
+      },
+      {
+        to: '/app/write-offs',
+        label: 'nav.items.writeOffs',
+        icon: ArrowLeftFromLine,
+        feature: 'warehouseEnabled',
+      },
     ],
   },
   {
     title: 'nav.groups.finance',
-    items: [{ to: '/app/accounts', label: 'nav.items.accounts', icon: Wallet, wip: true }],
+    items: [
+      {
+        to: '/app/accounts',
+        label: 'nav.items.accounts',
+        icon: Wallet,
+        wip: true,
+        feature: 'financeEnabled',
+      },
+    ],
+  },
+  {
+    title: 'nav.groups.objects',
+    items: [
+      {
+        to: '/app/objects',
+        label: 'nav.items.objects',
+        icon: Layers3Diagonal,
+        feature: 'objectsEnabled',
+      },
+    ],
   },
   {
     title: 'nav.groups.journals',
@@ -79,7 +113,6 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'nav.groups.references',
     items: [
-      { to: '/app/objects', label: 'nav.items.objects', icon: Layers3Diagonal },
       { to: '/app/products', label: 'nav.items.products', icon: Box },
       { to: '/app/diets', label: 'nav.items.diets', icon: Heart },
     ],
@@ -111,16 +144,38 @@ export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
  * scopes === null означает «ещё не знаем»: пункты со скоупом прячем до
  * выяснения. Показать и тут же убрать — хуже, чем дорисовать с задержкой.
  */
-export function isNavItemVisible(item: NavItem, scopes: string[] | null): boolean {
-  if (!item.scope) return true;
-
-  return scopes !== null && scopes.includes(item.scope);
+export function isNavItemVisible(
+  item: NavItem,
+  scopes: string[] | null,
+  organizationFeatures: {
+    warehouseEnabled: boolean;
+    financeEnabled: boolean;
+    objectsEnabled: boolean;
+  } | null = null
+): boolean {
+  if (item.scope && (scopes === null || !scopes.includes(item.scope))) return false;
+  if (item.feature && organizationFeatures?.[item.feature] !== true) return false;
+  return true;
 }
 
 /** Группы без скрытых пунктов; пустые группы отбрасываются целиком. */
-export function visibleNavGroups(scopes: string[] | null): NavGroup[] {
-  return NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => isNavItemVisible(item, scopes)),
-  })).filter((group) => group.items.length > 0);
+export function visibleNavGroups(
+  scopes: string[] | null,
+  organizationFeatures: {
+    warehouseEnabled: boolean;
+    financeEnabled: boolean;
+    objectsEnabled: boolean;
+  } | null
+): NavGroup[] {
+  return NAV_GROUPS.map((group) => {
+    const items = group.items.filter((item) =>
+      isNavItemVisible(item, scopes, organizationFeatures)
+    );
+    return {
+      ...group,
+      items,
+    };
+  }).filter((group) => {
+    return group.items.length > 0;
+  });
 }

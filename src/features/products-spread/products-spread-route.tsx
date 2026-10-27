@@ -70,7 +70,7 @@ function formatDisplayDate(date: string): string {
 
 /** Раскладка продуктов на день: тулбар закреплён, скроллится таблица. */
 export function ProductsSpreadRoute() {
-  const { current } = useOrganizations();
+  const { current, organizationFeatures } = useOrganizations();
   const { t } = useTranslation();
   const objects = useObjects();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -105,7 +105,12 @@ export function ProductsSpreadRoute() {
     objectOptions,
     ALL_OBJECTS
   );
-  const activeObjectId = selectedObjectId === ALL_OBJECTS ? null : selectedObjectId;
+  const multipleObjectsEnabled = organizationFeatures?.objectsEnabled === true;
+  const activeObjectId = multipleObjectsEnabled
+    ? selectedObjectId === ALL_OBJECTS
+      ? null
+      : selectedObjectId
+    : (objectsList[0]?.id ?? null);
 
   const spread = useProductSpread(date, activeObjectId);
   const confirmed = spread.data?.confirmed ?? false;
@@ -174,7 +179,7 @@ export function ProductsSpreadRoute() {
       <Flex className="products-spread-page__toolbar" direction="column" gap={3} wrap>
         <Flex alignItems="center" justifyContent="space-between" gap={2} wrap>
           <Flex alignItems="center" gap={3} wrap>
-            {objectsList.length > 0 && (
+            {multipleObjectsEnabled && objectsList.length > 0 && (
               <Select
                 size="l"
                 width={280}

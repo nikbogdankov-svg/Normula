@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApi } from '@/shared/api/use-api';
+import { useOrganizations } from '@/shared/auth';
 import type { CreateObjectRequest, ListObjectsResponse, UpdateObjectRequest } from './types';
 
 const KEY = 'objects';
@@ -7,10 +8,24 @@ const KEY = 'objects';
 /** Объекты и подобъекты организации одним списком — раздел «Объекты». */
 export function useObjects() {
   const api = useApi();
+  const { organizationFeatures } = useOrganizations();
 
   return useQuery({
     queryKey: [KEY, api.organizationId],
     queryFn: () => api.request<ListObjectsResponse>('/v1/objects'),
+    select: (data) => {
+      if (organizationFeatures?.objectsEnabled !== false) return data;
+
+      const firstObject = data.objects.find((object) => !object.parentObjectId);
+      if (!firstObject) return data;
+
+      return {
+        ...data,
+        objects: data.objects.filter(
+          (object) => object.id === firstObject.id || object.parentObjectId === firstObject.id
+        ),
+      };
+    },
     enabled: api.organizationId !== null,
   });
 }
