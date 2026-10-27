@@ -63,7 +63,7 @@ function toRow(account: Account): AccountRow {
 }
 
 export function AccountsRoute() {
-  const { current } = useOrganizations();
+  const { current, organizationFeatures } = useOrganizations();
   const { t } = useTranslation();
   const height = useDrawerHeight();
   const [selected, setSelected] = useState<AccountRow | null>(null);
@@ -88,6 +88,10 @@ export function AccountsRoute() {
     objectOptions,
     ALL_OBJECTS
   );
+  const multipleObjectsEnabled = organizationFeatures?.objectsEnabled === true;
+  const activeObjectId = multipleObjectsEnabled
+    ? objectId
+    : (objects.data?.objects.find((object) => !object.parentObjectId)?.id ?? ALL_OBJECTS);
 
   const objectFilterOptions = useMemo(
     () => [{ value: ALL_OBJECTS, content: t('accounts.allObjects') }, ...objectOptions],
@@ -98,13 +102,16 @@ export function AccountsRoute() {
     const byId = new Map((objects.data?.objects ?? []).map((object) => [object.id, object]));
 
     return (accounts.data?.accounts ?? []).map(toRow).filter((row) => {
-      if (objectId === ALL_OBJECTS) return true;
+      if (!multipleObjectsEnabled) {
+        return byId.has(row.objectId);
+      }
+      if (activeObjectId === ALL_OBJECTS) return true;
       // Счёт выписан подобъекту; выбор родительского объекта показывает
       // все его счета.
       const rowObject = byId.get(row.objectId);
-      return row.objectId === objectId || rowObject?.parentObjectId === objectId;
+      return row.objectId === activeObjectId || rowObject?.parentObjectId === activeObjectId;
     });
-  }, [objectId, objects.data, accounts.data]);
+  }, [activeObjectId, multipleObjectsEnabled, objects.data, accounts.data]);
 
   useEffect(() => {
     if (!selected) {
@@ -152,17 +159,19 @@ export function AccountsRoute() {
   return (
     <div className="ac-page">
       <Flex className="ac-page__toolbar" alignItems="center" gap={2} wrap>
-        <Select
-          size="l"
-          width={280}
-          label={t('accounts.objectLabel')}
-          value={[objectId]}
-          onUpdate={(value) => setObjectId(value[0] ?? ALL_OBJECTS)}
-          options={objectFilterOptions}
-          disabled={objects.isPending}
-        />
+        {multipleObjectsEnabled && (
+          <Select
+            size="l"
+            width={280}
+            label={t('accounts.objectLabel')}
+            value={[objectId]}
+            onUpdate={(value) => setObjectId(value[0] ?? ALL_OBJECTS)}
+            options={objectFilterOptions}
+            disabled={objects.isPending}
+          />
+        )}
         <Text variant="body-1" color="secondary">
-          {objectId === ALL_OBJECTS
+          {activeObjectId === ALL_OBJECTS
             ? t('accounts.totalAccounts', { count: rows.length })
             : t('accounts.found', { count: rows.length })}
         </Text>

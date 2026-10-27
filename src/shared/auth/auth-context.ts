@@ -4,6 +4,11 @@ import { createContext, useContext } from 'react';
 export interface Organization {
   id: string;
   name: string;
+  features?: {
+    warehouseEnabled: boolean;
+    financeEnabled: boolean;
+    objectsEnabled: boolean;
+  };
 }
 
 export interface AuthUser {

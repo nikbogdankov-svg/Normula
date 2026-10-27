@@ -29,7 +29,10 @@ export interface OrganizationRole {
 export interface OrganizationFeatures {
   warehouseEnabled: boolean;
   financeEnabled: boolean;
+  objectsEnabled: boolean;
 }
+
+export type UpdateOrganizationFeaturesRequest = OrganizationFeatures;
 
 export interface Organization {
   id: string;

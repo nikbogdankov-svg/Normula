@@ -60,9 +60,9 @@ const DESIGNED_ROUTES: Record<string, React.ReactElement> = {
  * бэкенда и покажет ошибку загрузки. Лучше сказать честно и сразу.
  */
 function GuardedRoute({ item, children }: { item: NavItem; children: React.ReactElement }) {
-  const { scopes } = useOrganizations();
+  const { scopes, organizationFeatures } = useOrganizations();
 
-  if (!isNavItemVisible(item, scopes)) {
+  if (!isNavItemVisible(item, scopes, organizationFeatures)) {
     return <NoAccessPage title={item.label} />;
   }
 
@@ -74,7 +74,8 @@ const appChildren = NAV_ITEMS.map((item) => {
 
   return {
     path: item.to.replace('/app/', ''),
-    element: item.scope ? <GuardedRoute item={item}>{element}</GuardedRoute> : element,
+    element:
+      item.scope || item.feature ? <GuardedRoute item={item}>{element}</GuardedRoute> : element,
   };
 });
 

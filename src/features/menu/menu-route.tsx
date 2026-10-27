@@ -20,6 +20,8 @@ import {
   Printer,
 } from '@gravity-ui/icons';
 import { useOrganizations } from '@/shared/auth';
+import { useObjects } from '@/features/objects/api';
+import { useObjectSelection } from '@/shared/object-selection';
 import { ErrorState, LoadingState, NoOrganizationSelectedState } from '@/shared/ui/states';
 import {
   useAllowViolation,
@@ -73,11 +75,6 @@ const METRIC_LABELS: Record<ViolationMetric, { labelKey: string; unitKey: string
   price: { labelKey: 'metrics.price', unitKey: 'units.ruble' },
 };
 
-/** Диеты групп объекта или подобъекта, без повторов, в порядке групп. */
-function objectDiets(): never[] {
-  return [];
-}
-
 /** Приёмы пищи сетки — из диеты; пустой mealIds у диеты — все приёмы. */
 function resolveActiveMeals(diet: Diet | undefined): MealId[] {
   const source = diet?.mealIds ?? [];
@@ -105,6 +102,9 @@ export function MenuRoute() {
 }
 
 function MenuByDates() {
+  const { organizationFeatures } = useOrganizations();
+  const objects = useObjects();
+  const { objectId: savedObjectId, setObjectId: saveObjectId } = useObjectSelection();
   const diets = useDiets();
   const menus = useMenus();
   const updateSlot = useUpdateSlot();
@@ -125,21 +125,48 @@ function MenuByDates() {
   /** Окно просмотра — стрелки обновляют только его, данные подтягиваются запросом. */
   const [startDate, setStartDate] = useState(() => startOfWeekMonday());
   const endDate = shiftIsoDate(startDate, CYCLE_DAYS - 1);
-
-  const selectedObject = undefined;
-
-  useEffect(() => {
-    // objects removed
-  }, []);
-
-  /** Диеты, которые справочник ещё знает: группы объекта могут ссылаться на удалённые. */
-  const knownDietIds = useMemo(
-    () => new Set((diets.data?.diets ?? []).map((diet) => diet.id)),
-    [diets.data]
+  const multipleObjectsEnabled = organizationFeatures?.objectsEnabled === true;
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(savedObjectId);
+  const objectOptions = useMemo(() => {
+    const allObjects = objects.data?.objects ?? [];
+    return allObjects
+      .filter((object) => !object.parentObjectId && object.type !== 'warehouse')
+      .map((object) => ({
+        label: object.name,
+        options: [
+          object,
+          ...allObjects.filter((candidate) => candidate.parentObjectId === object.id),
+        ].map((candidate) => ({ value: candidate.id, content: candidate.name })),
+      }));
+  }, [objects.data]);
+  const flatObjectOptions = useMemo(
+    () => objectOptions.flatMap((group) => group.options),
+    [objectOptions]
   );
 
-  /** Рационы селекта — весь справочник. */
-  const dietOptions: GroupDiet[] = (diets.data?.diets ?? []).map((diet) => ({ id: diet.id, name: diet.name }));
+  useEffect(() => {
+    if (!multipleObjectsEnabled) return;
+    if (flatObjectOptions.length === 0) {
+      setSelectedObjectId(null);
+      return;
+    }
+
+    if (
+      !selectedObjectId ||
+      !flatObjectOptions.some((option) => option.value === selectedObjectId)
+    ) {
+      const preferred =
+        savedObjectId && flatObjectOptions.some((option) => option.value === savedObjectId)
+          ? savedObjectId
+          : flatObjectOptions[0].value;
+      setSelectedObjectId(preferred);
+      saveObjectId(preferred);
+    }
+  }, [multipleObjectsEnabled, flatObjectOptions, savedObjectId, selectedObjectId, saveObjectId]);
+
+  const selectedObject = objects.data?.objects.find((object) => object.id === selectedObjectId);
+  const menuObjectId = multipleObjectsEnabled ? (selectedObjectId ?? '') : 'default';
+  const dietOptions = (diets.data?.diets ?? []).map((diet) => ({ id: diet.id, name: diet.name }));
 
   useEffect(() => {
     if (dietOptions.length === 0) {
@@ -158,8 +185,11 @@ function MenuByDates() {
   const priceLimit = norm.price;
 
   const scheduleParams = useMemo(
-    () => (dietId ? { objectId: 'default', dietId, from: startDate, to: endDate } : null),
-    [dietId, startDate, endDate]
+    () =>
+      dietId && menuObjectId
+        ? { objectId: menuObjectId, dietId, from: startDate, to: endDate }
+        : null,
+    [dietId, menuObjectId, startDate, endDate]
   );
   const schedule = useSchedule(scheduleParams);
   /** Пока в данных предыдущее окно — слоты ещё от другого периода. */
@@ -260,14 +290,6 @@ function MenuByDates() {
     );
   }
 
-  if (diets.isError) {
-    return (
-      <div className="menu-page">
-        <ErrorState error={diets.error} onRetry={() => void diets.refetch()} />
-      </div>
-    );
-  }
-
   if (schedule.isError) {
     return (
       <div className="menu-page">
@@ -280,20 +302,19 @@ function MenuByDates() {
   const isEmptyWeek = days.every((day) =>
     activeMeals.every((mealId) => (slotMap.get(slotKey(day, mealId)) ?? []).length === 0)
   );
-  const objectOptions: any[] = [];
   /** Имя меню по умолчанию — по окну, которое сохраняем. */
   const defaultMenuName = t('menu.defaultName', { range: formatDateRange(startDate, CYCLE_DAYS) });
 
   const fillFromSourceMenu = async (sourceMenuId: string) => {
     const sourceMenu = fillMenuOptions.find((candidate) => candidate.id === sourceMenuId);
-    if (!sourceMenu || !objectId || !dietId) return;
+    if (!sourceMenu || !menuObjectId || !dietId) return;
 
     setFillMenuSubmitting(true);
     try {
       // Уже прошедшие дни и сегодняшний не перезаписываются — меню
       // применяется со следующего дня.
       await fillSchedule.mutateAsync({
-        objectId: 'default',
+        objectId: menuObjectId,
         dietId,
         menuId: sourceMenu.id,
         from: startDate,
@@ -321,11 +342,17 @@ function MenuByDates() {
   };
 
   const createAndFillNewMenu = async () => {
-    if (!objectId || !dietId) return;
+    if (!menuObjectId || !dietId) return;
     const name = createMenuName.trim() || defaultMenuName;
     setFillMenuSubmitting(true);
     try {
-      await createMenu.mutateAsync({ name, objectId: 'default', dietId, from: startDate, to: endDate });
+      await createMenu.mutateAsync({
+        name,
+        objectId: menuObjectId,
+        dietId,
+        from: startDate,
+        to: endDate,
+      });
       setFillMenuOpen(false);
       setCreateMenuOpen(false);
       setCreateMenuName('');
@@ -386,7 +413,7 @@ function MenuByDates() {
   const allowDayViolation = (day: number) => {
     if (!dietId) return;
     allowViolation.mutate(
-      { objectId: 'default', dietId, date: toIsoDate(dateForCycleDay(startDate, day)) },
+      { objectId: menuObjectId, dietId, date: toIsoDate(dateForCycleDay(startDate, day)) },
       {
         onSuccess: () => {
           toaster.add({
@@ -414,7 +441,7 @@ function MenuByDates() {
       (dayTotals.get(picker.day)?.price ?? 0) - sumDishes(pickerDishes).price + sumPrice(picked);
     updateSlot.mutate(
       {
-        objectId: 'default',
+        objectId: menuObjectId,
         dietId,
         date: toIsoDate(dateForCycleDay(startDate, picker.day)),
         mealId: picker.mealId,
@@ -456,6 +483,22 @@ function MenuByDates() {
     <div className="menu-page">
       <Flex className="menu-toolbar" alignItems="center" justifyContent="space-between" gap={3}>
         <Flex alignItems="center" gap={2}>
+          {multipleObjectsEnabled && (
+            <Select
+              size="l"
+              label={t('menu.objectLabel')}
+              width={280}
+              value={selectedObjectId ? [selectedObjectId] : []}
+              placeholder={t('menu.objectLabel')}
+              onUpdate={(values) => {
+                const next = values[0] ?? null;
+                setSelectedObjectId(next);
+                if (next) saveObjectId(next);
+              }}
+              options={objectOptions}
+              disabled={objects.isPending || flatObjectOptions.length === 0}
+            />
+          )}
           <Select
             size="l"
             label={t('menu.dietLabel')}

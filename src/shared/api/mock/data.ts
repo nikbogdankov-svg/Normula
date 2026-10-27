@@ -1718,6 +1718,7 @@ export const organizations: Organization[] = ORGANIZATION_SEEDS.map((seed, index
   features: {
     warehouseEnabled: seed.id === 'org-styleu',
     financeEnabled: seed.id === 'org-styleu',
+    objectsEnabled: false,
   },
 }));
 

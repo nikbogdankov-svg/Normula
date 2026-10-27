@@ -826,8 +826,16 @@ function adminResource(method: string, rest: string[], body: unknown): unknown {
   }
 
   if (sub === 'features' && method === 'PATCH') {
-    const input = body as { warehouseEnabled: boolean; financeEnabled: boolean };
-    organization.features = { warehouseEnabled: input.warehouseEnabled, financeEnabled: input.financeEnabled };
+    const input = body as {
+      warehouseEnabled: boolean;
+      financeEnabled: boolean;
+      objectsEnabled: boolean;
+    };
+    organization.features = {
+      warehouseEnabled: input.warehouseEnabled,
+      financeEnabled: input.financeEnabled,
+      objectsEnabled: input.objectsEnabled,
+    };
     return { organization };
   }
 

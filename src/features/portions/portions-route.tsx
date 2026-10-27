@@ -126,7 +126,7 @@ function portionUnits(objects: ObjectItem[]): PortionUnit[] {
  * ПОРЦ-01…03 + бывший «Выход на раздачу».
  */
 export function PortionsRoute() {
-  const { current } = useOrganizations();
+  const { current, organizationFeatures } = useOrganizations();
   const { t } = useTranslation();
   const objects = useObjects();
   // Дата живёт в адресе страницы: перезагрузка или редирект (например,
@@ -158,6 +158,7 @@ export function PortionsRoute() {
   const preferredObjectId =
     savedObjectId && objectListIds.includes(savedObjectId) ? savedObjectId : objectsList[0]?.id;
   const activeObjectId = selectedObjectId ?? preferredObjectId ?? null;
+  const multipleObjectsEnabled = organizationFeatures?.objectsEnabled === true;
 
   // В «По объектам» глобальный выбор подхватывается, пока пользователь не
   // выбрал своё («Все»), иначе остаётся прежний дефолт. Значение хранится в
@@ -351,24 +352,29 @@ export function PortionsRoute() {
                     </span>
                   }
                 />
-                <Select
-                  size="m"
-                  width={280}
-                  label={t('portions.objectLabel')}
-                  title={t('portions.objectLabel')}
-                  value={[selectedId]}
-                  onUpdate={(value) => {
-                    const next = value[0] ?? ALL_SUBOBJECTS;
-                    setSelectedId(next);
-                    if (next === ALL_SUBOBJECTS) {
-                      clearObjectId();
-                    } else if (next.startsWith('object:')) {
-                      setObjectId(next.slice('object:'.length));
-                    }
-                  }}
-                  placeholder={t('portions.objectPlaceholder')}
-                  options={[{ value: ALL_SUBOBJECTS, content: t('common.all') }, ...objectOptions]}
-                />
+                {multipleObjectsEnabled && (
+                  <Select
+                    size="m"
+                    width={280}
+                    label={t('portions.objectLabel')}
+                    title={t('portions.objectLabel')}
+                    value={[selectedId]}
+                    onUpdate={(value) => {
+                      const next = value[0] ?? ALL_SUBOBJECTS;
+                      setSelectedId(next);
+                      if (next === ALL_SUBOBJECTS) {
+                        clearObjectId();
+                      } else if (next.startsWith('object:')) {
+                        setObjectId(next.slice('object:'.length));
+                      }
+                    }}
+                    placeholder={t('portions.objectPlaceholder')}
+                    options={[
+                      { value: ALL_SUBOBJECTS, content: t('common.all') },
+                      ...objectOptions,
+                    ]}
+                  />
+                )}
               </>
             )}
             {view === 'dishes' && objectsList.length > 0 && (
@@ -388,23 +394,25 @@ export function PortionsRoute() {
                     </span>
                   }
                 />
-                <Select
-                  size="m"
-                  width={280}
-                  label={t('portions.objectLabel')}
-                  title={t('portions.objectLabel')}
-                  value={activeObjectId ? [activeObjectId] : []}
-                  onUpdate={(value) => {
-                    const next = value[0] ?? null;
-                    setSelectedObjectId(next);
-                    if (next) setObjectId(next);
-                    else clearObjectId();
-                  }}
-                  options={objectsList.map((unit) => ({
-                    value: unit.id,
-                    content: unit.name,
-                  }))}
-                />
+                {multipleObjectsEnabled && (
+                  <Select
+                    size="m"
+                    width={280}
+                    label={t('portions.objectLabel')}
+                    title={t('portions.objectLabel')}
+                    value={activeObjectId ? [activeObjectId] : []}
+                    onUpdate={(value) => {
+                      const next = value[0] ?? null;
+                      setSelectedObjectId(next);
+                      if (next) setObjectId(next);
+                      else clearObjectId();
+                    }}
+                    options={objectsList.map((unit) => ({
+                      value: unit.id,
+                      content: unit.name,
+                    }))}
+                  />
+                )}
               </>
             )}
             <Button

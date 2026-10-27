@@ -6,6 +6,7 @@ import {
   Icon,
   Label,
   Select,
+  Switch,
   Table,
   Text,
   TextInput,
@@ -21,8 +22,9 @@ import {
   useOrganizationRoles,
   useRemoveMember,
   useRevokeInvitation,
+  useUpdateOrganizationFeatures,
 } from './api';
-import type { Invitation, InvitationStatus, Organization } from './types';
+import type { Invitation, InvitationStatus, Organization, OrganizationFeatures } from './types';
 import { formatDate } from './management-route';
 import { errorText } from '@/shared/api/error-text';
 
@@ -41,9 +43,11 @@ const STATUS_LABEL: Record<
 export function OrganizationDetails({
   organization,
   onClose,
+  onOrganizationUpdated,
 }: {
   organization: Organization;
   onClose: () => void;
+  onOrganizationUpdated: (organization: Organization) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -67,11 +71,81 @@ export function OrganizationDetails({
 
       <div style={{ padding: 16 }}>
         <Flex direction="column" gap={5}>
+          <FeatureAccessSection
+            organization={organization}
+            onOrganizationUpdated={onOrganizationUpdated}
+          />
           <MembersSection organizationId={organization.id} />
           <InvitationsSection organizationId={organization.id} />
         </Flex>
       </div>
     </Card>
+  );
+}
+
+function FeatureAccessSection({
+  organization,
+  onOrganizationUpdated,
+}: {
+  organization: Organization;
+  onOrganizationUpdated: (organization: Organization) => void;
+}) {
+  const { t } = useTranslation();
+  const updateFeatures = useUpdateOrganizationFeatures(organization.id);
+  const toaster = useToaster();
+  const features: OrganizationFeatures = organization.features ?? {
+    warehouseEnabled: true,
+    financeEnabled: true,
+    objectsEnabled: false,
+  };
+
+  const onFeatureUpdate = (feature: keyof OrganizationFeatures, enabled: boolean) => {
+    updateFeatures.mutate(
+      { ...features, [feature]: enabled },
+      {
+        onSuccess: ({ organization: updatedOrganization }, updatedFeatures) =>
+          onOrganizationUpdated({
+            ...updatedOrganization,
+            features: { ...updatedOrganization.features, ...updatedFeatures },
+          }),
+        onError: (error) =>
+          toaster.add({
+            name: 'organization-features',
+            title: t('common.error'),
+            content: errorText(error),
+            theme: 'danger',
+          }),
+      }
+    );
+  };
+
+  return (
+    <Flex direction="column" gap={2}>
+      <Text variant="subheader-1">{t('org.featureAccessTitle')}</Text>
+      <Flex gap={4} wrap>
+        <Switch
+          checked={features.warehouseEnabled}
+          disabled={updateFeatures.isPending}
+          onUpdate={(enabled) => onFeatureUpdate('warehouseEnabled', enabled)}
+        >
+          {t('org.warehouseAccess')}
+        </Switch>
+        <Switch
+          checked={features.financeEnabled}
+          disabled={updateFeatures.isPending}
+          onUpdate={(enabled) => onFeatureUpdate('financeEnabled', enabled)}
+        >
+          {t('org.financeAccess')}
+        </Switch>
+        <Switch
+          checked={features.objectsEnabled}
+          disabled={updateFeatures.isPending}
+          onUpdate={(enabled) => onFeatureUpdate('objectsEnabled', enabled)}
+        >
+          {t('org.objectsAccess')}
+        </Switch>
+      </Flex>
+    </Flex>
   );
 }
 
