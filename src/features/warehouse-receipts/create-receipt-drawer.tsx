@@ -36,35 +36,12 @@ import {
 import { useTranslation } from '@/shared/i18n';
 import './create-receipt-drawer.css';
 import { errorText } from '@/shared/api/error-text';
-
-/**
- * Значения селектов приёмочного контроля. Бэкенд хранит их как текст и
- * списки не проверяет, поэтому список живёт только здесь.
- */
-const DOCUMENT_TYPE_OPTIONS = [
-  'Декларация о соответствии',
-  'Ветеринарное свидетельство',
-  'Сертификат соответствия',
-  'Свидетельство о госрегистрации',
-  'Сертификат качества',
-  'Фитосанитарный сертификат',
-  'Товарная накладная',
-  'УПД',
-];
-
-const STORAGE_CONDITIONS_OPTIONS = [
-  'Сухое проветриваемое помещение',
-  'Тёмное прохладное место',
-  'Холодильная камера 0…+4 °C',
-  'Холодильная камера до +6 °C',
-  'Морозильная камера -18 °C',
-  'Комнатная температура',
-  'Не требует особых условий',
-];
-
-const ORGANOLEPTIC_OPTIONS = ['Соответствует', 'Не соответствует', 'Соответствует с замечаниями'];
-
-const selectOptions = (values: string[]) => values.map((value) => ({ value, content: value }));
+import {
+  DOCUMENT_TYPE_OPTIONS,
+  ORGANOLEPTIC_OPTIONS,
+  receiptSelectOptions,
+  STORAGE_CONDITIONS_OPTIONS,
+} from './receipt-options';
 
 /** Компактное текстовое поле строки товара. */
 function ItemInput({
@@ -585,7 +562,7 @@ export function CreateReceiptDrawer({
                             label={t('receipt.documentTypeLabel')}
                             placeholder={t('receipt.documentTypePlaceholder')}
                             value={row.documentType}
-                            options={selectOptions(DOCUMENT_TYPE_OPTIONS)}
+                            options={receiptSelectOptions(DOCUMENT_TYPE_OPTIONS, t)}
                             onUpdate={(v) => updateItem(index, { documentType: v })}
                           />
                           <ItemInput
@@ -604,14 +581,14 @@ export function CreateReceiptDrawer({
                             label={t('receipt.organolepticLabel')}
                             placeholder={t('receipt.organolepticPlaceholder')}
                             value={row.organoleptic}
-                            options={selectOptions(ORGANOLEPTIC_OPTIONS)}
+                            options={receiptSelectOptions(ORGANOLEPTIC_OPTIONS, t)}
                             onUpdate={(v) => updateItem(index, { organoleptic: v })}
                           />
                           <ItemSelect
                             label={t('receipt.storageConditionsLabel')}
                             placeholder={t('receipt.storageConditionsPlaceholder')}
                             value={row.storageConditions}
-                            options={selectOptions(STORAGE_CONDITIONS_OPTIONS)}
+                            options={receiptSelectOptions(STORAGE_CONDITIONS_OPTIONS, t)}
                             onUpdate={(v) => updateItem(index, { storageConditions: v })}
                           />
                         </Flex>

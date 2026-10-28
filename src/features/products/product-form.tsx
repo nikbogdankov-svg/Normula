@@ -10,7 +10,31 @@ type Draft = {
 
 const emptyDraft: Draft = { name: '', unit: '' };
 
-const UNIT_OPTIONS = ['кг', 'г', 'л', 'мл', 'шт', 'уп', 'кор', 'ящ'];
+const UNIT_OPTIONS = [
+  { value: 'kg', labelKey: 'products.units.kilogram' },
+  { value: 'g', labelKey: 'products.units.gram' },
+  { value: 'l', labelKey: 'products.units.litre' },
+  { value: 'ml', labelKey: 'products.units.millilitre' },
+  { value: 'pcs', labelKey: 'products.units.piece' },
+  { value: 'pack', labelKey: 'products.units.package' },
+  { value: 'box', labelKey: 'products.units.box' },
+  { value: 'crate', labelKey: 'products.units.crate' },
+];
+
+const LEGACY_UNIT_VALUES: Record<string, string> = {
+  кг: 'kg',
+  г: 'g',
+  л: 'l',
+  мл: 'ml',
+  шт: 'pcs',
+  уп: 'pack',
+  кор: 'box',
+  ящ: 'crate',
+};
+
+function normalizeUnit(unit: string): string {
+  return LEGACY_UNIT_VALUES[unit] ?? unit;
+}
 
 /** Состояние и разметка минимальной формы создания продукта (имя + единица). */
 export function useProductForm(initial?: Product | null, resetKey?: string) {
@@ -19,7 +43,7 @@ export function useProductForm(initial?: Product | null, resetKey?: string) {
 
   useEffect(() => {
     if (initial) {
-      setDraft({ name: initial.name, unit: initial.unit });
+      setDraft({ name: initial.name, unit: normalizeUnit(initial.unit) });
       return;
     }
     setDraft(emptyDraft);
@@ -30,18 +54,20 @@ export function useProductForm(initial?: Product | null, resetKey?: string) {
     setDraft((current) => ({ ...current, [field]: value }));
 
   /** Единица сохраняется как есть: если её нет в списке, добавляем вручную. */
-  const unitOptions: SelectOption[] = draft.unit
-    ? [...UNIT_OPTIONS, draft.unit]
-        .filter((unit, index, all) => all.indexOf(unit) === index)
-        .map((unit): SelectOption => ({ value: unit, content: unit }))
-    : UNIT_OPTIONS.map((unit): SelectOption => ({ value: unit, content: unit }));
+  const unitOptions: SelectOption[] = UNIT_OPTIONS.map(({ value, labelKey }) => ({
+    value,
+    content: t(labelKey),
+  }));
+  if (draft.unit && !UNIT_OPTIONS.some(({ value }) => value === draft.unit)) {
+    unitOptions.push({ value: draft.unit, content: draft.unit });
+  }
 
   /** Предзаполнить название (например, тем, что пользователь ввёл и не нашёл). */
   const setInitialName = (value: string) => setDraft((current) => ({ ...current, name: value }));
 
   const getBody = (): CreateProductRequest => ({
     name: draft.name.trim(),
-    unit: draft.unit.trim() || 'шт',
+    unit: draft.unit.trim() || 'pcs',
   });
 
   const fields = (

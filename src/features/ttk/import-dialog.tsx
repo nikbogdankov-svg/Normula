@@ -129,7 +129,7 @@ export function ImportCollectionsDialog({ open, onClose }: { open: boolean; onCl
       const { extractCollectionFromFile } = await import('./extract-collection');
       const extracted: ExtractedCollection[] = [];
       for (const [index, item] of files.entries()) {
-        const collection = await extractCollectionFromFile(item.file, index);
+        const collection = await extractCollectionFromFile(item.file, index, t);
         extracted.push({
           ...collection,
           // Если пользователь переименовал файл в списке — это станет именем сборника.

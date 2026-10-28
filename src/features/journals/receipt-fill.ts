@@ -1,5 +1,6 @@
 import { formatDate, formatQuantity } from '@/features/warehouse/format';
 import type { Receipt, ReceiptItem } from '@/features/warehouse/types';
+import { receiptOptionLabel } from '@/features/warehouse-receipts/receipt-options';
 
 /** Значение ячейки журнала приёмки: суффикс поля (journals.field.*) → текст. */
 export type ReceiptRowValues = Record<string, string>;
@@ -9,9 +10,15 @@ export type ReceiptRowValues = Record<string, string>;
  * знает о партии, журнал получает готовым; дата фактической реализации и
  * подпись ответственного остаются под руку и печатаются пустыми.
  */
-export function receiptRowValues(receipt: Receipt, item: ReceiptItem): ReceiptRowValues {
-  const expiry = item.expiryDate ? `до ${formatDate(item.expiryDate)}` : '';
-  const storage = [item.storageConditions, expiry].filter(Boolean).join('; ');
+export function receiptRowValues(
+  receipt: Receipt,
+  item: ReceiptItem,
+  t: (key: string) => string
+): ReceiptRowValues {
+  const expiry = item.expiryDate ? `${t('receipt.until')} ${formatDate(item.expiryDate)}` : '';
+  const storage = [receiptOptionLabel(item.storageConditions, t), expiry]
+    .filter(Boolean)
+    .join('; ');
 
   return {
     arrivalDateTime: formatDate(receipt.date),
@@ -21,8 +28,8 @@ export function receiptRowValues(receipt: Receipt, item: ReceiptItem): ReceiptRo
     manufacturer: item.manufacturer,
     supplier: item.supplier,
     arrivalQuantity: formatQuantity(item.quantity, item.unit),
-    safetyDocument: item.documentNumber || item.documentType,
-    organoleptic: item.organoleptic,
+    safetyDocument: item.documentNumber || receiptOptionLabel(item.documentType, t),
+    organoleptic: receiptOptionLabel(item.organoleptic, t),
     storageConditions: storage,
     note: item.note,
   };
