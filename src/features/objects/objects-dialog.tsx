@@ -299,10 +299,10 @@ function SubObjectBlock({
             width={240}
             value={[subObject.type]}
             options={[
-              { value: 'school', content: 'Школа' },
-              { value: 'kindergarten', content: 'Детский сад' },
-              { value: 'hospital', content: 'Больница' },
-              { value: 'warehouse', content: 'Склад' },
+              { value: 'school', content: t('facility.school') },
+              { value: 'kindergarten', content: t('facility.kindergarten') },
+              { value: 'hospital', content: t('facility.hospital') },
+              { value: 'warehouse', content: t('facility.warehouse') },
             ]}
             onUpdate={(newValue) => {
               const nextType = newValue[0] as FacilityType;

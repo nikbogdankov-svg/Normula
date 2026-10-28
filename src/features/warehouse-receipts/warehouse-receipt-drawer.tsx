@@ -8,6 +8,7 @@ import { formatDate, formatMoney, formatQuantity } from '@/features/warehouse/fo
 import { objectName, type ObjectOption } from '@/features/warehouse/object-select';
 import type { Receipt, ReceiptItem } from '@/features/warehouse/types';
 import { useTranslation } from '@/shared/i18n';
+import { receiptOptionLabel } from './receipt-options';
 import './warehouse-receipt-drawer.css';
 
 function Cell({
@@ -33,9 +34,9 @@ function ItemDetails({ item }: { item: ReceiptItem }) {
     [t('receipt.detailManufacturer'), item.manufacturer],
     [t('receipt.detailPackaging'), item.packaging],
     [t('receipt.detailProductionDate'), formatDate(item.productionDate)],
-    [t('receipt.detailDocumentType'), item.documentType],
-    [t('receipt.detailOrganoleptic'), item.organoleptic],
-    [t('receipt.detailStorageConditions'), item.storageConditions],
+    [t('receipt.detailDocumentType'), receiptOptionLabel(item.documentType, t)],
+    [t('receipt.detailOrganoleptic'), receiptOptionLabel(item.organoleptic, t)],
+    [t('receipt.detailStorageConditions'), receiptOptionLabel(item.storageConditions, t)],
     [t('receipt.detailUnitPrice'), formatMoney(item.unitPrice)],
     [t('receipt.detailTotal'), formatMoney(item.total)],
     [t('receipt.detailNote'), item.note],

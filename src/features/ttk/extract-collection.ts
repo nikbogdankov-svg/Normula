@@ -1,6 +1,7 @@
 import mammoth from 'mammoth';
 import * as pdfjs from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import type { TFunction } from 'i18next';
 import type { CreateRecipeIngredient } from './types';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -33,9 +34,10 @@ export function isExtractableFile(file: File): boolean {
  */
 export async function extractCollectionFromFile(
   file: File,
-  index: number
+  index: number,
+  t: TFunction
 ): Promise<ExtractedCollection> {
-  const document = await readDocument(file);
+  const document = await readDocument(file, t);
   const dishes = parseDocument(document, `${index}-${file.name}`);
 
   return {
@@ -53,7 +55,7 @@ interface ParsedDocument {
   html: string;
 }
 
-async function readDocument(file: File): Promise<ParsedDocument> {
+async function readDocument(file: File, t: TFunction): Promise<ParsedDocument> {
   const lower = file.name.toLowerCase();
   const buffer = await file.arrayBuffer();
 
@@ -80,14 +82,12 @@ async function readDocument(file: File): Promise<ParsedDocument> {
   if (lower.endsWith('.doc')) {
     const text = extractLegacyDocText(buffer);
     if (!text.trim()) {
-      throw new Error(
-        `Не удалось прочитать «${file.name}». Сохраните файл как .docx или .pdf и повторите.`
-      );
+      throw new Error(t('ttk.importFileReadFailed', { fileName: file.name }));
     }
     return { text, html: '' };
   }
 
-  throw new Error(`Формат файла «${file.name}» не поддерживается`);
+  throw new Error(t('ttk.importFileUnsupported', { fileName: file.name }));
 }
 
 async function extractPdfText(data: ArrayBuffer): Promise<string> {

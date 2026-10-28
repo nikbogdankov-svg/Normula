@@ -261,7 +261,7 @@ function JournalsCatalog() {
 
     const rows = receipts.flatMap((receipt) =>
       receipt.items.map((item) => {
-        const values = receiptRowValues(receipt, item);
+        const values = receiptRowValues(receipt, item, t);
         return columns.map((column) => values[fieldOf(column.key)] ?? '');
       })
     );
