@@ -1,0 +1,65 @@
+{
+  "rootId": "c1",
+  "nodes": [
+    {
+      "id": "c1",
+      "parentId": null,
+      "order": 0,
+      "kind": "frame",
+      "name": "Flex",
+      "className": "g-flex flex flex-col gap-[16px] items-center justify-center [min-height:100vh]",
+      "text": null,
+      "attrs": [],
+      "figmaId": null
+    },
+    {
+      "id": "c2",
+      "parentId": "c1",
+      "order": 0,
+      "kind": "text",
+      "name": "Text: 404",
+      "className": "g-text g-text_variant_display-1 text-style-display-1",
+      "text": "Táto stránka neexistuje",
+      "attrs": [],
+      "figmaId": null
+    },
+    {
+      "id": "c3",
+      "parentId": "c1",
+      "order": 1,
+      "kind": "frame",
+      "name": "Frame",
+      "className": "",
+      "text": null,
+      "attrs": [
+        {
+          "name": "to",
+          "value": "/app"
+        }
+      ],
+      "figmaId": null
+    },
+    {
+      "id": "c4",
+      "parentId": "c3",
+      "order": 0,
+      "kind": "component",
+      "name": "Button",
+      "className": "",
+      "text": null,
+      "attrs": [],
+      "figmaId": null,
+      "componentRef": {
+        "workspaceId": "ws_66e6d592f8e8",
+        "importPath": "@gravity-ui/uikit",
+        "exportName": "Button",
+        "localName": "Button",
+        "package": true,
+        "props": {
+          "children": "Na hlavní"
+        },
+        "variant": "viewActionSizeLIconNone"
+      }
+    }
+  ]
+}
