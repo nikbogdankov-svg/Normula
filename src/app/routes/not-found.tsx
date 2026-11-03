@@ -12,9 +12,9 @@ export function NotFoundRoute() {
       gap={4}
       style={{ minHeight: '100vh' }}
     >
-      <Text variant="display-1">404</Text>
+      <Text variant="display-1">Táto stránka neexistuje</Text>
       <Link to="/app">
-        <Button view="action">{t('notFound.goHome')}</Button>
+        <Button view="action" size="l">{t('notFound.goHome')}</Button>
       </Link>
     </Flex>
   );
