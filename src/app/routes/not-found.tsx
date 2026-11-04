@@ -14,7 +14,9 @@ export function NotFoundRoute() {
     >
       <Text variant="display-1">Táto stránka neexistuje</Text>
       <Link to="/app">
-        <Button view="action" size="l">{t('notFound.goHome')}</Button>
+        <Button view="action" size="l">
+          {t('notFound.goHome')}
+        </Button>
       </Link>
     </Flex>
   );
